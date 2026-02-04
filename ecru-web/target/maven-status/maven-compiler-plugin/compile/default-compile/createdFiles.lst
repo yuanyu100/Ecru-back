@@ -1,0 +1,8 @@
+com\ecru\web\config\WebConfig.class
+com\ecru\web\config\DataSourceConfig.class
+com\ecru\web\config\SecurityConfig.class
+com\ecru\web\EcruApplication.class
+com\ecru\web\config\MyBatisPlusConfig.class
+com\ecru\web\config\MyBatisPlusConfig$1.class
+com\ecru\web\config\Knife4jConfig.class
+com\ecru\web\interceptor\JwtInterceptor.class
