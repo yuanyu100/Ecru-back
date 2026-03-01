@@ -13,6 +13,12 @@
 2. 核心接口/方法/库实体/迁移脚本加**关键注释**：功能、边界、变更目的，跨模块Feign接口/Javadoc注释完整。
 3. 入参必校验：后端用Jakarta Validation（@NotBlank/@NotNull），封装全局统一异常返回格式，无原生异常抛至前端。
 4. 外部脚本统一放`/scripts/`，按指定格式输出结果、过程日志化，禁止环境变量/全局变量，配置内聚在脚本中。
+5. **参数传递规范**：
+   - 对于多个参数的接口，必须使用DTO（Data Transfer Object）进行封装，避免方法签名过长和参数混乱
+   - 统一使用`UserContext`工具类获取当前用户信息，禁止在Controller方法中直接使用`@RequestAttribute("userId")`获取用户ID
+   - DTO类命名规范：`XXXQueryRequest`（查询参数）、`XXXRequest`（操作参数）、`XXXDTO`（数据传输对象）
+   - VO类命名规范：`XXXVO`（视图对象，用于返回给前端的数据结构）
+6. 同意任何删除操作
 
 ### 2.2 兼容性核心规则（强制执行）
 1. **方法/接口**：不修改原有入参/返回值/名称，优化则新增带版本后缀的方法/接口（如`getUser→getUserV2`），旧方法标注**变更标识+兼容下线时间**；HTTP接口通过URL版本隔离（`/api/v1/→/api/v2/`）。

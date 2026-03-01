@@ -23,6 +23,8 @@
     <modules>
         <module>ecru-common</module>
         <module>ecru-user</module>
+        <module>ecru-clothing</module>
+        <module>ecru-outfit</module>
         <module>ecru-web</module>
     </modules>
 
@@ -53,6 +55,16 @@
                 <artifactId>ecru-user</artifactId>
                 <version>${project.version}</version>
             </dependency>
+            <dependency>
+                <groupId>com.ecru</groupId>
+                <artifactId>ecru-clothing</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.ecru</groupId>
+                <artifactId>ecru-outfit</artifactId>
+                <version>${project.version}</version>
+            </dependency>
 
             <!-- MyBatis Plus -->
             <dependency>
@@ -72,7 +84,7 @@
             <dependency>
                 <groupId>dev.langchain4j</groupId>
                 <artifactId>langchain4j-spring-boot-starter</artifactId>
-                <version>${langchain4j.version}</version>
+<!--                <version>${langchain4j.version}</version>-->
             </dependency>
 
             <!-- JSON处理 -->
@@ -87,6 +99,25 @@
                 <groupId>org.mapstruct</groupId>
                 <artifactId>mapstruct</artifactId>
                 <version>${mapstruct.version}</version>
+            </dependency>
+
+            <!-- PageHelper -->
+            <dependency>
+                <groupId>com.github.pagehelper</groupId>
+                <artifactId>pagehelper-spring-boot-starter</artifactId>
+                <version>1.4.7</version>
+            </dependency>
+            <!-- JSqlParser -->
+            <dependency>
+                <groupId>com.github.jsqlparser</groupId>
+                <artifactId>jsqlparser</artifactId>
+                <version>4.7</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>1.18.30</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

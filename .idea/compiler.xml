@@ -6,7 +6,7 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
-        <module name="ecru-common" />
+        <module name="ecru-outfit" />
         <module name="ecru-web" />
       </profile>
       <profile name="Annotation profile for Ecru AI Wardrobe Parent" enabled="true">
@@ -18,14 +18,21 @@
           <entry name="$PROJECT_DIR$/../../../../../Tools/Maven/apache-maven-3.6.1-bin/apache-maven-3.6.1/mvn_repo/org/mapstruct/mapstruct-processor/1.5.5.Final/mapstruct-processor-1.5.5.Final.jar" />
           <entry name="$PROJECT_DIR$/../../../../../Tools/Maven/apache-maven-3.6.1-bin/apache-maven-3.6.1/mvn_repo/org/mapstruct/mapstruct/1.5.5.Final/mapstruct-1.5.5.Final.jar" />
         </processorPath>
+        <module name="ecru-common" />
         <module name="ecru-user" />
+        <module name="ecru-clothing" />
       </profile>
     </annotationProcessing>
-    <bytecodeTargetLevel target="11" />
+    <bytecodeTargetLevel target="11">
+      <module name="ecru-api" target="17" />
+    </bytecodeTargetLevel>
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="ecru-api" options="-parameters" />
+      <module name="ecru-clothing" options="-parameters" />
       <module name="ecru-common" options="-parameters" />
+      <module name="ecru-outfit" options="-parameters" />
       <module name="ecru-user" options="-parameters" />
       <module name="ecru-web" options="-parameters" />
     </option>

@@ -27,6 +27,14 @@
             <groupId>com.ecru</groupId>
             <artifactId>ecru-user</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.ecru</groupId>
+            <artifactId>ecru-clothing</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.ecru</groupId>
+            <artifactId>ecru-outfit</artifactId>
+        </dependency>
 
         <!-- Spring Boot -->
         <dependency>
@@ -78,6 +86,20 @@
             <groupId>com.github.xiaoymin</groupId>
             <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
             <version>4.4.0</version>
+        </dependency>
+
+        <!-- PageHelper -->
+        <dependency>
+            <groupId>com.github.pagehelper</groupId>
+            <artifactId>pagehelper-spring-boot-starter</artifactId>
+            <version>1.4.1</version>
+        </dependency>
+
+        <!-- JSqlParser -->
+        <dependency>
+            <groupId>com.github.jsqlparser</groupId>
+            <artifactId>jsqlparser</artifactId>
+            <version>4.7</version>
         </dependency>
     </dependencies>
 

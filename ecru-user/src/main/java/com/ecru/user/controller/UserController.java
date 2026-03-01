@@ -3,6 +3,7 @@ package com.ecru.user.controller;
 import com.ecru.common.exception.BusinessException;
 import com.ecru.common.result.ErrorCode;
 import com.ecru.common.result.Result;
+import com.ecru.common.util.UserContext;
 import com.ecru.user.dto.UpdatePasswordDTO;
 import com.ecru.user.dto.UpdateUserDTO;
 import com.ecru.user.service.UserService;
@@ -28,9 +29,8 @@ public class UserController {
 
     @Operation(summary = "获取当前登录用户信息", description = "获取当前登录用户的详细信息")
     @GetMapping("/me")
-    public Result<UserVO> getCurrentUser(
-            @Parameter(description = "用户ID", required = true, example = "1")
-            @RequestAttribute(value = "userId", required = false) Long userId) {
+    public Result<UserVO> getCurrentUser() {
+        Long userId = UserContext.getCurrentUserId();
         if (userId == null) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }
@@ -50,8 +50,8 @@ public class UserController {
     @Operation(summary = "更新用户信息", description = "更新当前登录用户的基本信息")
     @PutMapping("/me")
     public Result<UserVO> updateUser(
-            @RequestAttribute(value = "userId", required = false) Long userId,
             @Valid @RequestBody UpdateUserDTO request) {
+        Long userId = UserContext.getCurrentUserId();
         if (userId == null) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }
@@ -62,8 +62,8 @@ public class UserController {
     @Operation(summary = "修改密码", description = "修改当前登录用户的密码")
     @PutMapping("/me/password")
     public Result<String> updatePassword(
-            @RequestAttribute(value = "userId", required = false) Long userId,
             @Valid @RequestBody UpdatePasswordDTO request) {
+        Long userId = UserContext.getCurrentUserId();
         if (userId == null) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }
@@ -74,9 +74,9 @@ public class UserController {
     @Operation(summary = "更新头像", description = "更新当前登录用户的头像")
     @PutMapping("/me/avatar")
     public Result<UserVO> updateAvatar(
-            @RequestAttribute(value = "userId", required = false) Long userId,
             @Parameter(description = "头像URL", required = true)
             @RequestParam String avatarUrl) {
+        Long userId = UserContext.getCurrentUserId();
         if (userId == null) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }
@@ -86,8 +86,8 @@ public class UserController {
 
     @Operation(summary = "获取用户设置", description = "获取当前登录用户的偏好设置")
     @GetMapping("/settings")
-    public Result<Map<String, String>> getUserSettings(
-            @RequestAttribute(value = "userId", required = false) Long userId) {
+    public Result<Map<String, String>> getUserSettings() {
+        Long userId = UserContext.getCurrentUserId();
         if (userId == null) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }
@@ -98,8 +98,8 @@ public class UserController {
     @Operation(summary = "更新用户设置", description = "更新当前登录用户的偏好设置")
     @PutMapping("/settings")
     public Result<Map<String, String>> updateUserSettings(
-            @RequestAttribute(value = "userId", required = false) Long userId,
             @RequestBody Map<String, String> settings) {
+        Long userId = UserContext.getCurrentUserId();
         if (userId == null) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }

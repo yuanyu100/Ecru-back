@@ -4,10 +4,14 @@ import com.baomidou.mybatisplus.annotation.DbType;
 import com.baomidou.mybatisplus.core.handlers.MetaObjectHandler;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
+import com.baomidou.mybatisplus.extension.spring.MybatisSqlSessionFactoryBean;
 import org.apache.ibatis.reflection.MetaObject;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.Resource;
 
+import javax.sql.DataSource;
+import java.io.IOException;
 import java.time.LocalDateTime;
 
 @Configuration
@@ -34,5 +38,16 @@ public class MyBatisPlusConfig {
                 this.strictUpdateFill(metaObject, "updatedAt", LocalDateTime.class, LocalDateTime.now());
             }
         };
+    }
+
+    @Bean
+    public MybatisSqlSessionFactoryBean sqlSessionFactory(DataSource dataSource) throws IOException {
+        MybatisSqlSessionFactoryBean factoryBean = new MybatisSqlSessionFactoryBean();
+        factoryBean.setDataSource(dataSource);
+        
+        // 禁用XML文件扫描，只使用注解配置
+        factoryBean.setMapperLocations(new Resource[0]);
+        
+        return factoryBean;
     }
 }

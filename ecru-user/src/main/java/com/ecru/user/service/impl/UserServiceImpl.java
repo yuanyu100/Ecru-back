@@ -10,7 +10,7 @@ import com.ecru.user.dto.UpdatePasswordDTO;
 import com.ecru.user.dto.UpdateUserDTO;
 import com.ecru.user.entity.User;
 import com.ecru.user.mapper.UserMapper;
-import com.ecru.user.service.UserLoginLogService;
+
 import com.ecru.user.service.UserService;
 import com.ecru.user.vo.LoginVO;
 import com.ecru.user.vo.UserVO;
@@ -34,7 +34,6 @@ public class UserServiceImpl implements UserService {
     private final UserMapper userMapper;
     private final JwtUtil jwtUtil;
     private final PasswordEncoder passwordEncoder;
-    private final UserLoginLogService userLoginLogService;
 
     @Override
     @Transactional
@@ -63,27 +62,30 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public LoginVO login(LoginDTO request) {
+        log.info("Login request received: {}", request);
         User user = userMapper.selectByUsername(request.getUsername());
+        log.info("User found: {}", user);
         
         // 获取请求IP和设备信息
         String loginIp = getClientIp();
         String loginDevice = getDeviceInfo();
+        log.info("Login IP: {}, Device: {}", loginIp, loginDevice);
         
         if (user == null) {
             // 记录登录失败日志
-            userLoginLogService.recordLoginLog(null, 1, loginIp, loginDevice, 0, "用户名不存在");
+            // userLoginLogService.recordLoginLog(0L, 1, loginIp, loginDevice, 0, "用户名不存在");
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
         }
 
         if (user.getStatus() == 0) {
             // 记录登录失败日志
-            userLoginLogService.recordLoginLog(user.getId(), 1, loginIp, loginDevice, 0, "用户已被禁用");
+            // userLoginLogService.recordLoginLog(user.getId(), 1, loginIp, loginDevice, 0, "用户已被禁用");
             throw new BusinessException(ErrorCode.USER_DISABLED);
         }
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             // 记录登录失败日志
-            userLoginLogService.recordLoginLog(user.getId(), 1, loginIp, loginDevice, 0, "密码错误");
+            // userLoginLogService.recordLoginLog(user.getId(), 1, loginIp, loginDevice, 0, "密码错误");
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
         }
 
@@ -97,7 +99,7 @@ public class UserServiceImpl implements UserService {
         String refreshToken = jwtUtil.generateRefreshToken(user.getId(), user.getUsername());
 
         // 记录登录成功日志
-        userLoginLogService.recordLoginLog(user.getId(), 1, loginIp, loginDevice, 1, null);
+        // userLoginLogService.recordLoginLog(user.getId(), 1, loginIp, loginDevice, 1, null);
 
         log.info("用户登录成功: {}", request.getUsername());
 

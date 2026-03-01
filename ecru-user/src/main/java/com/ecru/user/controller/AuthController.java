@@ -2,6 +2,7 @@ package com.ecru.user.controller;
 
 import com.ecru.common.result.Result;
 import com.ecru.common.util.JwtUtil;
+import com.ecru.common.util.UserContext;
 import com.ecru.user.converter.UserConverter;
 import com.ecru.user.dto.LoginDTO;
 import com.ecru.user.dto.RefreshTokenDTO;
@@ -58,7 +59,8 @@ public class AuthController {
 
     @Operation(summary = "用户登出", description = "用户登出，使当前Token失效")
     @PostMapping("/logout")
-    public Result<Void> logout(@RequestAttribute(value = "token", required = false) String token) {
+    public Result<Void> logout() {
+        String token = UserContext.getCurrentToken();
         if (token != null) {
             jwtUtil.blacklistToken(token);
         }

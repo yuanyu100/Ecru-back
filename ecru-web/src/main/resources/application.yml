@@ -9,7 +9,7 @@ spring:
 
   # MySQL 数据源（主数据源）
   datasource:
-    url: jdbc:mysql://localhost:3306/ecru?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false
+    jdbc-url: jdbc:mysql://localhost:3306/ecru?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     username: root
     password: 040726fan
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -22,7 +22,7 @@ spring:
 
   # PostgreSQL 数据源（向量存储）
   datasource-pg:
-    url: jdbc:postgresql://localhost:5432/ecru-pg
+    jdbc-url: jdbc:postgresql://localhost:5432/ecru-pg
     username: postgres
     password: 040726fan
     driver-class-name: org.postgresql.Driver
@@ -69,12 +69,12 @@ mybatis-plus:
       logic-delete-field: isDeleted
       logic-delete-value: 1
       logic-not-delete-value: 0
-  mapper-locations: classpath*:/mapper/**/*.xml,classpath*:/com/ecru/**/mapper/xml/*.xml
+  mapper-locations: classpath*:nonexistent/**/*.xml
 
 # JWT配置
 jwt:
   secret: ecru-secret-key-2026-for-jwt-token-generation
-  access-token-expire: 7200
+  access-token-expire: 720000
   refresh-token-expire: 604800
 
 # 日志配置
@@ -83,3 +83,50 @@ logging:
     com.ecru: debug
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# AI配置
+ai:
+  # Qwen3-VL 配置
+  qwen:
+    api-key: ${AI_API_KEY:your-api-key}
+    base-url: https://ark-cn-beijing.bytedance.net/api/v3
+    model: qwen3-vl-32b-instruct
+    timeout: 300000
+  # LangChain4j 配置
+  langchain4j:
+    embedding:
+      model: BAAI/bge-large-zh-v1.5
+      base-url: https://ark-cn-beijing.bytedance.net/api/v3
+      timeout: 60000
+
+# MCP配置
+mcp:
+  # 天气服务配置
+  weather:
+    api-key: ${MCP_WEATHER_API_KEY:your-api-key}
+    base-url: https://restapi.amap.com/v3
+    timeout: 10000
+
+# RAG配置
+rag:
+  # 向量搜索配置
+  vector:
+    dimension: 1024
+    similarity-threshold: 0.7
+    max-results: 10
+  # 缓存配置
+  cache:
+    enabled: true
+    ttl: 3600
+
+# Agent配置
+agent:
+  # 工作流配置
+  workflow:
+    timeout: 600000
+    max-steps: 50
+  # 提示模板配置
+  prompt:
+    outfit-advice: "你是一位专业的时尚搭配顾问，根据用户提供的信息，生成个性化的搭配建议。请考虑以下因素：\n1. 天气和季节因素\n2. 用户的风格偏好\n3. 场合需求\n4. 现有衣物的搭配可能性\n5. 时尚趋势和专业建议\n\n请提供详细的搭配方案，包括衣物选择、颜色搭配、配饰建议等，并给出专业的时尚分析。"
+    image-analysis: "你是一位专业的时尚分析师，请对提供的穿搭照片进行详细分析，包括：\n1. 颜色搭配分析\n2. 款式风格分析\n3. 场合适用性\n4. 气质匹配度\n5. 改进建议\n\n请提供专业、详细的分析结果。"
+    fabric-analysis: "你是一位专业的面料分析师，请对提供的面料照片进行详细分析，包括：\n1. 面料材质识别\n2. 质量评估\n3. 护理建议\n4. 适用季节\n5. 搭配建议\n\n请提供专业、详细的分析结果。"

@@ -1,5 +1,0 @@
-com\ecru\common\result\ErrorCode.class
-com\ecru\common\exception\GlobalExceptionHandler.class
-com\ecru\common\util\JwtUtil.class
-com\ecru\common\exception\BusinessException.class
-com\ecru\common\result\Result.class

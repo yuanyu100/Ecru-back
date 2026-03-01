@@ -1,14 +1,21 @@
 package com.ecru.web.config;
 
+import com.baomidou.mybatisplus.core.handlers.MetaObjectHandler;
 import com.baomidou.mybatisplus.extension.spring.MybatisSqlSessionFactoryBean;
 import org.apache.ibatis.session.SqlSessionFactory;
+import org.apache.ibatis.reflection.MetaObject;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.jdbc.DataSourceBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 import javax.sql.DataSource;
 
@@ -46,9 +53,11 @@ public class DataSourceConfig {
     public SqlSessionFactory mysqlSqlSessionFactory(@Qualifier("mysqlDataSource") DataSource dataSource) throws Exception {
         MybatisSqlSessionFactoryBean bean = new MybatisSqlSessionFactoryBean();
         bean.setDataSource(dataSource);
-        // 设置Mapper路径
-        bean.setMapperLocations(new PathMatchingResourcePatternResolver()
-                .getResources("classpath*:/mapper/**/*.xml,classpath*:/com/ecru/**/mapper/xml/*.xml"));
+        
+        // 暂时不设置Mapper路径，使用默认配置
+        // bean.setMapperLocations(new PathMatchingResourcePatternResolver()
+        //         .getResources("classpath*:com/ecru/user/mapper/*.xml"));
+        
         return bean.getObject();
     }
 
