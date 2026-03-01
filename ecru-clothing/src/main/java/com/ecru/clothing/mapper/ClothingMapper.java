@@ -11,10 +11,10 @@ import java.util.Map;
 @Mapper
 public interface ClothingMapper extends BaseMapper<Clothing> {
 
-    @Select("SELECT * FROM clothing WHERE id = #{id}")
+    @Select("SELECT * FROM clothings WHERE id = #{id}")
     Clothing selectById(Long id);
 
-    @Select("SELECT * FROM clothing WHERE user_id = #{userId} AND is_deleted = 0")
+    @Select("SELECT * FROM clothings WHERE (user_id = #{userId} OR #{userId} IS NULL) AND is_deleted = 0")
     List<Clothing> selectClothingList(Long userId, String category, String primaryColor, String material, 
                                      String styleTag, String occasionTag, String seasonTag, 
                                      String keyword, String sortBy, String sortOrder, 
@@ -22,23 +22,23 @@ public interface ClothingMapper extends BaseMapper<Clothing> {
 
     @Select("SELECT COUNT(*) as totalClothings, COUNT(DISTINCT wear_log.clothing_id) as totalWorn, " +
             "MAX(wear_log.clothing_id) as mostWornClothingId, MAX(wear_log.wear_count) as mostWornCount " +
-            "FROM clothing " +
+            "FROM clothings " +
             "LEFT JOIN (SELECT clothing_id, COUNT(*) as wear_count FROM clothing_wear_log " +
                       "WHERE user_id = #{userId} GROUP BY clothing_id) as wear_log " +
-            "ON clothing.id = wear_log.clothing_id " +
-            "WHERE clothing.user_id = #{userId} AND clothing.is_deleted = 0")
+            "ON clothings.id = wear_log.clothing_id " +
+            "WHERE clothings.user_id = #{userId} AND clothings.is_deleted = 0")
     Map<String, Object> selectClothingStatistics(Long userId, String period);
 
     @Select("SELECT category, COUNT(*) as count, " +
-            "ROUND((COUNT(*) * 100.0) / (SELECT COUNT(*) FROM clothing WHERE user_id = #{userId} AND is_deleted = 0), 2) as percentage " +
-            "FROM clothing " +
+            "ROUND((COUNT(*) * 100.0) / (SELECT COUNT(*) FROM clothings WHERE user_id = #{userId} AND is_deleted = 0), 2) as percentage " +
+            "FROM clothings " +
             "WHERE user_id = #{userId} AND is_deleted = 0 " +
             "GROUP BY category")
     List<Map<String, Object>> selectClothingCountByCategory(Long userId);
 
     @Select("SELECT primary_color as color, COUNT(*) as count, " +
-            "ROUND((COUNT(*) * 100.0) / (SELECT COUNT(*) FROM clothing WHERE user_id = #{userId} AND is_deleted = 0), 2) as percentage " +
-            "FROM clothing " +
+            "ROUND((COUNT(*) * 100.0) / (SELECT COUNT(*) FROM clothings WHERE user_id = #{userId} AND is_deleted = 0), 2) as percentage " +
+            "FROM clothings " +
             "WHERE user_id = #{userId} AND is_deleted = 0 " +
             "GROUP BY primary_color")
     List<Map<String, Object>> selectClothingCountByColor(Long userId);
@@ -53,7 +53,7 @@ public interface ClothingMapper extends BaseMapper<Clothing> {
             "ELSE '未知' " +
             "END as label, " +
             "COUNT(*) as count " +
-            "FROM clothing " +
+            "FROM clothings " +
             "WHERE user_id = #{userId} AND is_deleted = 0 " +
             "GROUP BY frequency_level")
     List<Map<String, Object>> selectClothingCountByFrequency(Long userId);

@@ -130,3 +130,11 @@ agent:
     outfit-advice: "你是一位专业的时尚搭配顾问，根据用户提供的信息，生成个性化的搭配建议。请考虑以下因素：\n1. 天气和季节因素\n2. 用户的风格偏好\n3. 场合需求\n4. 现有衣物的搭配可能性\n5. 时尚趋势和专业建议\n\n请提供详细的搭配方案，包括衣物选择、颜色搭配、配饰建议等，并给出专业的时尚分析。"
     image-analysis: "你是一位专业的时尚分析师，请对提供的穿搭照片进行详细分析，包括：\n1. 颜色搭配分析\n2. 款式风格分析\n3. 场合适用性\n4. 气质匹配度\n5. 改进建议\n\n请提供专业、详细的分析结果。"
     fabric-analysis: "你是一位专业的面料分析师，请对提供的面料照片进行详细分析，包括：\n1. 面料材质识别\n2. 质量评估\n3. 护理建议\n4. 适用季节\n5. 搭配建议\n\n请提供专业、详细的分析结果。"
+
+# MinIO配置
+minio:
+  endpoint: http://localhost:9000
+  accessKey: minioadmin
+  secretKey: minioadmin
+  bucketName: ecru
+  domain: http://localhost:9000

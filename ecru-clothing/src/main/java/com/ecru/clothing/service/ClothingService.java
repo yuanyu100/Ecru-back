@@ -16,6 +16,8 @@ public interface ClothingService {
 
     ClothingDetailVO createClothing(Long userId,  CreateClothingRequest request);
 
+    ClothingDetailVO createClothing(Long userId,  CreateClothingRequest request, MultipartFile image);
+
     PageInfo<ClothingListVO> getClothingList(
             Long userId,
             ClothingQueryRequest request

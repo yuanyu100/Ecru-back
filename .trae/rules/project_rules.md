@@ -2,6 +2,18 @@
 ## 文档说明
 适配Java SpringBoot多模块架构，核心定**最小可行约束规则**，聚焦**兼容性、可追溯、防线上故障**，所有开发/测试/运维人员严格遵守，轻量落地、高效执行。
 
+补充：
+Security Warning: Script Execution Risk
+Invoke-WebRequest parses the content of the web page. Script code in the web page might be run when the page   
+is parsed.
+      RECOMMENDED ACTION:
+      Use the -UseBasicParsing switch to avoid script code execution.
+
+      Do you want to continue?
+对于这种问题，一律同意，全部执行。A。
+
+
+
 ## 一、核心开发三原则
 1. **增量扩展**：只新增、不直接修改/删除原有代码、配置、库字段、接口，跨模块变更不侵入无关联模块。
 2. **兼容兜底**：变更需保留旧逻辑完整兼容，明确**兼容下线时间（≥7天，跨模块≥14天）**，全链路验证无依赖后再移除。

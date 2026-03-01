@@ -18,7 +18,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/clothings")
+@RequestMapping("/clothings")
 @Tag(name = "衣物管理", description = "衣物相关的RESTful接口")
 public class ClothingController {
 
@@ -26,10 +26,29 @@ public class ClothingController {
     private ClothingService clothingService;
 
     @PostMapping()
-    @Operation(summary = "创建衣物", description = "创建新的衣物记录，支持图片上传和AI识别")
+    @Operation(summary = "创建衣物", description = "创建新的衣物记录，支持图片URL")
     public Result<ClothingDetailVO> createClothing(@RequestBody CreateClothingRequest request) {
         Long userId = UserContext.getCurrentUserId();
         return Result.success(clothingService.createClothing(userId,  request));
+    }
+
+    @PostMapping("/upload")
+    @Operation(summary = "创建衣物（带图片上传）", description = "创建新的衣物记录，支持图片上传")
+    public Result<ClothingDetailVO> createClothingWithImage(
+            @RequestParam("image") MultipartFile image,
+            @RequestParam("name") String name,
+            @RequestParam(value = "category", required = false) String category,
+            @RequestParam(value = "primaryColor", required = false) String primaryColor,
+            @RequestParam(value = "autoRecognize", defaultValue = "false") Boolean autoRecognize) {
+        Long userId = UserContext.getCurrentUserId();
+        
+        CreateClothingRequest request = new CreateClothingRequest();
+        request.setName(name);
+        request.setCategory(category);
+        request.setPrimaryColor(primaryColor);
+        request.setAutoRecognize(autoRecognize);
+        
+        return Result.success(clothingService.createClothing(userId, request, image));
     }
 
     @GetMapping

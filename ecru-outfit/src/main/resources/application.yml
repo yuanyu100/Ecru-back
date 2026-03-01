@@ -1,0 +1,34 @@
+spring:
+  # 数据源配置
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ecru_db
+    username: postgres
+    password: 123456
+    driver-class-name: org.postgresql.Driver
+  # Redis 配置
+  redis:
+    host: localhost
+    port: 6379
+    password:
+    database: 0
+
+# pgvector 配置
+pgvector:
+  dimension: 1024
+  similarity-threshold: 0.7
+  max-results: 10
+  index-type: ivfflat
+  lists: 100
+
+# MinIO 配置
+minio:
+  endpoint: http://localhost:9000
+  access-key: minioadmin
+  secret-key: minioadmin
+  bucket-name: ecru-wardrobe
+  domain: http://localhost:9000/ecru-wardrobe
+
+# 日志配置
+logging:
+  level:
+    com.ecru.outfit.service.rag: info

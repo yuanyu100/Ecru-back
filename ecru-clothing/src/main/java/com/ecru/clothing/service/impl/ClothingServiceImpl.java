@@ -23,6 +23,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import com.ecru.common.service.storage.ImageStorageService;
 
 import java.io.File;
 import java.io.IOException;
@@ -49,22 +50,30 @@ public class ClothingServiceImpl implements ClothingService {
     @Autowired
     private ClothingConverter clothingConverter;
 
+    @Autowired
+    private ImageStorageService imageStorageService;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
     public ClothingDetailVO createClothing(Long userId,  CreateClothingRequest request) {
+        return createClothing(userId, request, null);
+    }
+
+    @Override
+    public ClothingDetailVO createClothing(Long userId,  CreateClothingRequest request, MultipartFile image) {
         Clothing clothing = new Clothing();
         clothing.setUserId(userId);
         
         // 处理图片上传
-//        if (image != null && !image.isEmpty()) {
-//            String imageUrl = saveImage(image);
-//            clothing.setImageUrl(imageUrl);
-//        } else if (request != null && StringUtils.isNotBlank(request.getImageUrl())) {
-//            clothing.setImageUrl(request.getImageUrl());
-//        } else {
-//            throw new BusinessException("请上传衣物图片或提供图片URL");
-//        }
+        if (image != null && !image.isEmpty()) {
+            String imageUrl = imageStorageService.uploadImage(image, userId);
+            clothing.setImageUrl(imageUrl);
+        } else if (request != null && StringUtils.isNotBlank(request.getImageUrl())) {
+            clothing.setImageUrl(request.getImageUrl());
+        } else {
+            throw new BusinessException("请上传衣物图片或提供图片URL");
+        }
 
         // 处理其他字段
         if (request != null) {

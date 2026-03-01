@@ -2,10 +2,13 @@ package com.ecru.outfit.service.rag;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -19,6 +22,12 @@ public class VectorSearchService {
 
     @Autowired
     private EmbeddingService embeddingService;
+
+    @Autowired
+    private PgVectorService pgVectorService;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     /**
      * 语义检索衣物
@@ -47,7 +56,7 @@ public class VectorSearchService {
                 }
             }
 
-            // 执行向量搜索（模拟）
+            // 执行向量搜索
             List<VectorSearchResult> results = executeVectorSearch(userId, queryEmbedding, limit);
 
             // 缓存结果
@@ -76,29 +85,68 @@ public class VectorSearchService {
      */
     private List<VectorSearchResult> executeVectorSearch(Long userId, float[] queryEmbedding, Integer limit) {
         try {
-            // 模拟向量搜索结果
+            // 使用pgvector执行向量检索
+            List<Map<String, Object>> vectorResults = pgVectorService.searchVectors(userId, queryEmbedding, limit);
+            
+            // 构建结果列表
             List<VectorSearchResult> results = new ArrayList<>();
-            for (int i = 0; i < Math.min(limit, 5); i++) {
-                VectorSearchResult result = new VectorSearchResult();
-                result.setClothingId((long) (i + 1));
-                result.setName("示例衣物 " + (i + 1));
-                result.setCategory("上装");
-                result.setPrimaryColor("白色");
-                result.setSecondaryColor("蓝色");
-                result.setMaterial("棉");
-                result.setStyleTags("简约,休闲");
-                result.setOccasionTags("日常,通勤");
-                result.setSeasonTags("春,秋");
-                result.setImageUrl("https://example.com/clothing" + (i + 1) + ".jpg");
-                result.setFrequencyLevel(3);
-                result.setSimilarity(0.85 - i * 0.05);
-                results.add(result);
+            for (Map<String, Object> vectorResult : vectorResults) {
+                Long clothingId = ((Number) vectorResult.get("clothing_id")).longValue();
+                Double similarity = (Double) vectorResult.get("similarity");
+                
+                // 查询衣物详细信息
+                VectorSearchResult result = getClothingDetails(clothingId);
+                if (result != null) {
+                    result.setSimilarity(similarity);
+                    results.add(result);
+                }
             }
 
             return results;
         } catch (Exception e) {
             System.err.println("执行向量搜索失败: " + e.getMessage());
             return new ArrayList<>();
+        }
+    }
+
+    /**
+     * 获取衣物详细信息
+     * @param clothingId 衣物ID
+     * @return 衣物详情
+     */
+    private VectorSearchResult getClothingDetails(Long clothingId) {
+        try {
+            String sql = """
+            SELECT 
+                c.id, c.name, c.category, c.sub_category, 
+                c.primary_color, c.secondary_color, c.material, 
+                c.style_tags, c.occasion_tags, c.season_tags, 
+                c.image_url, c.frequency_level
+            FROM 
+                clothing c
+            WHERE 
+                c.id = ? AND c.is_deleted = 0
+            """;
+            
+            Map<String, Object> clothingMap = jdbcTemplate.queryForMap(sql, clothingId);
+            
+            VectorSearchResult result = new VectorSearchResult();
+            result.setClothingId((Long) clothingMap.get("id"));
+            result.setName((String) clothingMap.get("name"));
+            result.setCategory((String) clothingMap.get("category"));
+            result.setPrimaryColor((String) clothingMap.get("primary_color"));
+            result.setSecondaryColor((String) clothingMap.get("secondary_color"));
+            result.setMaterial((String) clothingMap.get("material"));
+            result.setStyleTags((String) clothingMap.get("style_tags"));
+            result.setOccasionTags((String) clothingMap.get("occasion_tags"));
+            result.setSeasonTags((String) clothingMap.get("season_tags"));
+            result.setImageUrl((String) clothingMap.get("image_url"));
+            result.setFrequencyLevel((Integer) clothingMap.get("frequency_level"));
+            
+            return result;
+        } catch (Exception e) {
+            System.err.println("获取衣物详情失败: " + e.getMessage());
+            return null;
         }
     }
 
@@ -116,9 +164,19 @@ public class VectorSearchService {
                 return false;
             }
 
-            // 模拟存储到数据库
-            System.out.println("生成并存储嵌入成功: " + clothingId);
-            return true;
+            // 查询衣物信息以获取用户ID和其他元数据
+            String sql = "SELECT user_id, name, category, primary_color FROM clothing WHERE id = ?";
+            Map<String, Object> clothingMap = jdbcTemplate.queryForMap(sql, clothingId);
+            Long userId = (Long) clothingMap.get("user_id");
+            
+            // 构建元数据
+            Map<String, Object> metadata = new HashMap<>();
+            metadata.put("name", clothingMap.get("name"));
+            metadata.put("category", clothingMap.get("category"));
+            metadata.put("primary_color", clothingMap.get("primary_color"));
+            
+            // 存储到pgvector
+            return pgVectorService.storeVector(clothingId, userId, embedding, metadata);
         } catch (Exception e) {
             System.err.println("生成并存储嵌入失败: " + e.getMessage());
             return false;
