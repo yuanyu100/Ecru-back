@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ecru.user.mapper.StyleTagMapper">
+
+    <select id="selectByCategory" resultType="com.ecru.user.entity.StyleTag">
+        SELECT * FROM style_tags WHERE category = #{category}
+    </select>
+
+    <select id="selectPresetTags" resultType="com.ecru.user.entity.StyleTag">
+        SELECT * FROM style_tags WHERE is_preset = true
+    </select>
+
+    <update id="incrementUsageCount" parameterType="java.lang.Long">
+        UPDATE style_tags SET usage_count = usage_count + 1 WHERE id = #{id}
+    </update>
+
+</mapper>

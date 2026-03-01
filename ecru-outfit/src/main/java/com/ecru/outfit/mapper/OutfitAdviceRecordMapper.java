@@ -2,6 +2,7 @@ package com.ecru.outfit.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.ecru.outfit.entity.OutfitAdviceRecord;
+import com.github.pagehelper.Page;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -16,11 +17,9 @@ public interface OutfitAdviceRecordMapper extends BaseMapper<OutfitAdviceRecord>
     /**
      * 根据用户ID查询历史搭配记录
      * @param userId 用户ID
-     * @param offset 偏移量
-     * @param size 每页大小
      * @return 搭配记录列表
      */
-    List<OutfitAdviceRecord> selectByUserId(@Param("userId") Long userId, @Param("offset") Integer offset, @Param("size") Integer size);
+    Page<OutfitAdviceRecord> selectByUserId(@Param("userId") Long userId);
 
     /**
      * 根据用户ID和场合查询搭配记录
@@ -34,11 +33,9 @@ public interface OutfitAdviceRecordMapper extends BaseMapper<OutfitAdviceRecord>
     /**
      * 查询用户收藏的搭配记录
      * @param userId 用户ID
-     * @param offset 偏移量
-     * @param size 每页大小
      * @return 搭配记录列表
      */
-    List<OutfitAdviceRecord> selectFavoritesByUserId(@Param("userId") Long userId, @Param("offset") Integer offset, @Param("size") Integer size);
+    Page<OutfitAdviceRecord> selectFavoritesByUserId(@Param("userId") Long userId);
 
     /**
      * 统计用户搭配记录数量

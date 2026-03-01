@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ecru.outfit.mapper.OutfitUserStyleProfileMapper">
+
+    <select id="selectByUserId" resultType="com.ecru.outfit.entity.UserStyleProfile">
+        SELECT * FROM user_style_profiles WHERE user_id = #{userId}
+    </select>
+
+    <select id="selectByTemperamentType" resultType="com.ecru.outfit.entity.UserStyleProfile">
+        SELECT * FROM user_style_profiles WHERE temperament_type = #{temperamentType} LIMIT #{limit}
+    </select>
+</mapper>

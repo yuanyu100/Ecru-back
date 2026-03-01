@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ecru.outfit.mapper.OutfitItemMapper">
+
+    <select id="selectByOutfitAdviceId" resultType="com.ecru.outfit.entity.OutfitItem">
+        SELECT * FROM outfit_items WHERE outfit_advice_id = #{outfitAdviceId} ORDER BY sort_order ASC
+    </select>
+
+    <delete id="deleteByOutfitAdviceId" parameterType="java.lang.Long">
+        DELETE FROM outfit_items WHERE outfit_advice_id = #{outfitAdviceId}
+    </delete>
+
+    <insert id="batchInsert" parameterType="java.util.List">
+        INSERT INTO outfit_items (
+            outfit_advice_id, clothing_id, item_name, item_category, item_color, 
+            item_image_url, is_recommended, reason, sort_order, created_at
+        ) VALUES
+        <foreach collection="items" item="item" separator=",">
+            (
+                #{item.outfitAdviceId}, #{item.clothingId}, #{item.itemName}, #{item.itemCategory}, #{item.itemColor}, 
+                #{item.itemImageUrl}, #{item.isRecommended}, #{item.reason}, #{item.sortOrder}, #{item.createdAt}
+            )
+        </foreach>
+    </insert>
+
+</mapper>

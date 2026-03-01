@@ -9,6 +9,7 @@ import com.ecru.outfit.mapper.OutfitItemMapper;
 import com.ecru.outfit.mapper.OutfitFeedbackMapper;
 import com.ecru.outfit.mapper.OutfitUserStyleProfileMapper;
 import com.ecru.outfit.service.agent.OutfitAdvisorAgent;
+import com.github.pagehelper.PageHelper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -150,10 +151,9 @@ public class OutfitAdviceService {
      * @return 搭配记录列表
      */
     public List<OutfitAdviceRecord> getHistory(Long userId, Integer page, Integer size) {
-        // 计算偏移量
-        int offset = (page - 1) * size;
-        List<OutfitAdviceRecord> records = outfitAdviceRecordMapper.selectByUserId(userId, offset, size);
-        return records != null ? records : java.util.Collections.emptyList();
+        PageHelper.startPage(page, size);
+        com.github.pagehelper.Page<OutfitAdviceRecord> pageResult = outfitAdviceRecordMapper.selectByUserId(userId);
+        return pageResult.getResult() != null ? pageResult.getResult() : java.util.Collections.emptyList();
     }
 
     /**

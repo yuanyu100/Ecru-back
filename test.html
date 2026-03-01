@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>测试注册接口</title>
+</head>
+<body>
+    <h1>测试注册接口</h1>
+    <form id="registerForm">
+        <label>用户名: <input type="text" id="username" value="testuser"></label><br>
+        <label>密码: <input type="password" id="password" value="123456"></label><br>
+        <label>邮箱: <input type="email" id="email" value="test@example.com"></label><br>
+        <label>手机号: <input type="text" id="phone" value="13800138000"></label><br>
+        <button type="button" onclick="register()">注册</button>
+    </form>
+    <div id="result"></div>
+
+    <script>
+        function register() {
+            const data = {
+                username: document.getElementById('username').value,
+                password: document.getElementById('password').value,
+                email: document.getElementById('email').value,
+                phone: document.getElementById('phone').value
+            };
+
+            fetch('http://localhost:8081/api/v1/auth/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('result').innerHTML = JSON.stringify(data, null, 2);
+            })
+            .catch(error => {
+                document.getElementById('result').innerHTML = '错误: ' + error.message;
+            });
+        }
+    </script>
+</body>
+</html>

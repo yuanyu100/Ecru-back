@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ecru.outfit.mapper.OutfitAdviceRecordMapper">
+
+    <select id="selectByUserId" resultType="com.ecru.outfit.entity.OutfitAdviceRecord">
+        SELECT * FROM outfit_advice_records WHERE user_id = #{userId} ORDER BY created_at DESC
+    </select>
+
+    <select id="selectByUserIdAndOccasion" resultType="com.ecru.outfit.entity.OutfitAdviceRecord">
+        SELECT * FROM outfit_advice_records WHERE user_id = #{userId} AND occasion = #{occasion} ORDER BY created_at DESC LIMIT #{limit}
+    </select>
+
+    <select id="selectFavoritesByUserId" resultType="com.ecru.outfit.entity.OutfitAdviceRecord">
+        SELECT * FROM outfit_advice_records WHERE user_id = #{userId} AND is_favorite = true ORDER BY created_at DESC
+    </select>
+
+    <select id="countByUserId" resultType="java.lang.Integer">
+        SELECT COUNT(*) FROM outfit_advice_records WHERE user_id = #{userId}
+    </select>
+
+    <update id="updateIsFavorite" parameterType="map">
+        UPDATE outfit_advice_records SET
+            is_favorite = #{isFavorite}, updated_at = #{updatedAt}
+        WHERE id = #{id}
+    </update>
+
+
+
+</mapper>

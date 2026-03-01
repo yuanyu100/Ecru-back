@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ecru.outfit.mapper.OutfitFeedbackMapper">
+
+    <select id="selectByOutfitAndUser" resultType="com.ecru.outfit.entity.OutfitFeedback">
+        SELECT * FROM outfit_feedback WHERE outfit_advice_id = #{outfitAdviceId} AND user_id = #{userId}
+    </select>
+
+    <select id="selectByOutfitAdviceId" resultType="com.ecru.outfit.entity.OutfitFeedback">
+        SELECT * FROM outfit_feedback WHERE outfit_advice_id = #{outfitAdviceId}
+    </select>
+
+</mapper>

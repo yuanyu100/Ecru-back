@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ecru.user.mapper.StyleImageMapper">
+
+    <select id="selectByStyleCategory" resultType="com.ecru.user.entity.StyleImage">
+        SELECT * FROM style_images WHERE style_category = #{styleCategory}
+        <if test="excludeImageId != null">
+            AND id != #{excludeImageId}
+        </if>
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectActiveImages" resultType="com.ecru.user.entity.StyleImage">
+        SELECT * FROM style_images WHERE is_active = true LIMIT #{limit}
+    </select>
+
+    <select id="selectByIdWithTags" resultType="com.ecru.user.entity.StyleImage">
+        SELECT si.*, sit.style_tag_id, st.tag_name, st.category 
+        FROM style_images si
+        LEFT JOIN style_image_tag sit ON si.id = sit.image_id
+        LEFT JOIN style_tags st ON sit.style_tag_id = st.id
+        WHERE si.id = #{id}
+    </select>
+
+</mapper>

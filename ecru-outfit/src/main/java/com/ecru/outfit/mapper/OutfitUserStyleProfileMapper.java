@@ -5,6 +5,8 @@ import com.ecru.outfit.entity.UserStyleProfile;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.List;
+
 /**
  * 用户风格档案Mapper
  */
@@ -24,6 +26,7 @@ public interface OutfitUserStyleProfileMapper extends BaseMapper<UserStyleProfil
      * @param limit 限制数量
      * @return 档案列表
      */
-    java.util.List<UserStyleProfile> selectByTemperamentType(@Param("temperamentType") String temperamentType, @Param("limit") Integer limit);
+
+    List<UserStyleProfile> selectByTemperamentType(@Param("temperamentType") String temperamentType, @Param("limit") Integer limit);
 
 }

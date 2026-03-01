@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ecru.user.mapper.UserStyleProfileMapper">
+
+    <select id="selectByUserIdAndStyleTagId" resultType="com.ecru.user.entity.UserStyleProfile">
+        SELECT * FROM user_style_profile WHERE user_id = #{userId} AND style_tag_id = #{styleTagId}
+    </select>
+
+    <select id="selectByUserId" resultType="com.ecru.user.entity.UserStyleProfile">
+        SELECT * FROM user_style_profile WHERE user_id = #{userId}
+    </select>
+
+    <select id="selectTopPreferences" resultType="com.ecru.user.entity.UserStyleProfile">
+        SELECT * FROM user_style_profile WHERE user_id = #{userId} ORDER BY preference_score DESC LIMIT #{limit}
+    </select>
+
+    <update id="updatePreferenceScore" parameterType="map">
+        UPDATE user_style_profile SET
+            preference_score = #{preferenceScore},
+            interaction_count = #{interactionCount},
+            updated_at = NOW()
+        WHERE user_id = #{userId} AND style_tag_id = #{styleTagId}
+    </update>
+
+</mapper>
