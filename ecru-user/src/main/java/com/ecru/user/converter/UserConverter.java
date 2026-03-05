@@ -19,7 +19,6 @@ public interface UserConverter {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "password", ignore = true)
     @Mapping(target = "avatarUrl", ignore = true)
-    @Mapping(target = "nickname", ignore = true)
     @Mapping(target = "gender", ignore = true)
     @Mapping(target = "birthday", ignore = true)
     @Mapping(target = "status", ignore = true)

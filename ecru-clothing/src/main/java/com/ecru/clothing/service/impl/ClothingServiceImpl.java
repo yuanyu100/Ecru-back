@@ -24,10 +24,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import com.ecru.common.service.storage.ImageStorageService;
+import com.ecru.common.service.analyzer.ImageAnalyzerService;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigDecimal;
+import java.net.URL;
+import java.net.URLConnection;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -52,6 +56,9 @@ public class ClothingServiceImpl implements ClothingService {
 
     @Autowired
     private ImageStorageService imageStorageService;
+
+    @Autowired
+    private ImageAnalyzerService imageAnalyzerService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -341,29 +348,97 @@ public class ClothingServiceImpl implements ClothingService {
             throw new BusinessException("衣物不存在或无权限访问");
         }
 
-        // 模拟AI识别结果
-        clothing.setCategory("上装");
-        clothing.setSubCategory("T恤");
-        clothing.setPrimaryColor("白色");
-        clothing.setMaterial("棉");
-        clothing.setPattern("纯色");
-        clothing.setFit("宽松");
-        
-        try {
-            clothing.setStyleTags(objectMapper.writeValueAsString(Collections.singletonList("简约")));
-            clothing.setOccasionTags(objectMapper.writeValueAsString(Collections.singletonList("日常")));
-            clothing.setSeasonTags(objectMapper.writeValueAsString(List.of("春", "夏", "秋")));
-        } catch (JsonProcessingException e) {
-            log.error("序列化标签失败", e);
+        if (StringUtils.isBlank(clothing.getImageUrl())) {
+            throw new BusinessException("衣物图片不存在，无法进行AI识别");
         }
 
-        clothing.setName("白色纯棉T恤");
-        clothing.setSourceType("ai");
-        clothing.setAiConfidence(BigDecimal.valueOf(0.92));
-        clothing.setUpdatedAt(LocalDateTime.now());
+        try {
+            // 初始化ImageAnalyzerService
+            imageAnalyzerService.init();
+            
+            // 从图片URL获取输入流
+            try (InputStream imageStream = getImageStreamFromUrl(clothing.getImageUrl())) {
+                if (imageStream == null) {
+                    throw new BusinessException("无法获取图片流");
+                }
+                
+                // 调用AI分析服务
+                ImageAnalyzerService.ClothingAnalysisResult analysisResult = imageAnalyzerService.analyzeClothing(imageStream);
+                
+                if (analysisResult == null) {
+                    throw new BusinessException("AI识别失败，请稍后重试");
+                }
+                
+                // 更新衣物信息
+                if (StringUtils.isNotBlank(analysisResult.getCategory())) {
+                    clothing.setCategory(analysisResult.getCategory());
+                }
+                if (analysisResult.getColor() != null && analysisResult.getColor().containsKey("primary")) {
+                    clothing.setPrimaryColor(analysisResult.getColor().get("primary"));
+                }
+                if (analysisResult.getColor() != null && analysisResult.getColor().containsKey("secondary")) {
+                    clothing.setSecondaryColor(analysisResult.getColor().get("secondary"));
+                }
+                if (StringUtils.isNotBlank(analysisResult.getMaterial())) {
+                    clothing.setMaterial(analysisResult.getMaterial());
+                }
+                if (StringUtils.isNotBlank(analysisResult.getPattern())) {
+                    clothing.setPattern(analysisResult.getPattern());
+                }
+                if (analysisResult.getStyle() != null && !analysisResult.getStyle().isEmpty()) {
+                    clothing.setStyleTags(objectMapper.writeValueAsString(analysisResult.getStyle()));
+                }
+                if (analysisResult.getOccasion() != null && !analysisResult.getOccasion().isEmpty()) {
+                    clothing.setOccasionTags(objectMapper.writeValueAsString(analysisResult.getOccasion()));
+                }
+                if (analysisResult.getSeason() != null && !analysisResult.getSeason().isEmpty()) {
+                    clothing.setSeasonTags(objectMapper.writeValueAsString(analysisResult.getSeason()));
+                }
+                
+                // 生成衣物名称
+                StringBuilder nameBuilder = new StringBuilder();
+                if (StringUtils.isNotBlank(analysisResult.getColor().get("primary"))) {
+                    nameBuilder.append(analysisResult.getColor().get("primary"));
+                }
+                if (StringUtils.isNotBlank(analysisResult.getMaterial())) {
+                    nameBuilder.append(analysisResult.getMaterial());
+                }
+                if (StringUtils.isNotBlank(analysisResult.getCategory())) {
+                    nameBuilder.append(analysisResult.getCategory());
+                }
+                if (nameBuilder.length() > 0) {
+                    clothing.setName(nameBuilder.toString());
+                }
+                
+                clothing.setSourceType("ai");
+                clothing.setAiConfidence(BigDecimal.valueOf(0.95)); // 设置默认置信度
+                clothing.setUpdatedAt(LocalDateTime.now());
+                
+                // 保存到数据库
+                clothingMapper.updateById(clothing);
+            }
+        } catch (Exception e) {
+            log.error("AI识别衣物失败", e);
+            throw new BusinessException("AI识别失败：" + e.getMessage());
+        }
 
-        clothingMapper.updateById(clothing);
         return getClothingDetail(userId, clothingId);
+    }
+    
+    /**
+     * 从URL获取图片输入流
+     */
+    private InputStream getImageStreamFromUrl(String imageUrl) throws IOException {
+        if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
+            URL url = new URL(imageUrl);
+            URLConnection connection = url.openConnection();
+            connection.setConnectTimeout(10000);
+            connection.setReadTimeout(10000);
+            return connection.getInputStream();
+        } else {
+            // 本地文件路径处理（如果需要）
+            throw new BusinessException("不支持的图片URL格式");
+        }
     }
 
     @Override

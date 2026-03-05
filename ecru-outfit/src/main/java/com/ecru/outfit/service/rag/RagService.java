@@ -15,7 +15,7 @@ public class RagService {
     private EmbeddingService embeddingService;
 
     @Autowired
-    private VectorSearchService vectorSearchService;
+    private VectorSearchServiceV3 vectorSearchService;
 
     /**
      * 语义检索衣物
@@ -24,7 +24,7 @@ public class RagService {
      * @param limit 限制数量
      * @return 检索结果
      */
-    public List<VectorSearchService.VectorSearchResult> searchClothes(Long userId, String query, Integer limit) {
+    public List<VectorSearchServiceV3.VectorSearchResult> searchClothes(Long userId, String query, Integer limit) {
         try {
             return vectorSearchService.searchClothes(userId, query, limit);
         } catch (Exception e) {

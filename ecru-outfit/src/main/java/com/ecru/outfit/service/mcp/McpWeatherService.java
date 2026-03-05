@@ -21,7 +21,7 @@ public class McpWeatherService {
     @Autowired
     private RestTemplate restTemplate;
 
-    @Autowired
+    @Autowired(required = false)
     private StringRedisTemplate redisTemplate;
 
     /**
@@ -33,14 +33,21 @@ public class McpWeatherService {
         try {
             // 先尝试从缓存获取
             String cacheKey = "weather:" + location;
-            String cachedData = redisTemplate.opsForValue().get(cacheKey);
-            if (cachedData != null) {
-                return WeatherInfo.fromJson(cachedData);
+            if (redisTemplate != null) {
+                try {
+                    String cachedData = redisTemplate.opsForValue().get(cacheKey);
+                    if (cachedData != null) {
+                        return WeatherInfo.fromJson(cachedData);
+                    }
+                } catch (Exception e) {
+                    System.err.println("Redis缓存获取失败: " + e.getMessage());
+                    // 继续执行，不使用缓存
+                }
             }
 
             // 构建请求参数
             Map<String, String> params = new HashMap<>();
-            params.put("key", "test-api-key");
+            params.put("key", "fb9ea899d5e5f09da5af6e5b2a441aca");
             params.put("city", location);
             params.put("extensions", "base");
             params.put("output", "JSON");
@@ -53,13 +60,18 @@ public class McpWeatherService {
             WeatherInfo weatherInfo = parseWeatherResponse(response);
 
             // 缓存结果
-            if (weatherInfo != null) {
-                redisTemplate.opsForValue().set(
-                        cacheKey, 
-                        weatherInfo.toJson(), 
-                        3600, 
-                        TimeUnit.SECONDS
-                );
+            if (weatherInfo != null && redisTemplate != null) {
+                try {
+                    redisTemplate.opsForValue().set(
+                            cacheKey, 
+                            weatherInfo.toJson(), 
+                            3600, 
+                            TimeUnit.SECONDS
+                    );
+                } catch (Exception e) {
+                    System.err.println("Redis缓存设置失败: " + e.getMessage());
+                    // 继续执行，不使用缓存
+                }
             }
 
             return weatherInfo;

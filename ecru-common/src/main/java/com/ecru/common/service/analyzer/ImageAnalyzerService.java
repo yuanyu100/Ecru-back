@@ -1,4 +1,4 @@
-package com.ecru.outfit.service.analyzer;
+package com.ecru.common.service.analyzer;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
@@ -12,6 +12,7 @@ import org.springframework.util.Base64Utils;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Objects;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
@@ -21,7 +22,7 @@ import java.util.concurrent.TimeUnit;
 @Service
 public class ImageAnalyzerService {
 
-    @Autowired
+    @Autowired(required = false)
     private StringRedisTemplate redisTemplate;
 
     private OkHttpClient okHttpClient;
@@ -51,10 +52,15 @@ public class ImageAnalyzerService {
 
             // 尝试从缓存获取
             boolean enableCache = true;
-            if (enableCache) {
-                String cachedData = redisTemplate.opsForValue().get(cacheKey);
-                if (cachedData != null) {
-                    return ImageAnalysisResult.fromJson(cachedData);
+            if (enableCache && redisTemplate != null) {
+                try {
+                    String cachedData = redisTemplate.opsForValue().get(cacheKey);
+                    if (cachedData != null) {
+                        return ImageAnalysisResult.fromJson(cachedData);
+                    }
+                } catch (Exception e) {
+                    System.err.println("Redis缓存获取失败: " + e.getMessage());
+                    // 继续执行，不使用缓存
                 }
             }
 
@@ -65,13 +71,18 @@ public class ImageAnalyzerService {
             ImageAnalysisResult result = callQwenVlApi(base64Image, prompt);
 
             // 缓存结果
-            if (result != null && enableCache) {
-                redisTemplate.opsForValue().set(
-                        cacheKey,
-                        result.toJson(),
-                        86400,
-                        TimeUnit.SECONDS
-                );
+            if (result != null && enableCache && redisTemplate != null) {
+                try {
+                    redisTemplate.opsForValue().set(
+                            cacheKey,
+                            result.toJson(),
+                            86400,
+                            java.util.concurrent.TimeUnit.SECONDS
+                    );
+                } catch (Exception e) {
+                    System.err.println("Redis缓存设置失败: " + e.getMessage());
+                    // 继续执行，不使用缓存
+                }
             }
 
             return result;
@@ -226,11 +237,23 @@ public class ImageAnalyzerService {
             ClothingAnalysisResult result = new ClothingAnalysisResult();
             result.setCategory(analysisJson.getString("category"));
             result.setColor(new HashMap<>());
+            if (analysisJson.containsKey("color")) {
+                result.setColor(analysisJson.getJSONObject("color").toJavaObject(Map.class));
+            }
             result.setStyle(new ArrayList<>());
+            if (analysisJson.containsKey("style")) {
+                result.setStyle(analysisJson.getJSONArray("style").toJavaList(String.class));
+            }
             result.setMaterial(analysisJson.getString("material"));
             result.setPattern(analysisJson.getString("pattern"));
             result.setOccasion(new ArrayList<>());
+            if (analysisJson.containsKey("occasion")) {
+                result.setOccasion(analysisJson.getJSONArray("occasion").toJavaList(String.class));
+            }
             result.setSeason(new ArrayList<>());
+            if (analysisJson.containsKey("season")) {
+                result.setSeason(analysisJson.getJSONArray("season").toJavaList(String.class));
+            }
 
             return result;
         } catch (Exception e) {

@@ -77,18 +77,27 @@ public class ClothingVectorService {
      * 批量为衣物生成并存储向量
      */
     public void batchGenerateAndStoreVectors() {
-        // 获取所有衣物
-        List<Clothing> clothingList = clothingMapper.selectClothingList(null, null, null, null, null, null, null, null, null, null, null, null);
-        
-        System.out.println("开始为 " + clothingList.size() + " 件衣物生成向量");
-        
-        for (Clothing clothing : clothingList) {
-            executorService.submit(() -> {
-                generateAndStoreVector(clothing);
-            });
+        try {
+            // 初始化表结构
+            pgVectorService.initTable();
+            
+            // 获取所有衣物
+            List<Clothing> clothingList = clothingMapper.selectClothingList(null, null, null, null, null, null, null, null, null, null, null, null);
+            
+            System.out.println("开始为 " + clothingList.size() + " 件衣物生成向量");
+            
+            for (Clothing clothing : clothingList) {
+                executorService.submit(() -> {
+                    generateAndStoreVector(clothing);
+                });
+            }
+            
+            System.out.println("批量任务已提交，正在异步处理中");
+        } catch (Exception e) {
+            System.err.println("批量生成向量失败: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
         }
-        
-        System.out.println("批量任务已提交，正在异步处理中");
     }
 
     /**

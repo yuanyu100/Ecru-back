@@ -27,4 +27,8 @@ public class RegisterDTO {
     @Schema(description = "手机号", example = "13800138000")
     @Pattern(regexp = "^1[3-9]\\d{9}$", message = "手机号格式不正确")
     private String phone;
+
+    @Schema(description = "昵称", example = "张三")
+    @Size(max = 50, message = "昵称长度不能超过50位")
+    private String nickname;
 }

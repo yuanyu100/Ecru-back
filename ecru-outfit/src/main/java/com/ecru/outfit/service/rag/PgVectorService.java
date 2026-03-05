@@ -1,13 +1,10 @@
 package com.ecru.outfit.service.rag;
 
-import com.ecru.outfit.config.PgVectorConfig;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
-import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -15,56 +12,14 @@ import java.util.Map;
 /**
  * pgvector 向量数据库服务
  */
-@Slf4j
 @Service
 public class PgVectorService {
 
+    @Value("${ai.siliconflow.embedding.model}")
+    private String modelName;
+
     @Autowired
-    @Qualifier("postgresJdbcTemplate")
     private JdbcTemplate jdbcTemplate;
-
-    @Autowired
-    private PgVectorConfig pgVectorConfig;
-
-    /**
-     * 初始化向量表结构
-     */
-    @PostConstruct
-    public void init() {
-        try {
-            log.info("开始初始化pgvector表结构");
-            // 检查并创建向量表
-            log.info("开始创建向量表");
-            createVectorTable();
-            log.info("向量表创建成功");
-            log.info("pgvector 表结构初始化成功");
-        } catch (Exception e) {
-            log.error("pgvector 表结构初始化失败: {}", e.getMessage());
-            e.printStackTrace();
-        }
-    }
-
-    /**
-     * 创建向量表
-     */
-    private void createVectorTable() {
-        String sql = """
-        CREATE TABLE IF NOT EXISTS clothing_embeddings (
-            id SERIAL PRIMARY KEY,
-            clothing_id BIGINT NOT NULL,
-            user_id BIGINT NOT NULL,
-            embedding VECTOR(?) NOT NULL,
-            metadata JSONB DEFAULT '{}'::jsonb,
-            embedding_model VARCHAR(50) DEFAULT 'text-embedding-3-small',
-            embedding_text TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE (clothing_id)
-        )
-        """;
-
-        jdbcTemplate.update(sql, pgVectorConfig.getDimension());
-    }
 
     /**
      * 存储向量
@@ -83,27 +38,19 @@ public class PgVectorService {
             // 转换metadata为JSON字符串
             String metadataJson = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(metadata);
             
-            // 日志输出，确认修改后的代码被执行
-            log.info("开始存储向量，衣物ID: {}, 用户ID: {}", clothingId, userId);
-            log.info("向量长度: {}", embedding.length);
-            log.info("向量前10个元素: {}", java.util.Arrays.toString(java.util.Arrays.copyOfRange(embedding, 0, Math.min(embedding.length, 10))));
-
             // 先检查是否存在
             if (vectorExists(clothingId, userId)) {
                 // 更新向量
-                String updateSql = "UPDATE public.clothing_embeddings SET embedding = ?::vector, embedding_model = 'text-embedding-3-small', embedding_text = ?, metadata = ?::jsonb, updated_at = CURRENT_TIMESTAMP WHERE clothing_id = ?";
-                log.info("更新向量SQL: {}", updateSql);
-                jdbcTemplate.update(updateSql, vectorString, embeddingText, metadataJson, clothingId);
+                String updateSql = "UPDATE clothing_embeddings SET embedding = ?::vector, embedding_model = ?, embedding_text = ?, metadata = ?::jsonb, updated_at = CURRENT_TIMESTAMP WHERE clothing_id = ?";
+                jdbcTemplate.update(updateSql, vectorString, modelName, embeddingText, metadataJson, clothingId);
             } else {
                 // 插入向量
-                String insertSql = "INSERT INTO public.clothing_embeddings (clothing_id, user_id, embedding, embedding_model, embedding_text, metadata, updated_at) VALUES (?, ?, ?::vector, 'text-embedding-3-small', ?, ?::jsonb, CURRENT_TIMESTAMP)";
-                log.info("插入向量SQL: {}", insertSql);
-                jdbcTemplate.update(insertSql, clothingId, userId, vectorString, embeddingText, metadataJson);
+                String insertSql = "INSERT INTO clothing_embeddings (clothing_id, user_id, embedding, embedding_model, embedding_text, metadata, updated_at) VALUES (?, ?, ?::vector, ?, ?, ?::jsonb, CURRENT_TIMESTAMP)";
+                jdbcTemplate.update(insertSql, clothingId, userId, vectorString, modelName, embeddingText, metadataJson);
             }
-            log.info("存储向量成功，衣物ID: {}", clothingId);
             return true;
         } catch (Exception e) {
-            log.error("存储向量失败: {}", e.getMessage());
+            System.err.println("存储向量失败: " + e.getMessage());
             e.printStackTrace();
             return false;
         }
@@ -137,7 +84,7 @@ public class PgVectorService {
 
             return jdbcTemplate.queryForList(sql, vectorString, userId, vectorString, topK);
         } catch (Exception e) {
-            log.error("检索向量失败: {}", e.getMessage());
+            System.err.println("检索向量失败: " + e.getMessage());
             return new ArrayList<>();
         }
     }
@@ -154,7 +101,7 @@ public class PgVectorService {
             int rows = jdbcTemplate.update(sql, clothingId);
             return rows > 0;
         } catch (Exception e) {
-            log.error("删除向量失败: {}", e.getMessage());
+            System.err.println("删除向量失败: " + e.getMessage());
             return false;
         }
     }
@@ -171,7 +118,7 @@ public class PgVectorService {
             Integer count = jdbcTemplate.queryForObject(sql, Integer.class, clothingId);
             return count != null && count > 0;
         } catch (Exception e) {
-            log.error("检查向量存在失败: {}", e.getMessage());
+            System.err.println("检查向量存在失败: " + e.getMessage());
             return false;
         }
     }
@@ -190,6 +137,64 @@ public class PgVectorService {
         }
         sb.append(']');
         return sb.toString();
+    }
+
+    /**
+     * 初始化表结构
+     */
+    public void initTable() {
+        try {
+            // 检查pgvector扩展是否安装
+            String checkExtensionSql = "SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname = 'vector')";
+            Boolean extensionExists = jdbcTemplate.queryForObject(checkExtensionSql, Boolean.class);
+            if (!extensionExists) {
+                // 安装pgvector扩展
+                jdbcTemplate.execute("CREATE EXTENSION IF NOT EXISTS vector");
+                System.out.println("已安装pgvector扩展");
+            } else {
+                System.out.println("pgvector扩展已存在");
+            }
+
+            // 直接尝试删除并重建表，确保维度正确
+            try {
+                // 先删除表
+                jdbcTemplate.execute("DROP TABLE IF EXISTS clothing_embeddings");
+                System.out.println("已删除旧的clothing_embeddings表");
+                
+                // 重建clothing_embeddings表，向量维度为1024
+                String createTableSql = """
+                CREATE TABLE clothing_embeddings (
+                    id SERIAL PRIMARY KEY,
+                    clothing_id BIGINT NOT NULL,
+                    user_id BIGINT NOT NULL,
+                    embedding VECTOR(1024) NOT NULL,
+                    embedding_model VARCHAR(255) NOT NULL,
+                    embedding_text TEXT NOT NULL,
+                    metadata JSONB,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(clothing_id)
+                )
+                """;
+                jdbcTemplate.execute(createTableSql);
+                System.out.println("已重新创建clothing_embeddings表，向量维度为1024");
+            } catch (Exception e) {
+                System.err.println("重建表结构失败: " + e.getMessage());
+                e.printStackTrace();
+            }
+
+            // 创建索引
+            try {
+                String createIndexSql = "CREATE INDEX IF NOT EXISTS idx_clothing_embeddings_embedding ON clothing_embeddings USING ivfflat (embedding) WITH (lists = 100)";
+                jdbcTemplate.execute(createIndexSql);
+                System.out.println("已创建向量索引");
+            } catch (Exception e) {
+                System.err.println("创建索引失败: " + e.getMessage());
+            }
+        } catch (Exception e) {
+            System.err.println("初始化表结构失败: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
 }

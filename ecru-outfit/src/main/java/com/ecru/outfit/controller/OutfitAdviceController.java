@@ -4,7 +4,7 @@ import com.ecru.outfit.entity.OutfitAdviceRecord;
 import com.ecru.outfit.entity.OutfitFeedback;
 import com.ecru.outfit.entity.UserStyleProfile;
 import com.ecru.outfit.service.OutfitAdviceService;
-import com.ecru.outfit.service.analyzer.ImageAnalyzerService;
+import com.ecru.common.service.analyzer.ImageAnalyzerService;
 import com.ecru.outfit.service.rag.RagService;
 import com.ecru.common.result.Result;
 import io.swagger.v3.oas.annotations.Operation;
@@ -17,6 +17,7 @@ import org.springframework.web.multipart.MultipartFile;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 搭配建议控制器
@@ -312,6 +313,40 @@ public class OutfitAdviceController {
         } catch (Exception e) {
             log.error("更新用户风格档案失败: {}", e.getMessage());
             return Result.error(500, "更新用户风格档案失败");
+        }
+    }
+
+    /**
+     * Agent聊天接口
+     * @param request HTTP请求
+     * @param chatRequest 聊天请求
+     * @return 聊天响应
+     */
+    @PostMapping("/chat")
+    @Operation(summary = "Agent聊天", description = "智能聊天接口，可根据天气和需求推荐衣物")
+    public Result<?> chatWithAgent(
+            HttpServletRequest request,
+            @RequestBody OutfitAdviceService.ChatRequest chatRequest
+    ) {
+        try {
+            // 获取用户ID，默认值为1，方便测试
+            Long userId = (Long) request.getAttribute("userId");
+            if (userId == null) {
+                userId = 1L; // 默认用户ID，方便测试
+            }
+
+            // 验证参数
+            if (chatRequest.getMessage() == null || chatRequest.getMessage().trim().isEmpty()) {
+                return Result.error(400, "请输入聊天内容");
+            }
+
+            // 处理聊天请求
+            OutfitAdviceService.ChatResponse response = outfitAdviceService.chatWithAgent(userId, chatRequest);
+
+            return Result.success(response);
+        } catch (Exception e) {
+            log.error("Agent聊天失败: {}", e.getMessage());
+            return Result.error(500, "Agent聊天失败");
         }
     }
 
