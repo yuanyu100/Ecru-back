@@ -81,8 +81,9 @@ jwt:
 logging:
   level:
     com.ecru: debug
+    org.springframework.web: debug
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n"
 
 # AI配置
 ai:

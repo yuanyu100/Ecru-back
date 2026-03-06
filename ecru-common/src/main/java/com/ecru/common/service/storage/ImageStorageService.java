@@ -74,7 +74,9 @@ public class ImageStorageService {
                     .build());
 
             // 返回访问URL
-            return minioConfig.getDomain() + "/" + fileName;
+            String url = minioConfig.getDomain() + "/" + minioConfig.getBucketName() + "/" + fileName;
+            log.info("上传图片成功，访问URL: {}", url);
+            return url;
         } catch (Exception e) {
             log.error("上传图片失败: {}", e.getMessage());
             throw new RuntimeException("上传图片失败", e);

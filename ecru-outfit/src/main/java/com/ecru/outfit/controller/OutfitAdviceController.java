@@ -4,13 +4,14 @@ import com.ecru.outfit.entity.OutfitAdviceRecord;
 import com.ecru.outfit.entity.OutfitFeedback;
 import com.ecru.outfit.entity.UserStyleProfile;
 import com.ecru.outfit.service.OutfitAdviceService;
-import com.ecru.common.service.analyzer.ImageAnalyzerService;
+import com.ecru.common.service.ai.AiImageAnalyzerService;
 import com.ecru.outfit.service.rag.RagService;
 import com.ecru.common.result.Result;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -32,7 +33,8 @@ public class OutfitAdviceController {
     private OutfitAdviceService outfitAdviceService;
 
     @Autowired
-    private ImageAnalyzerService imageAnalyzerService;
+    @Qualifier("aiImageAnalyzerService")
+    private AiImageAnalyzerService imageAnalyzerService;
 
     @Autowired
     private RagService ragService;
