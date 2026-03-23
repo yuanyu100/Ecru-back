@@ -26,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import com.ecru.common.service.storage.ImageStorageService;
 import com.ecru.common.service.ai.AiImageAnalyzerService;
+import com.ecru.common.service.vector.ClothingVectorService;
 import io.minio.MinioClient;
 import io.minio.GetObjectArgs;
 
@@ -67,6 +68,9 @@ public class ClothingServiceImpl implements ClothingService {
     @Autowired
     @Qualifier("aiImageAnalyzerService")
     private AiImageAnalyzerService imageAnalyzerService;
+
+    @Autowired
+    private ClothingVectorService clothingVectorService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -181,6 +185,18 @@ public class ClothingServiceImpl implements ClothingService {
 
         // 保存到数据库
         clothingMapper.insert(clothing);
+
+        // 生成衣物向量
+        clothingVectorService.generateAndStoreVector(
+                clothing.getId(),
+                clothing.getUserId(),
+                clothing.getName(),
+                clothing.getCategory(),
+                clothing.getPrimaryColor(),
+                clothing.getStyleTags(),
+                clothing.getOccasionTags(),
+                clothing.getSeasonTags()
+        );
 
         // 模拟AI识别
         if (request != null && Boolean.TRUE.equals(request.getAutoRecognize())) {
@@ -328,6 +344,18 @@ public class ClothingServiceImpl implements ClothingService {
         clothing.setUpdatedAt(LocalDateTime.now());
         clothingMapper.updateById(clothing);
 
+        // 更新衣物向量
+        clothingVectorService.updateClothingVector(
+                clothing.getId(),
+                clothing.getUserId(),
+                clothing.getName(),
+                clothing.getCategory(),
+                clothing.getPrimaryColor(),
+                clothing.getStyleTags(),
+                clothing.getOccasionTags(),
+                clothing.getSeasonTags()
+        );
+
         return getClothingDetail(userId, clothingId);
     }
 
@@ -341,11 +369,15 @@ public class ClothingServiceImpl implements ClothingService {
         if (force) {
             // 硬删除
             clothingMapper.deleteById(clothingId);
+            // 删除衣物向量
+            clothingVectorService.deleteClothingVector(clothingId, userId);
         } else {
             // 软删除
             clothing.setIsDeleted(true);
             clothing.setUpdatedAt(LocalDateTime.now());
             clothingMapper.updateById(clothing);
+            // 删除衣物向量
+            clothingVectorService.deleteClothingVector(clothingId, userId);
         }
     }
 
@@ -444,6 +476,18 @@ public class ClothingServiceImpl implements ClothingService {
                 // 保存到数据库
                 int updateResult = clothingMapper.updateById(clothing);
                 log.info("更新数据库结果: {}", updateResult);
+                
+                // 更新衣物向量
+                clothingVectorService.updateClothingVector(
+                        clothing.getId(),
+                        clothing.getUserId(),
+                        clothing.getName(),
+                        clothing.getCategory(),
+                        clothing.getPrimaryColor(),
+                        clothing.getStyleTags(),
+                        clothing.getOccasionTags(),
+                        clothing.getSeasonTags()
+                );
             }
         } catch (Exception e) {
             log.error("AI识别衣物失败", e);

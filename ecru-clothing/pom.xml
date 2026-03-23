@@ -19,6 +19,7 @@
             <groupId>com.ecru</groupId>
             <artifactId>ecru-common</artifactId>
         </dependency>
+
         <!-- Lombok -->
         <dependency>
             <groupId>org.projectlombok</groupId>

@@ -1,5 +1,6 @@
 package com.ecru.outfit.service.rag;
 
+import com.ecru.common.service.vector.EmbeddingService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -22,15 +23,27 @@ public class RagService {
      * @param userId 用户ID
      * @param query 查询文本
      * @param limit 限制数量
+     * @param negativePreferences 负面偏好
      * @return 检索结果
      */
-    public List<VectorSearchServiceV3.VectorSearchResult> searchClothes(Long userId, String query, Integer limit) {
+    public List<VectorSearchServiceV3.VectorSearchResult> searchClothes(Long userId, String query, Integer limit, List<String> negativePreferences) {
         try {
-            return vectorSearchService.searchClothes(userId, query, limit);
+            return vectorSearchService.searchClothes(userId, query, limit, negativePreferences);
         } catch (Exception e) {
             System.err.println("语义检索衣物失败: " + e.getMessage());
             return List.of();
         }
+    }
+
+    /**
+     * 语义检索衣物（兼容旧接口）
+     * @param userId 用户ID
+     * @param query 查询文本
+     * @param limit 限制数量
+     * @return 检索结果
+     */
+    public List<VectorSearchServiceV3.VectorSearchResult> searchClothes(Long userId, String query, Integer limit) {
+        return searchClothes(userId, query, limit, null);
     }
 
     /**

@@ -1,6 +1,6 @@
 package com.ecru.outfit.controller;
 
-import com.ecru.outfit.service.rag.ClothingVectorService;
+import com.ecru.common.service.vector.ClothingVectorService;
 import com.ecru.outfit.service.rag.VectorSearchServiceV3;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

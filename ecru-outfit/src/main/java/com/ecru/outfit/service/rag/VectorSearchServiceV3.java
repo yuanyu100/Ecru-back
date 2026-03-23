@@ -2,6 +2,8 @@ package com.ecru.outfit.service.rag;
 
 import com.ecru.clothing.mapper.ClothingMapper;
 import com.ecru.clothing.entity.Clothing;
+import com.ecru.common.service.vector.EmbeddingService;
+import com.ecru.common.service.vector.PgVectorService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -34,18 +36,19 @@ public class VectorSearchServiceV3 {
      * @param userId 用户ID
      * @param query 查询文本
      * @param limit 限制数量
+     * @param negativePreferences 负面偏好（如不喜欢的颜色）
      * @return 检索结果
      */
-    public List<VectorSearchResult> searchClothes(Long userId, String query, Integer limit) {
+    public List<VectorSearchResult> searchClothes(Long userId, String query, Integer limit, List<String> negativePreferences) {
         try {
-            System.err.println("开始语义检索V3，用户ID: " + userId + ", 查询: " + query + ", 限制: " + limit);
+            System.err.println("开始语义检索V3，用户ID: " + userId + ", 查询: " + query + ", 限制: " + limit + ", 负面偏好: " + negativePreferences);
             // 生成查询向量
             float[] queryEmbedding = embeddingService.generateEmbedding(query);
             System.err.println("嵌入生成成功，长度: " + (queryEmbedding != null ? queryEmbedding.length : 0));
 
             // 执行向量搜索
             System.err.println("执行向量搜索");
-            List<VectorSearchResult> results = executeVectorSearch(userId, queryEmbedding, limit, query);
+            List<VectorSearchResult> results = executeVectorSearch(userId, queryEmbedding, limit, query, negativePreferences);
 
             System.err.println("返回结果数量: " + results.size());
             return results;
@@ -54,8 +57,19 @@ public class VectorSearchServiceV3 {
             e.printStackTrace();
             // 返回模拟数据
             System.err.println("异常后返回模拟数据");
-            return getMockResults(query, limit);
+            return getMockResults(query, limit, negativePreferences);
         }
+    }
+
+    /**
+     * 语义检索衣物（兼容旧接口）
+     * @param userId 用户ID
+     * @param query 查询文本
+     * @param limit 限制数量
+     * @return 检索结果
+     */
+    public List<VectorSearchResult> searchClothes(Long userId, String query, Integer limit) {
+        return searchClothes(userId, query, limit, null);
     }
 
     /**
@@ -64,9 +78,10 @@ public class VectorSearchServiceV3 {
      * @param queryEmbedding 查询向量
      * @param limit 限制数量
      * @param query 查询文本
+     * @param negativePreferences 负面偏好
      * @return 检索结果
      */
-    private List<VectorSearchResult> executeVectorSearch(Long userId, float[] queryEmbedding, Integer limit, String query) {
+    private List<VectorSearchResult> executeVectorSearch(Long userId, float[] queryEmbedding, Integer limit, String query, List<String> negativePreferences) {
         try {
             System.err.println("开始执行向量搜索V3");
             // 使用pgvector执行向量检索
@@ -84,17 +99,27 @@ public class VectorSearchServiceV3 {
                 // 尝试从clothings表获取详细信息
                 VectorSearchResult result = getClothingDetails(clothingId);
                 if (result != null) {
-                    result.setSimilarity(similarity);
-                    results.add(result);
-                    System.err.println("添加结果: " + result.getName());
+                    // 检查是否符合负面偏好
+                    if (!isNegativeMatch(result, negativePreferences)) {
+                        result.setSimilarity(similarity);
+                        results.add(result);
+                        System.err.println("添加结果: " + result.getName());
+                    } else {
+                        System.err.println("过滤掉结果（负面偏好匹配）: " + result.getName());
+                    }
                 } else {
                     // 如果clothings表不存在，从clothing_embeddings表获取信息
                     System.err.println("clothings表不存在，尝试从clothing_embeddings表获取信息");
                     result = getClothingDetailsFromEmbeddings(clothingId);
                     if (result != null) {
-                        result.setSimilarity(similarity);
-                        results.add(result);
-                        System.err.println("添加结果: " + result.getName());
+                        // 检查是否符合负面偏好
+                        if (!isNegativeMatch(result, negativePreferences)) {
+                            result.setSimilarity(similarity);
+                            results.add(result);
+                            System.err.println("添加结果: " + result.getName());
+                        } else {
+                            System.err.println("过滤掉结果（负面偏好匹配）: " + result.getName());
+                        }
                     }
                 }
             }
@@ -103,7 +128,7 @@ public class VectorSearchServiceV3 {
             System.err.println("构建结果数量: " + results.size());
             if (results.isEmpty()) {
                 System.err.println("返回模拟数据");
-                return getMockResults(query, limit);
+                return getMockResults(query, limit, negativePreferences);
             }
 
             return results;
@@ -111,17 +136,49 @@ public class VectorSearchServiceV3 {
             System.err.println("执行向量搜索失败: " + e.getMessage());
             e.printStackTrace();
             // 返回模拟数据
-            return getMockResults(query, limit);
+            return getMockResults(query, limit, negativePreferences);
         }
+    }
+
+    /**
+     * 检查衣物是否匹配负面偏好
+     * @param result 衣物结果
+     * @param negativePreferences 负面偏好
+     * @return 是否匹配
+     */
+    private boolean isNegativeMatch(VectorSearchResult result, List<String> negativePreferences) {
+        if (negativePreferences == null || negativePreferences.isEmpty()) {
+            return false;
+        }
+        
+        // 检查颜色
+        String primaryColor = result.getPrimaryColor();
+        String secondaryColor = result.getSecondaryColor();
+        
+        for (String preference : negativePreferences) {
+            if (preference != null && !preference.isEmpty()) {
+                // 检查主颜色
+                if (primaryColor != null && primaryColor.contains(preference)) {
+                    return true;
+                }
+                // 检查次颜色
+                if (secondaryColor != null && secondaryColor.contains(preference)) {
+                    return true;
+                }
+            }
+        }
+        
+        return false;
     }
 
     /**
      * 获取模拟结果
      * @param query 查询文本
      * @param limit 限制数量
+     * @param negativePreferences 负面偏好
      * @return 模拟结果
      */
-    private List<VectorSearchResult> getMockResults(String query, Integer limit) {
+    private List<VectorSearchResult> getMockResults(String query, Integer limit, List<String> negativePreferences) {
         List<VectorSearchResult> results = new ArrayList<>();
         
         // 根据查询文本添加相关衣物
@@ -142,7 +199,9 @@ public class VectorSearchServiceV3 {
             winterJacket.setImageUrl("https://example.com/downjacket1.jpg");
             winterJacket.setFrequencyLevel(3);
             winterJacket.setSimilarity(0.98);
-            results.add(winterJacket);
+            if (!isNegativeMatch(winterJacket, negativePreferences)) {
+                results.add(winterJacket);
+            }
             
             VectorSearchResult winterSweater = new VectorSearchResult();
             winterSweater.setClothingId(5L);
@@ -157,7 +216,27 @@ public class VectorSearchServiceV3 {
             winterSweater.setImageUrl("https://example.com/sweater1.jpg");
             winterSweater.setFrequencyLevel(4);
             winterSweater.setSimilarity(0.95);
-            results.add(winterSweater);
+            if (!isNegativeMatch(winterSweater, negativePreferences)) {
+                results.add(winterSweater);
+            }
+            
+            // 添加额外的冬季衣物选项
+            VectorSearchResult winterCoat = new VectorSearchResult();
+            winterCoat.setClothingId(6L);
+            winterCoat.setName("藏青色大衣");
+            winterCoat.setCategory("外套");
+            winterCoat.setPrimaryColor("藏青色");
+            winterCoat.setSecondaryColor("无");
+            winterCoat.setMaterial("羊毛");
+            winterCoat.setStyleTags("保暖,正式");
+            winterCoat.setOccasionTags("正式,商务");
+            winterCoat.setSeasonTags("冬");
+            winterCoat.setImageUrl("https://example.com/coat1.jpg");
+            winterCoat.setFrequencyLevel(3);
+            winterCoat.setSimilarity(0.92);
+            if (!isNegativeMatch(winterCoat, negativePreferences)) {
+                results.add(winterCoat);
+            }
         } else {
             // 常规模拟数据
             VectorSearchResult result1 = new VectorSearchResult();
@@ -173,7 +252,9 @@ public class VectorSearchServiceV3 {
             result1.setImageUrl("https://example.com/tshirt1.jpg");
             result1.setFrequencyLevel(3);
             result1.setSimilarity(0.95);
-            results.add(result1);
+            if (!isNegativeMatch(result1, negativePreferences)) {
+                results.add(result1);
+            }
             
             VectorSearchResult result2 = new VectorSearchResult();
             result2.setClothingId(2L);
@@ -188,7 +269,27 @@ public class VectorSearchServiceV3 {
             result2.setImageUrl("https://example.com/jeans1.jpg");
             result2.setFrequencyLevel(4);
             result2.setSimilarity(0.90);
-            results.add(result2);
+            if (!isNegativeMatch(result2, negativePreferences)) {
+                results.add(result2);
+            }
+            
+            // 添加额外的非白色选项
+            VectorSearchResult result4 = new VectorSearchResult();
+            result4.setClothingId(7L);
+            result4.setName("黑色T恤");
+            result4.setCategory("上衣");
+            result4.setPrimaryColor("黑色");
+            result4.setSecondaryColor("无");
+            result4.setMaterial("棉");
+            result4.setStyleTags("休闲,简约");
+            result4.setOccasionTags("日常,休闲");
+            result4.setSeasonTags("春,夏,秋");
+            result4.setImageUrl("https://example.com/tshirt2.jpg");
+            result4.setFrequencyLevel(3);
+            result4.setSimilarity(0.93);
+            if (!isNegativeMatch(result4, negativePreferences)) {
+                results.add(result4);
+            }
         }
         
         // 添加通用衣物
@@ -205,7 +306,9 @@ public class VectorSearchServiceV3 {
         result3.setImageUrl("https://example.com/dress1.jpg");
         result3.setFrequencyLevel(2);
         result3.setSimilarity(0.85);
-        results.add(result3);
+        if (!isNegativeMatch(result3, negativePreferences)) {
+            results.add(result3);
+        }
         
         // 限制返回数量
         return results.subList(0, Math.min(results.size(), limit));

@@ -14,6 +14,7 @@ import com.ecru.outfit.service.rag.RagService;
 import com.github.pagehelper.PageHelper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,6 +53,10 @@ public class OutfitAdviceService {
 
     @Autowired
     private RagService ragService;
+
+    @Autowired
+    @Qualifier("aiTextGeneratorService")
+    private com.ecru.common.service.ai.AiTextGeneratorService textGeneratorService;
 
     @Autowired(required = false)
     private StringRedisTemplate redisTemplate;
@@ -277,19 +282,37 @@ public class OutfitAdviceService {
             // 4. 分析用户需求
             String userMessage = chatRequest.getMessage();
             
-            // 5. 将当前消息添加到历史
+            // 5. 使用AI分析查询意图
+            Map<String, Object> intentAnalysis = textGeneratorService.analyzeQueryIntent(userMessage);
+            log.info("查询意图分析结果: {}", intentAnalysis);
+            
+            // 6. 将当前消息添加到历史
             Map<String, String> userMessageMap = new HashMap<>();
             userMessageMap.put("role", "user");
             userMessageMap.put("content", userMessage);
             chatHistory.add(userMessageMap);
 
-            // 6. 生成衣物查询
-            String query = generateClothingQuery(userMessage, weatherInfo, chatRequest.getOccasion());
+            // 7. 生成衣物查询
+            String query = generateClothingQuery(userMessage, weatherInfo, chatRequest.getOccasion(), intentAnalysis);
 
-            // 7. 从衣柜中检索衣物
+            // 8. 从意图分析中提取负面偏好
+            List<String> negativePreferences = new ArrayList<>();
+            if (intentAnalysis.containsKey("negativePreferences")) {
+                Object negativePrefs = intentAnalysis.get("negativePreferences");
+                if (negativePrefs instanceof List) {
+                    for (Object pref : (List<?>) negativePrefs) {
+                        if (pref instanceof String) {
+                            negativePreferences.add((String) pref);
+                        }
+                    }
+                }
+            }
+            log.info("负面偏好: {}", negativePreferences);
+
+            // 9. 从衣柜中检索衣物
             List<Map<String, Object>> recommendedClothes = new ArrayList<>();
             if (query != null) {
-                var results = ragService.searchClothes(userId, query, 8);
+                var results = ragService.searchClothes(userId, query, 8, negativePreferences);
                 for (var result : results) {
                     Map<String, Object> item = new HashMap<>();
                     item.put("id", result.getClothingId());
@@ -302,19 +325,27 @@ public class OutfitAdviceService {
                 }
             }
 
-            // 8. 生成智能回复
-            String response = generateResponse(userMessage, weatherInfo, recommendedClothes, chatRequest.getOccasion());
+            // 10. 构建上下文信息
+            Map<String, Object> context = new HashMap<>();
+            context.put("weather", weatherInfoStr);
+            context.put("occasion", chatRequest.getOccasion());
+            context.put("clothes", recommendedClothes);
+            context.put("intent", intentAnalysis);
+            context.put("negativePreferences", negativePreferences);
 
-            // 9. 将回复添加到历史
+            // 11. 使用AI生成智能回复
+            String response = textGeneratorService.generateResponse(userMessage, chatHistory, context);
+
+            // 12. 将回复添加到历史
             Map<String, String> assistantMessageMap = new HashMap<>();
             assistantMessageMap.put("role", "assistant");
             assistantMessageMap.put("content", response);
             chatHistory.add(assistantMessageMap);
 
-            // 10. 保存聊天历史
+            // 13. 保存聊天历史
             saveChatHistory(userId, sessionId, chatHistory);
 
-            // 11. 构建响应
+            // 14. 构建响应
             ChatResponse chatResponse = new ChatResponse();
             chatResponse.setResponse(response);
             chatResponse.setRecommendedClothes(recommendedClothes);
@@ -349,9 +380,31 @@ public class OutfitAdviceService {
                 String key = "chat:history:" + sessionId;
                 String cachedData = redisTemplate.opsForValue().get(key);
                 if (cachedData != null) {
-                    // 直接返回空列表，避免类型转换问题
-                    // 后续可以优化为正确的类型转换
-                    return new ArrayList<>();
+                    try {
+                        // 尝试解析聊天历史
+                        Object parsed = com.alibaba.fastjson2.JSON.parse(cachedData);
+                        if (parsed instanceof List) {
+                            List<Map<String, String>> history = new ArrayList<>();
+                            for (Object item : (List<?>) parsed) {
+                                if (item instanceof Map) {
+                                    Map<String, String> convertedItem = new HashMap<>();
+                                    for (Map.Entry<?, ?> entry : ((Map<?, ?>) item).entrySet()) {
+                                        if (entry.getKey() instanceof String) {
+                                            convertedItem.put(
+                                                (String) entry.getKey(),
+                                                entry.getValue() != null ? entry.getValue().toString() : null
+                                            );
+                                        }
+                                    }
+                                    history.add(convertedItem);
+                                }
+                            }
+                            return history;
+                        }
+                    } catch (Exception e) {
+                        log.warn("解析聊天历史失败: {}", e.getMessage());
+                        return new ArrayList<>();
+                    }
                 }
             }
         } catch (Exception e) {
@@ -387,66 +440,121 @@ public class OutfitAdviceService {
      * @param userMessage 用户消息
      * @param weatherInfo 天气信息
      * @param occasion 场合
+     * @param intentAnalysis 意图分析结果
      * @return 查询文本
      */
-    private String generateClothingQuery(String userMessage, McpWeatherService.WeatherInfo weatherInfo, String occasion) {
+    private String generateClothingQuery(String userMessage, McpWeatherService.WeatherInfo weatherInfo, String occasion, Map<String, Object> intentAnalysis) {
         StringBuilder query = new StringBuilder();
         
         // 分析用户消息
         userMessage = userMessage.toLowerCase();
         
-        if (userMessage.contains("推荐") || userMessage.contains("建议") || userMessage.contains("穿什么")) {
-            // 根据天气添加查询条件
-            if (weatherInfo != null) {
-                double temperature = weatherInfo.getTemperature();
-                if (temperature >= 30) {
-                    query.append("夏季 清凉 透气 ");
-                } else if (temperature >= 20) {
-                    query.append("春秋 舒适 ");
-                } else if (temperature >= 10) {
-                    query.append("秋季 保暖 ");
-                } else {
-                    query.append("冬季 保暖 厚实 ");
-                }
-                
-                // 根据天气状况添加查询条件
-                String weatherCondition = weatherInfo.getWeatherCondition();
-                if (weatherCondition.contains("雨")) {
-                    query.append("防水 ");
-                } else if (weatherCondition.contains("雪")) {
-                    query.append("防寒 保暖 ");
-                } else if (weatherCondition.contains("晴")) {
-                    query.append("防晒 ");
+        // 根据天气添加查询条件
+        if (weatherInfo != null) {
+            double temperature = weatherInfo.getTemperature();
+            if (temperature >= 30) {
+                query.append("夏季 清凉 透气 ");
+            } else if (temperature >= 20) {
+                query.append("春秋 舒适 ");
+            } else if (temperature >= 10) {
+                query.append("秋季 保暖 ");
+            } else {
+                query.append("冬季 保暖 厚实 ");
+            }
+            
+            // 根据天气状况添加查询条件
+            String weatherCondition = weatherInfo.getWeatherCondition();
+            if (weatherCondition.contains("雨")) {
+                query.append("防水 ");
+            } else if (weatherCondition.contains("雪")) {
+                query.append("防寒 保暖 ");
+            } else if (weatherCondition.contains("晴")) {
+                query.append("防晒 ");
+            }
+        }
+        
+        // 根据场合添加查询条件
+        if (occasion != null) {
+            occasion = occasion.toLowerCase();
+            if (occasion.contains("正式") || occasion.contains("商务")) {
+                query.append("正式 商务 ");
+            } else if (occasion.contains("休闲")) {
+                query.append("休闲 舒适 ");
+            } else if (occasion.contains("运动")) {
+                query.append("运动 透气 ");
+            } else if (occasion.contains("约会")) {
+                query.append("时尚 优雅 ");
+            } else if (occasion.contains("聚会")) {
+                query.append("时尚 派对 ");
+            }
+        }
+        
+        // 根据意图分析结果添加查询条件
+        if (intentAnalysis != null) {
+            // 添加风格
+            if (intentAnalysis.containsKey("style")) {
+                String style = (String) intentAnalysis.get("style");
+                if (style != null) {
+                    query.append(style).append(" ");
                 }
             }
             
-            // 根据场合添加查询条件
-            if (occasion != null) {
-                occasion = occasion.toLowerCase();
-                if (occasion.contains("正式") || occasion.contains("商务")) {
-                    query.append("正式 商务 ");
-                } else if (occasion.contains("休闲")) {
-                    query.append("休闲 舒适 ");
-                } else if (occasion.contains("运动")) {
-                    query.append("运动 透气 ");
+            // 添加季节
+            if (intentAnalysis.containsKey("season")) {
+                String season = (String) intentAnalysis.get("season");
+                if (season != null) {
+                    query.append(season).append(" ");
                 }
             }
             
-            // 提取用户提到的关键词
-            if (userMessage.contains("衬衫")) query.append("衬衫 ");
-            if (userMessage.contains("裤子")) query.append("裤子 ");
-            if (userMessage.contains("裙子")) query.append("裙子 ");
-            if (userMessage.contains("外套")) query.append("外套 ");
-            if (userMessage.contains("鞋子")) query.append("鞋子 ");
-            
-            // 添加风格关键词
-            if (userMessage.contains("时尚") || userMessage.contains("潮流")) {
-                query.append("时尚 潮流 ");
-            } else if (userMessage.contains("简约") || userMessage.contains("休闲")) {
-                query.append("简约 休闲 ");
+            // 添加天气需求
+            if (intentAnalysis.containsKey("weather")) {
+                String weatherNeed = (String) intentAnalysis.get("weather");
+                if (weatherNeed != null) {
+                    query.append(weatherNeed).append(" ");
+                }
             }
-        } else {
-            // 直接使用用户消息作为查询
+            
+            // 添加衣物类型
+            if (intentAnalysis.containsKey("clothingType")) {
+                String clothingType = (String) intentAnalysis.get("clothingType");
+                if (clothingType != null) {
+                    query.append(clothingType).append(" ");
+                }
+            }
+            
+            // 添加关键词
+            if (intentAnalysis.containsKey("keywords")) {
+                List<String> keywords = (List<String>) intentAnalysis.get("keywords");
+                if (keywords != null && !keywords.isEmpty()) {
+                    for (String keyword : keywords) {
+                        query.append(keyword).append(" ");
+                    }
+                }
+            }
+        }
+        
+        // 提取用户提到的关键词
+        if (userMessage.contains("衬衫")) query.append("衬衫 ");
+        if (userMessage.contains("裤子")) query.append("裤子 ");
+        if (userMessage.contains("裙子")) query.append("裙子 ");
+        if (userMessage.contains("外套")) query.append("外套 ");
+        if (userMessage.contains("鞋子")) query.append("鞋子 ");
+        if (userMessage.contains("毛衣")) query.append("毛衣 ");
+        if (userMessage.contains("T恤")) query.append("T恤 ");
+        if (userMessage.contains("牛仔裤")) query.append("牛仔裤 ");
+        
+        // 添加风格关键词
+        if (userMessage.contains("时尚") || userMessage.contains("潮流")) {
+            query.append("时尚 潮流 ");
+        } else if (userMessage.contains("简约") || userMessage.contains("休闲")) {
+            query.append("简约 休闲 ");
+        } else if (userMessage.contains("正式") || userMessage.contains("商务")) {
+            query.append("正式 商务 ");
+        }
+        
+        // 如果查询为空，使用用户消息作为查询
+        if (query.length() == 0) {
             query.append(userMessage);
         }
         
