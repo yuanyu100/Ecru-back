@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ecru.outfit.mapper.AiConversationMapper">
+
+    <select id="selectByUserId" resultType="com.ecru.outfit.entity.AiConversation">
+        SELECT * FROM ai_conversations WHERE user_id = #{userId} ORDER BY updated_at DESC
+    </select>
+
+    <select id="selectByUserIdAndActive" resultType="com.ecru.outfit.entity.AiConversation">
+        SELECT * FROM ai_conversations WHERE user_id = #{userId} AND is_active = #{isActive} ORDER BY updated_at DESC
+    </select>
+
+    <select id="selectBySessionId" resultType="com.ecru.outfit.entity.AiConversation">
+        SELECT * FROM ai_conversations WHERE session_id = #{sessionId}
+    </select>
+
+    <select id="selectByUserIdAndContext" resultType="com.ecru.outfit.entity.AiConversation">
+        SELECT * FROM ai_conversations WHERE user_id = #{userId} AND context = #{context} ORDER BY updated_at DESC
+    </select>
+
+    <select id="countByUserId" resultType="java.lang.Integer">
+        SELECT COUNT(*) FROM ai_conversations WHERE user_id = #{userId}
+    </select>
+
+    <update id="updateMessageCount">
+        UPDATE ai_conversations SET
+            message_count = #{messageCount},
+            updated_at = NOW()
+        WHERE id = #{conversationId}
+    </update>
+
+</mapper>
