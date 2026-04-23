@@ -15,7 +15,7 @@ bishe/
 │  └─ manual-tests/          # 手工联调脚本、HTML、SQL 样例
 ├─ frontend/                 # 前端工作区
 │  ├─ user-app/              # 当前主用户端（Vue 3 + Vite）
-│  └─ admin-prototype/       # 后台原型，含较多 mock/占位内容
+│  └─ admin-app/             # 后台应用骨架（Vue 3 + Vite）
 ├─ docs/
 │  ├─ product/
 │  ├─ technical/
@@ -27,7 +27,7 @@ bishe/
 
 - 主后端：`backend`
 - 主用户端：`frontend/user-app`
-- `frontend/admin-prototype` 目前仅作后台原型参考，不作为主联调入口
+- 主后台端：`frontend/admin-app`
 
 ## 启动方式
 
@@ -47,6 +47,13 @@ mvn spring-boot:run -pl ecru-web
 ```powershell
 cd frontend
 cd user-app
+npm install
+npm run dev
+```
+
+```powershell
+cd frontend
+cd admin-app
 npm install
 npm run dev
 ```
