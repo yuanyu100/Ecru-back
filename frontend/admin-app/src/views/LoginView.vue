@@ -3,7 +3,7 @@
     <div class="auth-panel">
       <p class="eyebrow">Ecru Admin</p>
       <h1>后台管理入口</h1>
-      <p class="auth-copy">当前后台已接入真实登录接口。只有管理员账号可以进入用户管理和 AI 监控。</p>
+      <p class="auth-copy">当前后台直接对接真实登录接口，管理员权限由后端角色控制。</p>
 
       <form class="auth-form" @submit.prevent="handleSubmit">
         <label>
@@ -22,7 +22,7 @@
       </form>
 
       <p v-if="errorMessage" class="form-message error">{{ errorMessage }}</p>
-      <p class="form-tip">后端当前约定 `userId = 1` 为管理员身份。</p>
+      <p class="form-tip">Nginx 部署后，后台入口会固定在 `/admin/`。</p>
     </div>
   </section>
 </template>
@@ -51,7 +51,7 @@ const handleSubmit = async () => {
       return;
     }
 
-    router.push('/admin/dashboard');
+    router.push('/dashboard');
   } catch (error) {
     errorMessage.value = error.response?.data?.message || '登录失败，请确认后端服务已启动。';
   } finally {

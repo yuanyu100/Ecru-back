@@ -4,7 +4,7 @@ import { authApi } from '../api/auth';
 const routes = [
   {
     path: '/',
-    redirect: '/admin/dashboard'
+    redirect: '/dashboard'
   },
   {
     path: '/login',
@@ -13,13 +13,13 @@ const routes = [
     meta: { guestOnly: true }
   },
   {
-    path: '/admin',
+    path: '/',
     component: () => import('../views/Admin/AdminLayout.vue'),
     meta: { requiresAuth: true },
     children: [
       {
         path: '',
-        redirect: '/admin/dashboard'
+        redirect: '/dashboard'
       },
       {
         path: 'dashboard',
@@ -50,7 +50,7 @@ const routes = [
 ];
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes
 });
 
@@ -60,7 +60,7 @@ router.beforeEach((to) => {
   const currentUser = authApi.getCurrentUser();
 
   if (to.meta.guestOnly && authApi.isAuthenticated()) {
-    return '/admin/dashboard';
+    return '/dashboard';
   }
 
   if (requiresAuth && !authApi.isAuthenticated()) {
@@ -68,7 +68,7 @@ router.beforeEach((to) => {
   }
 
   if (requiresAdmin && currentUser?.role !== 'ADMIN') {
-    return '/admin/dashboard';
+    return '/dashboard';
   }
 
   return true;

@@ -16,6 +16,10 @@ Thumbs.db
 logs/
 *.log
 hs_err_pid*
+backend/run.log
+backend/run.err
+deploy/nginx/logs/
+deploy/nginx/temp/
 
 # Environment variables
 .env
