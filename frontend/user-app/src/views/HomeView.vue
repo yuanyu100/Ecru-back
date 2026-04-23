@@ -8,8 +8,8 @@
             登录
           </button>
           <template v-else>
-            <button class="ghost-button" type="button" @click="navigateToProfile">个人页</button>
-            <button class="ghost-button" type="button" @click="navigateToChat">搭配助手</button>
+            <button class="ghost-button" type="button" @click="navigateToProfile">个人中心</button>
+            <button class="ghost-button" type="button" @click="navigateToChat">穿搭助手</button>
           </template>
         </div>
       </div>
@@ -18,7 +18,7 @@
         <div>
           <h1>{{ headline }}</h1>
           <p class="hero-copy">
-            先把移动端主链路走通：衣橱录入、AI 对话、偏好设置和最近搭配，都集中在这里。
+            先把移动端主链路走通：衣橱录入、AI 对话、偏好设置和最近穿搭，都集中在这里。
           </p>
         </div>
 
@@ -28,7 +28,7 @@
             <strong>{{ conversationList.length }}</strong>
           </article>
           <article class="metric-pill">
-            <span>搭配记录</span>
+            <span>穿搭记录</span>
             <strong>{{ outfitHistory.length }}</strong>
           </article>
           <article class="metric-pill">
@@ -42,8 +42,8 @@
     <section class="action-grid">
       <article class="action-card primary" @click="navigateToChat">
         <p class="eyebrow">AI Flow</p>
-        <h2>开始智能搭配</h2>
-        <p>进入真实聊天链路，直接让后端结合衣橱推荐单品。</p>
+        <h2>开始智能穿搭</h2>
+        <p>进入真实对话链路，直接让后端结合衣橱数据推荐单品。</p>
         <button class="primary-button" type="button" @click.stop="navigateToChat">去聊天</button>
       </article>
 
@@ -57,14 +57,14 @@
       <article class="action-card" @click="navigateToWardrobe">
         <p class="eyebrow">Collection</p>
         <h2>管理我的衣橱</h2>
-        <p>查看已录入衣物、编辑主图、完善颜色和使用频率。</p>
+        <p>查看已录入衣物、编辑主图、补全颜色与使用频率。</p>
         <button class="ghost-button" type="button" @click.stop="navigateToWardrobe">去衣橱</button>
       </article>
 
       <article class="action-card" @click="navigateToProfile">
         <p class="eyebrow">Profile</p>
         <h2>维护个人偏好</h2>
-        <p>同步风格偏好、尺码、地区和头像，方便后续推荐更稳定。</p>
+        <p>同步风格偏好、尺码、地区和头像，便于后续推荐更稳定。</p>
         <button class="ghost-button" type="button" @click.stop="navigateToProfile">去设置</button>
       </article>
     </section>
@@ -128,7 +128,7 @@
 
         <div v-if="conversationList.length === 0" class="empty-block">
           <p>还没有会话记录。</p>
-          <button class="primary-button" type="button" @click="navigateToChat">开始第一次搭配咨询</button>
+          <button class="primary-button" type="button" @click="navigateToChat">开始第一次穿搭咨询</button>
         </div>
 
         <div v-else class="list-block">
@@ -151,18 +151,23 @@
         <div class="section-header">
           <div>
             <p class="eyebrow">Outfit History</p>
-            <h2>最近搭配记录</h2>
+            <h2>最近穿搭记录</h2>
           </div>
           <button class="ghost-button" type="button" @click="navigateToChat">继续生成</button>
         </div>
 
         <div v-if="outfitHistory.length === 0" class="empty-block">
-          <p>目前还没有落库的搭配记录。</p>
-          <p class="muted-text">这通常说明你还没有使用“搭配建议记录”这条旧接口，现阶段先走 AI 聊天也没问题。</p>
+          <p>目前还没有落库的穿搭记录。</p>
+          <p class="muted-text">先去生成一次穿搭建议，记录列表和详情页就会有数据。</p>
         </div>
 
         <div v-else class="history-grid">
-          <article v-for="item in outfitHistory" :key="item.id" class="history-card">
+          <article
+            v-for="item in outfitHistory"
+            :key="item.id"
+            class="history-card"
+            @click="openOutfitDetail(item.id)"
+          >
             <div class="history-card-top">
               <div>
                 <h3>{{ item.outfitName }}</h3>
@@ -212,13 +217,10 @@ const headline = computed(() => {
   return `${nickname}，今天想怎么穿？`;
 });
 
-const preferredStyleCount = computed(() => {
-  return styleProfile.value?.preferredStylesList?.length || 0;
-});
+const preferredStyleCount = computed(() => styleProfile.value?.preferredStylesList?.length || 0);
 
 const loadDashboard = async () => {
   isAuthenticated.value = authApi.isAuthenticated();
-
   if (!isAuthenticated.value) {
     return;
   }
@@ -247,31 +249,23 @@ const loadDashboard = async () => {
   }
 };
 
-const navigateToLogin = () => {
-  router.push('/login');
-};
-
-const navigateToProfile = () => {
-  router.push('/profile');
-};
-
-const navigateToChat = () => {
-  router.push('/chat');
-};
-
-const navigateToWardrobe = () => {
-  router.push('/wardrobe');
-};
-
-const navigateToAddClothing = () => {
-  router.push('/wardrobe/add');
-};
+const navigateToLogin = () => router.push('/login');
+const navigateToProfile = () => router.push('/profile');
+const navigateToChat = () => router.push('/chat');
+const navigateToWardrobe = () => router.push('/wardrobe');
+const navigateToAddClothing = () => router.push('/wardrobe/add');
 
 const openConversation = (sessionId) => {
   if (sessionId) {
     localStorage.setItem('chatSessionId', sessionId);
   }
   router.push('/chat');
+};
+
+const openOutfitDetail = (id) => {
+  if (id) {
+    router.push(`/outfit/history/${id}`);
+  }
 };
 
 const formatTime = (value) => {
@@ -514,6 +508,10 @@ onMounted(loadDashboard);
 
 .history-grid {
   display: grid;
+}
+
+.history-card {
+  cursor: pointer;
 }
 
 .history-card-top {

@@ -2,22 +2,52 @@ import { apiClient } from './client';
 
 const splitTags = (value) =>
   String(value || '')
-    .split(/[，,、]/)
+    .split(/[，、,]/)
     .map((item) => item.trim())
     .filter(Boolean);
 
 const normalizeHistoryItem = (item = {}) => ({
   ...item,
   id: item.id,
-  outfitName: item.outfitName || '未命名搭配',
+  outfitName: item.outfitName || '未命名穿搭',
   outfitDescription: item.outfitDescription || '',
   occasion: item.occasion || '',
   weatherCondition: item.weatherCondition || '',
   season: item.season || '',
+  reasoning: item.reasoning || '',
+  fashionSuggestions: item.fashionSuggestions || '',
   isFavorite: Boolean(item.isFavorite),
   createdAt: item.createdAt || '',
   updatedAt: item.updatedAt || ''
 });
+
+const normalizeOutfitItem = (item = {}) => ({
+  ...item,
+  id: item.id,
+  itemName: item.itemName || '未命名单品',
+  itemCategory: item.itemCategory || '',
+  itemColor: item.itemColor || '',
+  itemImageUrl: item.itemImageUrl || '',
+  isRecommended: Boolean(item.isRecommended),
+  reason: item.reason || ''
+});
+
+const normalizeFeedback = (feedback) => {
+  if (!feedback) {
+    return null;
+  }
+
+  return {
+    ...feedback,
+    overallRating: Number(feedback.overallRating || 0),
+    styleRating: Number(feedback.styleRating || 0),
+    practicalityRating: Number(feedback.practicalityRating || 0),
+    weatherRating: Number(feedback.weatherRating || 0),
+    isWorn: Boolean(feedback.isWorn),
+    feedbackText: feedback.feedbackText || '',
+    wornAt: feedback.wornAt || ''
+  };
+};
 
 const normalizeStyleProfile = (profile = {}) => ({
   ...profile,
@@ -28,19 +58,23 @@ const normalizeStyleProfile = (profile = {}) => ({
   lifestyleTagsList: splitTags(profile.lifestyleTags)
 });
 
+const normalizeAdviceDetail = (payload = {}) => ({
+  record: normalizeHistoryItem(payload.record || {}),
+  items: Array.isArray(payload.items) ? payload.items.map(normalizeOutfitItem) : [],
+  feedback: normalizeFeedback(payload.feedback)
+});
+
 export const outfitApi = {
   async getHistory(page = 1, size = 5) {
     const response = await apiClient.get('/outfit/history', {
       params: { page, size }
     });
 
-    const items = Array.isArray(response.data?.data)
-      ? response.data.data.map(normalizeHistoryItem)
-      : [];
-
     return {
       ...response.data,
-      data: items
+      data: Array.isArray(response.data?.data)
+        ? response.data.data.map(normalizeHistoryItem)
+        : []
     };
   },
 
@@ -48,8 +82,12 @@ export const outfitApi = {
     const response = await apiClient.get(`/outfit/history/${id}`);
     return {
       ...response.data,
-      data: normalizeHistoryItem(response.data?.data)
+      data: normalizeAdviceDetail(response.data?.data || {})
     };
+  },
+
+  async deleteAdvice(id) {
+    return (await apiClient.delete(`/outfit/history/${id}`)).data;
   },
 
   async toggleFavorite(id, isFavorite) {
@@ -58,6 +96,14 @@ export const outfitApi = {
         params: { isFavorite }
       })
     ).data;
+  },
+
+  async submitFeedback(id, payload) {
+    const response = await apiClient.post(`/outfit/${id}/feedback`, payload);
+    return {
+      ...response.data,
+      data: normalizeFeedback(response.data?.data)
+    };
   },
 
   async getStyleProfile() {
@@ -69,7 +115,6 @@ export const outfitApi = {
   },
 
   async updateStyleProfile(payload) {
-    const response = await apiClient.put('/outfit/style-profile', payload);
-    return response.data;
+    return (await apiClient.put('/outfit/style-profile', payload)).data;
   }
 };

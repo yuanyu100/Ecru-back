@@ -1,5 +1,7 @@
 package com.ecru.outfit.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.ecru.outfit.dto.response.OutfitAdviceDetailDTO;
 import com.ecru.outfit.entity.OutfitAdviceRecord;
 import com.ecru.outfit.entity.OutfitItem;
 import com.ecru.outfit.entity.OutfitFeedback;
@@ -20,10 +22,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.InputStream;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -182,8 +186,17 @@ public class OutfitAdviceService {
      * @param id 搭配记录ID
      * @return 搭配记录
      */
-    public OutfitAdviceRecord getAdviceById(Long id) {
-        return outfitAdviceRecordMapper.selectById(id);
+    public OutfitAdviceDetailDTO getAdviceById(Long id, Long userId) {
+        OutfitAdviceRecord record = getOwnedAdviceRecord(id, userId);
+        if (record == null) {
+            return null;
+        }
+
+        OutfitAdviceDetailDTO detail = new OutfitAdviceDetailDTO();
+        detail.setRecord(record);
+        detail.setItems(outfitItemMapper.selectByOutfitAdviceId(id));
+        detail.setFeedback(outfitFeedbackMapper.selectByOutfitAndUser(id, userId));
+        return detail;
     }
 
     /**
@@ -192,7 +205,16 @@ public class OutfitAdviceService {
      * @return 是否成功
      */
     @Transactional
-    public boolean deleteAdvice(Long id) {
+    public boolean deleteAdvice(Long id, Long userId) {
+        if (getOwnedAdviceRecord(id, userId) == null) {
+            return false;
+        }
+        outfitFeedbackMapper.delete(new LambdaQueryWrapper<OutfitFeedback>()
+                .eq(OutfitFeedback::getOutfitAdviceId, id)
+                .eq(OutfitFeedback::getUserId, userId));
+        if (getOwnedAdviceRecord(id, userId) == null) {
+            return false;
+        }
         // 删除搭配单品
         outfitItemMapper.deleteByOutfitAdviceId(id);
         // 删除搭配记录
@@ -205,12 +227,13 @@ public class OutfitAdviceService {
      * @param isFavorite 是否收藏
      * @return 是否成功
      */
-    public boolean toggleFavorite(Long id, Boolean isFavorite) {
-        OutfitAdviceRecord record = outfitAdviceRecordMapper.selectById(id);
+    public boolean toggleFavorite(Long id, Long userId, Boolean isFavorite) {
+        OutfitAdviceRecord record = getOwnedAdviceRecord(id, userId);
         if (record == null) {
             return false;
         }
         record.setIsFavorite(isFavorite);
+        record.setUpdatedAt(LocalDateTime.now());
         return outfitAdviceRecordMapper.updateById(record) > 0;
     }
 
@@ -222,8 +245,30 @@ public class OutfitAdviceService {
      * @return 反馈记录
      */
     public OutfitFeedback submitFeedback(Long outfitAdviceId, Long userId, OutfitFeedback feedback) {
+        if (getOwnedAdviceRecord(outfitAdviceId, userId) == null) {
+            return null;
+        }
+
+        OutfitFeedback existing = outfitFeedbackMapper.selectByOutfitAndUser(outfitAdviceId, userId);
+        LocalDateTime now = LocalDateTime.now();
+
+        if (existing != null) {
+            existing.setOverallRating(feedback.getOverallRating());
+            existing.setStyleRating(feedback.getStyleRating());
+            existing.setPracticalityRating(feedback.getPracticalityRating());
+            existing.setWeatherRating(feedback.getWeatherRating());
+            existing.setIsWorn(feedback.getIsWorn());
+            existing.setWornAt(feedback.getWornAt());
+            existing.setFeedbackText(feedback.getFeedbackText());
+            existing.setUpdatedAt(now);
+            outfitFeedbackMapper.updateById(existing);
+            return existing;
+        }
+
         feedback.setOutfitAdviceId(outfitAdviceId);
         feedback.setUserId(userId);
+        feedback.setCreatedAt(now);
+        feedback.setUpdatedAt(now);
         outfitFeedbackMapper.insert(feedback);
         return feedback;
     }
@@ -233,6 +278,14 @@ public class OutfitAdviceService {
      * @param userId 用户ID
      * @return 风格档案
      */
+    private OutfitAdviceRecord getOwnedAdviceRecord(Long id, Long userId) {
+        OutfitAdviceRecord record = outfitAdviceRecordMapper.selectById(id);
+        if (record == null || !Objects.equals(record.getUserId(), userId)) {
+            return null;
+        }
+        return record;
+    }
+
     public UserStyleProfile getStyleProfile(Long userId) {
         UserStyleProfile profile = userStyleProfileMapper.selectByUserId(userId);
         if (profile == null) {
@@ -249,6 +302,19 @@ public class OutfitAdviceService {
      * @return 是否成功
      */
     public boolean updateStyleProfile(UserStyleProfile profile) {
+        UserStyleProfile existing = userStyleProfileMapper.selectByUserId(profile.getUserId());
+        LocalDateTime now = LocalDateTime.now();
+
+        if (existing == null) {
+            profile.setId(null);
+            profile.setCreatedAt(now);
+            profile.setUpdatedAt(now);
+            return userStyleProfileMapper.insert(profile) > 0;
+        }
+
+        profile.setId(existing.getId());
+        profile.setCreatedAt(existing.getCreatedAt());
+        profile.setUpdatedAt(now);
         return userStyleProfileMapper.updateById(profile) > 0;
     }
 

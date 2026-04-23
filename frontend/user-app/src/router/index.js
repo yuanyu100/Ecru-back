@@ -58,6 +58,12 @@ const routes = [
     name: 'clothing-detail',
     component: () => import('../views/ClothingDetailView.vue'),
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/outfit/history/:id',
+    name: 'outfit-history-detail',
+    component: () => import('../views/OutfitHistoryDetailView.vue'),
+    meta: { requiresAuth: true }
   }
 ];
 
