@@ -1,489 +1,636 @@
 <template>
-  <div class="profile">
-    <header class="profile-header">
-      <h1>个人设置</h1>
-      <button class="back-btn" @click="goBack">返回</button>
+  <div class="profile-page">
+    <header class="page-header">
+      <button class="ghost-button" type="button" @click="goHome">返回首页</button>
+      <div>
+        <p class="eyebrow">Account Center</p>
+        <h1>个人设置</h1>
+      </div>
     </header>
-    
-    <div v-if="isLoading" class="loading-container">
-      <div class="loading-indicator">
-        <span class="dot"></span>
-        <span class="dot"></span>
-        <span class="dot"></span>
-      </div>
-      <p>加载中...</p>
-    </div>
-    
-    <div v-else class="profile-content">
-      <div class="profile-section">
-        <h2>基本信息</h2>
-        <div class="info-item">
-          <span class="info-label">用户名:</span>
-          <span class="info-value">{{ userInfo.nickname }}</span>
+
+    <div v-if="isLoading" class="state-card">正在加载账户信息...</div>
+
+    <div v-else class="content-grid">
+      <section class="panel profile-hero">
+        <div class="avatar-shell">
+          <img v-if="avatarPreview" :src="avatarPreview" alt="avatar" />
+          <span v-else>{{ displayInitial }}</span>
         </div>
-        <div class="info-item">
-          <span class="info-label">邮箱:</span>
-          <span class="info-value">{{ userInfo.email }}</span>
+
+        <div class="hero-copy">
+          <p class="user-name">{{ profileForm.nickname || currentProfile.username || '未命名用户' }}</p>
+          <p class="user-meta">{{ currentProfile.email || '未设置邮箱' }}</p>
+          <p class="user-meta">角色：{{ currentProfile.role || 'USER' }}</p>
         </div>
-        <div class="info-item">
-          <span class="info-label">注册时间:</span>
-          <span class="info-value">{{ formatDate(userInfo.registrationTime) }}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">最后登录:</span>
-          <span class="info-value">{{ formatDate(userInfo.lastLoginTime) }}</span>
-        </div>
-      </div>
-      
-      <div class="profile-section">
-        <h2>风格偏好</h2>
-        <form @submit.prevent="updatePreferences">
-          <div class="form-group">
-            <label>风格偏好</label>
-            <div class="style-tags">
-              <span 
-                v-for="style in availableStyles" 
-                :key="style"
-                :class="['style-tag', userPreferences.stylePreferences.includes(style) ? 'active' : '']"
-                @click="toggleStyle(style)"
-              >
-                {{ style }}
-              </span>
-            </div>
+
+        <label :class="['upload-avatar', isUploadingAvatar ? 'disabled' : '']">
+          <input type="file" accept="image/*" :disabled="isUploadingAvatar" @change="handleAvatarUpload" />
+          {{ isUploadingAvatar ? '上传中...' : '更新头像' }}
+        </label>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Profile</p>
+            <h2>基础资料</h2>
           </div>
-          
-          <div class="form-group">
-            <label for="usualSize">常用尺码</label>
-            <input 
-              type="text" 
-              id="usualSize" 
-              v-model="userPreferences.usualSize"
-              placeholder="请输入常用尺码"
-            />
-          </div>
-          
-          <div class="form-group">
-            <label for="region">所在地区</label>
-            <input 
-              type="text" 
-              id="region" 
-              v-model="userPreferences.region"
-              placeholder="请输入所在地区"
-            />
-          </div>
-          
-          <button type="submit" class="save-btn" :disabled="isSaving">
-            {{ isSaving ? '保存中...' : '保存修改' }}
+          <button class="primary-button" type="button" :disabled="isSavingProfile" @click="saveProfile">
+            {{ isSavingProfile ? '保存中...' : '保存资料' }}
           </button>
-        </form>
-      </div>
-      
-      <div class="profile-section">
-        <h2>账号安全</h2>
-        <div class="security-actions">
-          <button class="security-btn">修改密码</button>
-          <button class="logout-btn" @click="logout">退出登录</button>
         </div>
-      </div>
+
+        <div class="form-grid">
+          <label>
+            <span>昵称</span>
+            <input v-model.trim="profileForm.nickname" type="text" maxlength="50" placeholder="请输入昵称" />
+          </label>
+          <label>
+            <span>邮箱</span>
+            <input v-model.trim="profileForm.email" type="email" placeholder="例如：name@example.com" />
+          </label>
+          <label>
+            <span>手机号</span>
+            <input v-model.trim="profileForm.phone" type="text" placeholder="例如：13800138000" />
+          </label>
+          <label>
+            <span>性别</span>
+            <select v-model.number="profileForm.gender">
+              <option :value="0">未设置</option>
+              <option :value="1">男</option>
+              <option :value="2">女</option>
+            </select>
+          </label>
+          <label class="wide">
+            <span>生日</span>
+            <input v-model="profileForm.birthday" type="date" />
+          </label>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Preference</p>
+            <h2>穿搭偏好</h2>
+          </div>
+          <button class="primary-button" type="button" :disabled="isSavingSettings" @click="saveSettings">
+            {{ isSavingSettings ? '保存中...' : '保存偏好' }}
+          </button>
+        </div>
+
+        <div class="chip-group">
+          <button
+            v-for="style in availableStyles"
+            :key="style"
+            type="button"
+            :class="['chip', settingsForm.stylePreferences.includes(style) ? 'active' : '']"
+            @click="toggleStyle(style)"
+          >
+            {{ style }}
+          </button>
+        </div>
+
+        <div class="form-grid">
+          <label>
+            <span>常用尺码</span>
+            <input v-model.trim="settingsForm.usualSize" type="text" placeholder="例如：M / 38 / 42" />
+          </label>
+          <label>
+            <span>常驻地区</span>
+            <input v-model.trim="settingsForm.region" type="text" placeholder="例如：上海 / 杭州" />
+          </label>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Security</p>
+            <h2>修改密码</h2>
+          </div>
+          <button class="primary-button" type="button" :disabled="isUpdatingPassword" @click="savePassword">
+            {{ isUpdatingPassword ? '提交中...' : '更新密码' }}
+          </button>
+        </div>
+
+        <div class="form-grid">
+          <label>
+            <span>当前密码</span>
+            <input v-model="passwordForm.oldPassword" type="password" placeholder="请输入当前密码" />
+          </label>
+          <label>
+            <span>新密码</span>
+            <input v-model="passwordForm.newPassword" type="password" placeholder="不少于 6 位" />
+          </label>
+          <label class="wide">
+            <span>确认新密码</span>
+            <input v-model="passwordForm.confirmPassword" type="password" placeholder="再次输入新密码" />
+          </label>
+        </div>
+      </section>
+
+      <section class="panel account-panel">
+        <div>
+          <p class="eyebrow">Account</p>
+          <h2>账户状态</h2>
+        </div>
+
+        <dl class="meta-list">
+          <div>
+            <dt>用户名</dt>
+            <dd>{{ currentProfile.username || '-' }}</dd>
+          </div>
+          <div>
+            <dt>注册时间</dt>
+            <dd>{{ formatDate(currentProfile.createdAt) }}</dd>
+          </div>
+          <div>
+            <dt>最近登录</dt>
+            <dd>{{ formatDate(currentProfile.lastLoginAt) }}</dd>
+          </div>
+        </dl>
+
+        <div class="account-actions">
+          <button class="ghost-button" type="button" @click="goWardrobe">我的衣橱</button>
+          <button class="danger-button" type="button" @click="logout">退出登录</button>
+        </div>
+      </section>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { authApi } from '../api/auth';
+import { wardrobeApi } from '../api/wardrobe';
 
 const router = useRouter();
 const isLoading = ref(true);
-const isSaving = ref(false);
-const userInfo = ref({});
-const userPreferences = reactive({
+const isSavingProfile = ref(false);
+const isSavingSettings = ref(false);
+const isUpdatingPassword = ref(false);
+const isUploadingAvatar = ref(false);
+const currentProfile = ref({});
+const avatarPreview = ref('');
+
+const availableStyles = ['通勤', '休闲', '运动', '复古', '极简', '甜酷', '学院', '户外'];
+
+const profileForm = reactive({
+  nickname: '',
+  email: '',
+  phone: '',
+  gender: 0,
+  birthday: ''
+});
+
+const settingsForm = reactive({
   stylePreferences: [],
   usualSize: '',
   region: ''
 });
 
-const availableStyles = ['休闲', '商务', '运动', '复古', '时尚', '简约'];
+const passwordForm = reactive({
+  oldPassword: '',
+  newPassword: '',
+  confirmPassword: ''
+});
 
-const fetchUserInfo = async () => {
+const displayInitial = computed(() => {
+  const source = profileForm.nickname || currentProfile.value.username || 'E';
+  return source.charAt(0).toUpperCase();
+});
+
+const parseStylePreferences = (value) => {
+  if (!value) {
+    return [];
+  }
+
+  if (Array.isArray(value)) {
+    return value.filter(Boolean);
+  }
+
   try {
-    const currentUser = authApi.getCurrentUser();
-    if (currentUser) {
-      // 这里需要实现获取用户详情的API调用
-      // 暂时使用模拟数据
-      userInfo.value = {
-        userId: currentUser.userId,
-        nickname: currentUser.nickname,
-        email: currentUser.email,
-        registrationTime: '2026-01-01T00:00:00Z',
-        lastLoginTime: '2026-03-24T12:00:00Z'
-      };
-      
-      // 模拟用户偏好
-      userPreferences.stylePreferences = ['休闲', '商务'];
-      userPreferences.usualSize = 'M';
-      userPreferences.region = '北京市';
-    }
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+  } catch (_error) {
+    return String(value)
+      .split(/[，,]/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+};
+
+const applyProfile = (profile = {}) => {
+  currentProfile.value = profile;
+  profileForm.nickname = profile.nickname || '';
+  profileForm.email = profile.email || '';
+  profileForm.phone = profile.phone || '';
+  profileForm.gender = Number(profile.gender ?? 0);
+  profileForm.birthday = profile.birthday || '';
+  avatarPreview.value = profile.avatarUrl || '';
+};
+
+const applySettings = (settings = {}) => {
+  settingsForm.stylePreferences = parseStylePreferences(settings.stylePreferences);
+  settingsForm.usualSize = settings.usualSize || '';
+  settingsForm.region = settings.region || '';
+};
+
+const loadPage = async () => {
+  isLoading.value = true;
+  try {
+    const [profileResponse, settingsResponse] = await Promise.all([
+      authApi.getCurrentProfile(),
+      authApi.getUserSettings()
+    ]);
+
+    applyProfile(profileResponse.data || {});
+    applySettings(settingsResponse.data || {});
   } catch (error) {
-    console.error('获取用户信息失败:', error);
+    console.error('Load profile page failed:', error);
+    alert(error.response?.data?.message || '加载个人信息失败');
   } finally {
     isLoading.value = false;
   }
 };
 
-const toggleStyle = (style) => {
-  const index = userPreferences.stylePreferences.indexOf(style);
-  if (index > -1) {
-    userPreferences.stylePreferences.splice(index, 1);
-  } else {
-    userPreferences.stylePreferences.push(style);
+const saveProfile = async () => {
+  isSavingProfile.value = true;
+  try {
+    const response = await authApi.updateCurrentProfile({
+      nickname: profileForm.nickname || null,
+      email: profileForm.email || null,
+      phone: profileForm.phone || null,
+      gender: Number(profileForm.gender ?? 0),
+      birthday: profileForm.birthday || null
+    });
+
+    applyProfile(response.data || {});
+    alert('基础资料已更新');
+  } catch (error) {
+    console.error('Save profile failed:', error);
+    alert(error.response?.data?.message || '保存基础资料失败');
+  } finally {
+    isSavingProfile.value = false;
   }
 };
 
-const updatePreferences = async () => {
-  isSaving.value = true;
+const saveSettings = async () => {
+  isSavingSettings.value = true;
   try {
-    const currentUser = authApi.getCurrentUser();
-    if (currentUser) {
-      await authApi.updatePreferences(currentUser.userId, userPreferences);
-      alert('保存成功');
-    }
+    const response = await authApi.updateUserSettings({
+      stylePreferences: JSON.stringify(settingsForm.stylePreferences),
+      usualSize: settingsForm.usualSize || '',
+      region: settingsForm.region || ''
+    });
+
+    applySettings(response.data || {});
+    alert('穿搭偏好已更新');
   } catch (error) {
-    console.error('更新偏好失败:', error);
-    alert('保存失败，请重试');
+    console.error('Save settings failed:', error);
+    alert(error.response?.data?.message || '保存偏好失败');
   } finally {
-    isSaving.value = false;
+    isSavingSettings.value = false;
   }
+};
+
+const savePassword = async () => {
+  if (!passwordForm.oldPassword || !passwordForm.newPassword) {
+    alert('请先填写完整的密码信息');
+    return;
+  }
+
+  if (passwordForm.newPassword.length < 6) {
+    alert('新密码至少 6 位');
+    return;
+  }
+
+  if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+    alert('两次输入的新密码不一致');
+    return;
+  }
+
+  isUpdatingPassword.value = true;
+  try {
+    await authApi.updatePassword({
+      oldPassword: passwordForm.oldPassword,
+      newPassword: passwordForm.newPassword
+    });
+
+    passwordForm.oldPassword = '';
+    passwordForm.newPassword = '';
+    passwordForm.confirmPassword = '';
+    alert('密码已更新');
+  } catch (error) {
+    console.error('Update password failed:', error);
+    alert(error.response?.data?.message || '修改密码失败');
+  } finally {
+    isUpdatingPassword.value = false;
+  }
+};
+
+const handleAvatarUpload = async (event) => {
+  const [file] = event.target.files || [];
+  event.target.value = '';
+
+  if (!file) {
+    return;
+  }
+
+  isUploadingAvatar.value = true;
+  try {
+    const uploadResponse = await wardrobeApi.uploadImage(null, file);
+    const imageUrl = uploadResponse.data;
+    const profileResponse = await authApi.updateAvatar(imageUrl);
+    applyProfile(profileResponse.data || {});
+    alert('头像已更新');
+  } catch (error) {
+    console.error('Upload avatar failed:', error);
+    alert(error.response?.data?.message || '头像上传失败');
+  } finally {
+    isUploadingAvatar.value = false;
+  }
+};
+
+const toggleStyle = (style) => {
+  if (settingsForm.stylePreferences.includes(style)) {
+    settingsForm.stylePreferences = settingsForm.stylePreferences.filter((item) => item !== style);
+    return;
+  }
+
+  settingsForm.stylePreferences = [...settingsForm.stylePreferences, style];
 };
 
 const logout = () => {
-  if (confirm('确定要退出登录吗？')) {
-    authApi.logout();
-    router.push('/login');
+  if (!window.confirm('确认退出当前账号吗？')) {
+    return;
   }
+
+  authApi.logout();
+  router.push('/login');
 };
 
-const goBack = () => {
+const goHome = () => {
   router.push('/');
 };
 
-const formatDate = (dateString) => {
-  if (!dateString) return '';
-  const date = new Date(dateString);
-  return date.toLocaleString();
+const goWardrobe = () => {
+  router.push('/wardrobe');
 };
 
-onMounted(() => {
-  fetchUserInfo();
-});
+const formatDate = (value) => {
+  if (!value) {
+    return '-';
+  }
+
+  return new Date(value).toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
+
+onMounted(loadPage);
 </script>
 
 <style scoped>
-.profile {
+.profile-page {
   min-height: 100vh;
-  background-color: #f9f3e6;
-  padding: 10px;
+  padding: 20px 16px 40px;
+  background:
+    radial-gradient(circle at top, rgba(255, 243, 214, 0.86), transparent 34%),
+    linear-gradient(180deg, #f8f1df 0%, #efe2ca 100%);
 }
 
-.profile-header {
+.page-header,
+.section-heading,
+.account-actions,
+.meta-list div {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  padding-bottom: 10px;
-  border-bottom: 2px solid #e8d5a2;
 }
 
-.profile-header h1 {
-  font-size: 20px;
-  color: #8b7355;
+.page-header {
+  gap: 14px;
+  margin-bottom: 18px;
 }
 
-.back-btn {
-  background-color: #f5e6c3;
-  color: #8b7355;
-  border: 1px solid #e8d5a2;
-  padding: 6px 12px;
-  border-radius: 4px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s ease;
+.eyebrow {
+  margin-bottom: 6px;
+  color: #8f6a37;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-.back-btn:active {
-  background-color: #e8d5a2;
+.page-header h1,
+.panel h2 {
+  color: #5d4523;
 }
 
-.loading-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 50vh;
+.state-card,
+.panel {
+  border-radius: 24px;
+  background: rgba(255, 251, 244, 0.92);
+  border: 1px solid rgba(145, 104, 49, 0.14);
+  box-shadow: 0 18px 44px rgba(109, 78, 38, 0.08);
 }
 
-.loading-indicator {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 15px;
-}
-
-.dot {
-  width: 12px;
-  height: 12px;
-  background-color: #8b7355;
-  border-radius: 50%;
-  animation: pulse 1.4s infinite ease-in-out both;
-}
-
-.dot:nth-child(1) {
-  animation-delay: -0.32s;
-}
-
-.dot:nth-child(2) {
-  animation-delay: -0.16s;
-}
-
-@keyframes pulse {
-  0%, 80%, 100% {
-    transform: scale(0);
-  }
-  40% {
-    transform: scale(1);
-  }
-}
-
-.profile-content {
-  background: #fdfaf5;
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e8d5a2;
-}
-
-.profile-section {
-  margin-bottom: 20px;
-  padding-bottom: 15px;
-  border-bottom: 1px solid #f5e6c3;
-}
-
-.profile-section:last-child {
-  border-bottom: none;
-  margin-bottom: 0;
-  padding-bottom: 0;
-}
-
-.profile-section h2 {
-  font-size: 16px;
-  margin-bottom: 15px;
-  color: #8b7355;
-  font-weight: 600;
-}
-
-.info-item {
-  display: flex;
-  margin-bottom: 10px;
-  align-items: center;
-}
-
-.info-label {
-  width: 90px;
+.state-card {
+  padding: 32px 20px;
+  text-align: center;
   color: #6d573b;
-  font-size: 14px;
 }
 
-.info-value {
-  flex: 1;
-  color: #8b7355;
-  font-size: 14px;
+.content-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.panel {
+  padding: 18px;
+}
+
+.profile-hero {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 16px;
+  align-items: center;
+}
+
+.avatar-shell {
+  width: 84px;
+  height: 84px;
+  border-radius: 28px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #6b4b1f 0%, #b48a52 100%);
+  color: #fff8ef;
+  font-size: 30px;
+  font-weight: 700;
+}
+
+.avatar-shell img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hero-copy {
+  min-width: 0;
+}
+
+.user-name {
+  color: #5d4523;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.user-meta {
+  margin-top: 6px;
+  color: #7d6240;
   word-break: break-all;
 }
 
-.form-group {
-  margin-bottom: 15px;
+.upload-avatar {
+  grid-column: 1 / -1;
+  justify-self: start;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: #ead7b8;
+  color: #5d4523;
+  cursor: pointer;
 }
 
-.form-group label {
-  display: block;
-  margin-bottom: 6px;
-  color: #6d573b;
+.upload-avatar input {
+  display: none;
+}
+
+.section-heading {
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.form-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.form-grid label {
+  display: grid;
+  gap: 8px;
+  color: #6c522f;
   font-size: 14px;
-  font-weight: 500;
 }
 
-.form-group input {
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid #e8d5a2;
-  border-radius: 4px;
-  font-size: 14px;
-  transition: border-color 0.2s ease;
-  background-color: #fcf9f0;
+.form-grid input,
+.form-grid select {
+  border: 1px solid #d9c39b;
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: #fffdf8;
+  color: #5d4523;
 }
 
-.form-group input:focus {
-  outline: none;
-  border-color: #8b7355;
-  box-shadow: 0 0 0 2px rgba(139, 115, 85, 0.1);
+.wide {
+  grid-column: 1 / -1;
 }
 
-.style-tags {
+.chip-group {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px;
+  margin-bottom: 16px;
 }
 
-.style-tag {
-  padding: 6px 12px;
-  border: 1px solid #e8d5a2;
-  border-radius: 20px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.2s ease;
+.chip {
+  border: 1px solid #d4bc93;
+  border-radius: 999px;
+  padding: 10px 14px;
+  background: #fff8eb;
   color: #6d573b;
-}
-
-.style-tag:active {
-  border-color: #8b7355;
-  color: #8b7355;
-}
-
-.style-tag.active {
-  background-color: #8b7355;
-  color: white;
-  border-color: #8b7355;
-}
-
-.save-btn {
-  padding: 8px 16px;
-  background-color: #8b7355;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-size: 14px;
   cursor: pointer;
-  transition: all 0.2s ease;
-  width: 100%;
 }
 
-.save-btn:active:not(:disabled) {
-  background-color: #6d573b;
+.chip.active {
+  background: #6b4b1f;
+  border-color: #6b4b1f;
+  color: #fff8ef;
 }
 
-.save-btn:disabled {
-  background-color: #d5c18a;
+.meta-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.meta-list dt {
+  color: #8b6f48;
+  font-size: 13px;
+}
+
+.meta-list dd {
+  color: #5d4523;
+  font-weight: 600;
+}
+
+.account-actions {
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.ghost-button,
+.primary-button,
+.danger-button {
+  border: none;
+  border-radius: 999px;
+  padding: 10px 16px;
+  cursor: pointer;
+}
+
+.ghost-button {
+  background: #ead7b8;
+  color: #5d4523;
+}
+
+.primary-button {
+  background: #6b4b1f;
+  color: #fff8ef;
+}
+
+.danger-button {
+  background: #d95d51;
+  color: #fffaf7;
+}
+
+.primary-button:disabled,
+.upload-avatar.disabled {
+  opacity: 0.6;
   cursor: not-allowed;
 }
 
-.security-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
+@media (min-width: 900px) {
+  .profile-page {
+    padding: 28px 28px 48px;
+  }
 
-.security-btn {
-  flex: 1;
-  padding: 10px;
-  background-color: #f5e6c3;
-  color: #8b7355;
-  border: 1px solid #e8d5a2;
-  border-radius: 4px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
+  .content-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 
-.security-btn:active {
-  background-color: #e8d5a2;
-}
+  .profile-hero,
+  .account-panel {
+    grid-column: span 2;
+  }
 
-.logout-btn {
-  flex: 1;
-  padding: 10px;
-  background-color: #ff4d4f;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.logout-btn:active {
-  background-color: #ff7875;
-}
-
-@media (min-width: 768px) {
-  .profile {
-    padding: 20px;
-  }
-  
-  .profile-header {
-    margin-bottom: 30px;
-    padding-bottom: 15px;
-  }
-  
-  .profile-header h1 {
-    font-size: 24px;
-  }
-  
-  .back-btn {
-    padding: 8px 16px;
-  }
-  
-  .profile-content {
-    padding: 30px;
-  }
-  
-  .profile-section {
-    margin-bottom: 30px;
-    padding-bottom: 20px;
-  }
-  
-  .profile-section h2 {
-    font-size: 18px;
-    margin-bottom: 20px;
-  }
-  
-  .info-label {
-    width: 100px;
-  }
-  
-  .form-group {
-    margin-bottom: 20px;
-  }
-  
-  .form-group label {
-    margin-bottom: 8px;
-  }
-  
-  .form-group input {
-    padding: 10px;
-  }
-  
-  .style-tags {
-    gap: 10px;
-  }
-  
-  .style-tag {
-    padding: 8px 16px;
-    font-size: 14px;
-  }
-  
-  .save-btn {
-    padding: 10px 20px;
-    width: auto;
-  }
-  
-  .security-actions {
-    flex-direction: row;
-    gap: 15px;
-  }
-  
-  .security-btn,
-  .logout-btn {
-    padding: 12px;
+  .form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 </style>

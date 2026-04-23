@@ -289,10 +289,7 @@ public class AiChatService {
         }
 
         // 获取意图类型
-        String intent = null;
-        if (intentAnalysis.containsKey("intent")) {
-            intent = (String) intentAnalysis.get("intent");
-        }
+        String intent = readIntentText(intentAnalysis.get("intent"));
 
         // 不需要检索衣柜的意图类型
         Set<String> noSearchIntents = new HashSet<>(Arrays.asList(
@@ -344,7 +341,7 @@ public class AiChatService {
 
         // 默认情况下，如果意图不明确且有衣物类型，则检索
         if (intentAnalysis.containsKey("clothingType")) {
-            String clothingType = (String) intentAnalysis.get("clothingType");
+            String clothingType = readIntentText(intentAnalysis.get("clothingType"));
             if (clothingType != null && !clothingType.isEmpty()) {
                 log.info("意图分析包含衣物类型 [{}]，需要检索衣柜", clothingType);
                 return true;
@@ -382,19 +379,19 @@ public class AiChatService {
         // 根据意图分析添加查询条件
         if (intentAnalysis != null) {
             if (intentAnalysis.containsKey("style")) {
-                String style = (String) intentAnalysis.get("style");
+                String style = readIntentText(intentAnalysis.get("style"));
                 if (style != null) {
                     query.append(style).append(" ");
                 }
             }
             if (intentAnalysis.containsKey("season")) {
-                String season = (String) intentAnalysis.get("season");
+                String season = readIntentText(intentAnalysis.get("season"));
                 if (season != null) {
                     query.append(season).append(" ");
                 }
             }
             if (intentAnalysis.containsKey("clothingType")) {
-                String clothingType = (String) intentAnalysis.get("clothingType");
+                String clothingType = readIntentText(intentAnalysis.get("clothingType"));
                 if (clothingType != null) {
                     query.append(clothingType).append(" ");
                 }
@@ -431,6 +428,30 @@ public class AiChatService {
     /**
      * 搜索衣物
      */
+    private String readIntentText(Object value) {
+        if (value == null) {
+            return null;
+        }
+
+        if (value instanceof String text) {
+            String normalized = text.trim();
+            return normalized.isEmpty() ? null : normalized;
+        }
+
+        if (value instanceof Collection<?> values) {
+            String joined = values.stream()
+                    .filter(Objects::nonNull)
+                    .map(String::valueOf)
+                    .map(String::trim)
+                    .filter(item -> !item.isEmpty())
+                    .collect(Collectors.joining(" "));
+            return joined.isEmpty() ? null : joined;
+        }
+
+        String normalized = String.valueOf(value).trim();
+        return normalized.isEmpty() ? null : normalized;
+    }
+
     private List<Map<String, Object>> searchClothes(Long userId, String query, List<String> negativePreferences) {
         List<Map<String, Object>> results = new ArrayList<>();
         if (query == null || query.trim().isEmpty()) {

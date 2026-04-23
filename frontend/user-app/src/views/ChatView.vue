@@ -1,686 +1,697 @@
 <template>
-  <div class="chat-view" :class="{ 'has-messages': hasChatMessages }">
-    <!-- 左上角汉堡菜单 -->
-    <div class="menu-icon" @click="toggleMenu">
-      <div class="menu-line"></div>
-      <div class="menu-line"></div>
-      <div class="menu-line"></div>
-    </div>
+  <div class="chat-page">
+    <header class="chat-header">
+      <button class="ghost-button mobile-only" type="button" @click="toggleSidebar">
+        {{ isSidebarOpen ? '收起会话' : '查看会话' }}
+      </button>
+      <div>
+        <p class="eyebrow">AI Stylist</p>
+        <h1>搭配助手</h1>
+      </div>
+      <div class="header-actions">
+        <button class="ghost-button" type="button" @click="goHome">首页</button>
+        <button class="ghost-button" type="button" @click="goWardrobe">衣橱</button>
+        <button class="ghost-button" type="button" @click="goProfile">个人页</button>
+      </div>
+    </header>
 
-    <!-- 左侧抽屉菜单 -->
-    <div class="drawer" :class="{ open: isMenuOpen }">
-      <div class="drawer-content">
-        <div class="drawer-header">
-          <h3>菜单</h3>
-          <div class="close-icon" @click="toggleMenu">×</div>
+    <div class="chat-layout">
+      <aside class="conversation-panel" :class="{ open: isSidebarOpen }">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Conversation</p>
+            <h2>会话列表</h2>
+          </div>
+          <button class="primary-button" type="button" @click="startNewConversation">新会话</button>
         </div>
-        <div class="drawer-menu">
-          <div class="menu-item" @click="navigateTo('/')">
-            <span class="menu-icon-text">🏠</span>
-            <span>首页</span>
-          </div>
-          <div class="menu-item" @click="navigateTo('/wardrobe')">
-            <span class="menu-icon-text">👕</span>
-            <span>我的衣橱</span>
-          </div>
-          <div class="menu-item" @click="navigateTo('/profile')">
-            <span class="menu-icon-text">⚙️</span>
-            <span>设置</span>
-          </div>
-          <div class="menu-item" @click="toggleTheme">
-            <span class="menu-icon-text">🎨</span>
-            <span>切换主题</span>
-          </div>
-          <div class="menu-item" @click="clearChat">
-            <span class="menu-icon-text">🗑️</span>
-            <span>清除聊天记录</span>
-          </div>
+
+        <div v-if="isConversationLoading" class="panel-state">正在加载会话...</div>
+        <div v-else-if="conversations.length === 0" class="panel-state">还没有会话，直接开始提问即可。</div>
+
+        <div v-else class="conversation-list">
+          <article
+            v-for="conversation in conversations"
+            :key="conversation.sessionId"
+            :class="['conversation-item', currentSessionId === conversation.sessionId ? 'active' : '']"
+            @click="selectConversation(conversation.sessionId)"
+          >
+            <div class="conversation-copy">
+              <h3>{{ conversation.title }}</h3>
+              <p>{{ conversation.lastMessagePreview || '暂无摘要' }}</p>
+              <span>{{ formatTime(conversation.updatedAt || conversation.createdAt) }}</span>
+            </div>
+            <button class="text-danger" type="button" @click.stop="removeConversation(conversation.sessionId)">
+              删除
+            </button>
+          </article>
         </div>
-      </div>
-    </div>
+      </aside>
 
-    <!-- 遮罩层 -->
-    <div class="overlay" v-if="isMenuOpen" @click="toggleMenu"></div>
+      <main class="chat-main">
+        <section v-if="messages.length === 0" class="empty-state">
+          <p class="eyebrow">Quick Start</p>
+          <h2>今天想怎么穿？</h2>
+          <p>你可以直接输入天气、场景、颜色偏好，后端会结合衣橱给出建议。</p>
 
-    <!-- 聊天消息区域 -->
-    <div class="chat-messages" v-if="hasChatMessages" ref="chatMessagesRef">
-      <div
-        v-for="(message, index) in messages"
-        :key="index"
-        :class="['message', message.type]"
-      >
-        <div class="message-content">{{ message.content }}</div>
-        <div class="message-time">{{ message.timestamp }}</div>
-      </div>
-      <div v-if="isLoading" class="message loading">
-        <div class="loading-indicator">
-          <span class="dot"></span>
-          <span class="dot"></span>
-          <span class="dot"></span>
-        </div>
-      </div>
-    </div>
+          <div class="prompt-grid">
+            <button v-for="prompt in quickPrompts" :key="prompt" class="prompt-chip" type="button" @click="sendQuickPrompt(prompt)">
+              {{ prompt }}
+            </button>
+          </div>
+        </section>
 
-    <!-- 推荐流区域 -->
-    <div class="recommendation-flow" :class="{ expanded: isFlowExpanded }" v-if="!hasChatMessages">
-      <div class="flow-header" @click="toggleFlow">
-        <span class="flow-title">今日精选</span>
-        <span class="flow-arrow" :class="{ rotated: isFlowExpanded }">⌄</span>
-      </div>
-      <div class="flow-content">
-        <div
-          v-for="(item, index) in recommendations"
-          :key="index"
-          class="recommendation-card"
-          @dblclick="likeItem(index)"
-          @mousedown="startDislikeTimer(index)"
-          @mouseup="cancelDislikeTimer"
-          @mouseleave="cancelDislikeTimer"
-        >
-          <div class="card-image">
-            <img :src="item.image" :alt="item.title" />
-            <div class="like-overlay" v-if="item.liked">
-              <span class="like-icon">❤️</span>
+        <section ref="messageListRef" class="message-list">
+          <article
+            v-for="message in messages"
+            :key="message.id"
+            :class="['message-card', message.role === 'user' ? 'user' : 'assistant']"
+          >
+            <div class="message-role">{{ message.role === 'user' ? '我' : 'AI 造型师' }}</div>
+            <p class="message-content">{{ message.content }}</p>
+
+            <div v-if="message.recommendations?.length" class="recommendation-grid">
+              <article v-for="(item, index) in message.recommendations" :key="`${message.id}-${index}`" class="recommendation-card">
+                <div class="recommendation-image">
+                  <img :src="resolveRecommendationImage(item)" :alt="resolveRecommendationTitle(item)" />
+                </div>
+                <div class="recommendation-copy">
+                  <h4>{{ resolveRecommendationTitle(item) }}</h4>
+                  <p>{{ resolveRecommendationSubtitle(item) }}</p>
+                </div>
+              </article>
+            </div>
+
+            <time class="message-time">{{ formatTime(message.createdAt) }}</time>
+          </article>
+
+          <div v-if="isSending" class="message-card assistant pending-card">
+            <div class="message-role">AI 造型师</div>
+            <div class="loading-dots">
+              <span></span>
+              <span></span>
+              <span></span>
             </div>
           </div>
-          <div class="card-title">{{ item.title }}</div>
-        </div>
-      </div>
-    </div>
+        </section>
 
-    <!-- 核心交互区 -->
-    <div class="prompt-area">
-      <div class="prompt-text" v-if="!hasUserInput && !hasChatMessages">
-        <span class="typing-text">今天想穿成什么样。</span>
-      </div>
-      <div class="input-area">
-        <input
-          v-model="userInput"
-          type="text"
-          placeholder=""
-          class="chat-input"
-          @keyup.enter="sendMessage"
-        />
-        <div class="input-line"></div>
-      </div>
+        <form class="composer" @submit.prevent="submitMessage">
+          <textarea
+            v-model.trim="userInput"
+            rows="3"
+            placeholder="例如：明天上海 20 度，通勤场景，帮我搭一套不显臃肿的穿搭"
+            :disabled="isSending"
+            @keydown.enter.exact.prevent="submitMessage"
+          ></textarea>
+
+          <div class="composer-actions">
+            <p>{{ currentConversationLabel }}</p>
+            <button class="primary-button" type="submit" :disabled="isSending || !userInput.trim()">
+              {{ isSending ? '发送中...' : '发送' }}
+            </button>
+          </div>
+        </form>
+      </main>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { nextTick, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { chatApi } from '../api/chat';
 
 const router = useRouter();
-const isMenuOpen = ref(false);
-const isFlowExpanded = ref(false);
+const messageListRef = ref(null);
+const conversations = ref([]);
+const messages = ref([]);
+const currentSessionId = ref(localStorage.getItem('chatSessionId') || '');
+const currentConversationLabel = ref('新会话');
 const userInput = ref('');
-const isLoading = ref(false);
-const hasUserInput = ref(false);
-const dislikeTimer = ref(null);
-const currentDislikeIndex = ref(-1);
-const chatMessagesRef = ref(null);
+const isSending = ref(false);
+const isConversationLoading = ref(false);
+const isSidebarOpen = ref(false);
 
-// 从 localStorage 加载历史聊天记录
-const loadChatHistory = () => {
-  const history = localStorage.getItem('chatHistory');
-  if (history) {
-    return JSON.parse(history);
+const quickPrompts = [
+  '今天下雨，帮我搭一套通勤穿搭',
+  '周末出游，想穿得轻松一点',
+  '面试场景，需要稳重但不老气',
+  '我想用衣橱里的黑白单品做搭配'
+];
+
+const fallbackImage =
+  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="320" height="420"><rect width="100%" height="100%" fill="%23f0e4cf"/><text x="50%" y="50%" text-anchor="middle" fill="%238b7355" font-size="24">LOOK</text></svg>';
+
+const scrollToBottom = async () => {
+  await nextTick();
+  if (messageListRef.value) {
+    messageListRef.value.scrollTop = messageListRef.value.scrollHeight;
   }
-  return [];
 };
 
-// 保存聊天记录到 localStorage
-const saveChatHistory = (messages) => {
-  localStorage.setItem('chatHistory', JSON.stringify(messages));
+const syncConversationLabel = () => {
+  const currentConversation = conversations.value.find((item) => item.sessionId === currentSessionId.value);
+  currentConversationLabel.value = currentConversation?.title || '新会话';
 };
 
-const messages = ref(loadChatHistory());
-
-// 推荐数据
-const recommendations = ref([
-  {
-    id: 1,
-    title: '春日休闲风',
-    image: 'https://via.placeholder.com/300x400?text=Spring+Casual',
-    liked: false
-  },
-  {
-    id: 2,
-    title: '职场商务风',
-    image: 'https://via.placeholder.com/300x400?text=Business+Style',
-    liked: false
-  }
-]);
-
-// 计算属性
-const hasChatMessages = computed(() => {
-  return messages.value.length > 0;
-});
-
-// 切换菜单
-const toggleMenu = () => {
-  isMenuOpen.value = !isMenuOpen.value;
-};
-
-// 切换推荐流
-const toggleFlow = () => {
-  isFlowExpanded.value = !isFlowExpanded.value;
-};
-
-// 导航到其他页面
-const navigateTo = (path) => {
-  router.push(path);
-  isMenuOpen.value = false;
-};
-
-// 切换主题
-const toggleTheme = () => {
-  // 这里可以实现主题切换逻辑
-  alert('主题切换功能开发中');
-};
-
-// 清除聊天记录
-const clearChat = () => {
-  if (confirm('确定要清除聊天记录吗？')) {
+const loadMessages = async (sessionId) => {
+  if (!sessionId) {
     messages.value = [];
-    saveChatHistory(messages.value);
-    hasUserInput.value = false;
-    isFlowExpanded.value = false;
+    currentConversationLabel.value = '新会话';
+    return;
   }
-};
 
-// 自动滚动到聊天消息底部
-const scrollToBottom = () => {
-  setTimeout(() => {
-    if (chatMessagesRef.value) {
-      chatMessagesRef.value.scrollTop = chatMessagesRef.value.scrollHeight;
-    }
-  }, 100);
-};
-
-// 发送消息
-const sendMessage = async () => {
-  if (!userInput.value.trim() || isLoading.value) return;
-  
-  const userMessage = userInput.value.trim();
-  const timestamp = new Date().toLocaleTimeString();
-  
-  messages.value.push({
-    type: 'user',
-    content: userMessage,
-    timestamp
-  });
-  
-  saveChatHistory(messages.value);
-  userInput.value = '';
-  hasUserInput.value = true;
-  isFlowExpanded.value = true;
-  
-  // 滚动到底部
-  scrollToBottom();
-  
-  isLoading.value = true;
   try {
-    const response = await chatApi.sendMessage(userMessage);
-    messages.value.push({
-      type: 'ai',
-      content: response.data || '抱歉，我无法理解你的问题。',
-      timestamp: new Date().toLocaleTimeString()
-    });
+    const response = await chatApi.getConversationMessages(sessionId);
+    messages.value = response.data || [];
+    syncConversationLabel();
+    await scrollToBottom();
   } catch (error) {
-    messages.value.push({
-      type: 'ai',
-      content: '抱歉，服务暂时不可用，请稍后再试。',
-      timestamp: new Date().toLocaleTimeString()
-    });
+    console.error('Load chat messages failed:', error);
+    alert(error.response?.data?.message || '加载聊天记录失败');
+  }
+};
+
+const loadConversations = async (preferredSessionId = currentSessionId.value) => {
+  isConversationLoading.value = true;
+  try {
+    const response = await chatApi.getConversations(1, 20);
+    conversations.value = response.data?.items || [];
+
+    const targetSessionId =
+      preferredSessionId && conversations.value.some((item) => item.sessionId === preferredSessionId)
+        ? preferredSessionId
+        : conversations.value[0]?.sessionId || '';
+
+    currentSessionId.value = targetSessionId;
+
+    if (targetSessionId) {
+      localStorage.setItem('chatSessionId', targetSessionId);
+    } else {
+      chatApi.clearCurrentSession();
+    }
+
+    syncConversationLabel();
+  } catch (error) {
+    console.error('Load conversations failed:', error);
+    alert(error.response?.data?.message || '加载会话列表失败');
   } finally {
-    isLoading.value = false;
-    saveChatHistory(messages.value);
-    // 滚动到底部
-    scrollToBottom();
+    isConversationLoading.value = false;
   }
 };
 
-// 喜欢推荐
-const likeItem = (index) => {
-  recommendations.value[index].liked = true;
-  // 这里可以添加收藏逻辑
+const selectConversation = async (sessionId) => {
+  currentSessionId.value = sessionId;
+  localStorage.setItem('chatSessionId', sessionId);
+  isSidebarOpen.value = false;
+  syncConversationLabel();
+  await loadMessages(sessionId);
 };
 
-// 开始不喜欢计时
-const startDislikeTimer = (index) => {
-  currentDislikeIndex.value = index;
-  dislikeTimer.value = setTimeout(() => {
-    // 移除当前推荐并添加新推荐
-    recommendations.value.splice(index, 1);
-    recommendations.value.push({
-      id: Date.now(),
-      title: '新推荐',
-      image: `https://via.placeholder.com/300x400?text=New+Recommendation+${Date.now()}`,
-      liked: false
+const startNewConversation = () => {
+  currentSessionId.value = '';
+  currentConversationLabel.value = '新会话';
+  messages.value = [];
+  userInput.value = '';
+  isSidebarOpen.value = false;
+  chatApi.clearCurrentSession();
+};
+
+const submitMessage = async () => {
+  const text = userInput.value.trim();
+  if (!text || isSending.value) {
+    return;
+  }
+
+  const optimisticMessage = {
+    id: `local-${Date.now()}`,
+    role: 'user',
+    content: text,
+    recommendations: [],
+    createdAt: new Date().toISOString()
+  };
+
+  messages.value = [...messages.value, optimisticMessage];
+  userInput.value = '';
+  isSending.value = true;
+  await scrollToBottom();
+
+  try {
+    const response = await chatApi.sendMessage({
+      message: text,
+      sessionId: currentSessionId.value,
+      context: 'general'
     });
-  }, 1000);
-};
 
-// 取消不喜欢计时
-const cancelDislikeTimer = () => {
-  if (dislikeTimer.value) {
-    clearTimeout(dislikeTimer.value);
-    dislikeTimer.value = null;
-    currentDislikeIndex.value = -1;
+    const nextSessionId = response.data?.sessionId || currentSessionId.value;
+    currentSessionId.value = nextSessionId || '';
+
+    if (nextSessionId) {
+      localStorage.setItem('chatSessionId', nextSessionId);
+      await loadConversations(nextSessionId);
+      await loadMessages(nextSessionId);
+    } else {
+      await loadConversations('');
+    }
+  } catch (error) {
+    console.error('Send chat message failed:', error);
+    messages.value = messages.value.filter((item) => item.id !== optimisticMessage.id);
+    alert(error.response?.data?.message || '发送消息失败，请检查后端 AI 服务');
+  } finally {
+    isSending.value = false;
+    await scrollToBottom();
   }
 };
 
-onMounted(() => {
-  // 初始化
+const sendQuickPrompt = async (prompt) => {
+  userInput.value = prompt;
+  await submitMessage();
+};
+
+const removeConversation = async (sessionId) => {
+  if (!window.confirm('确认删除这个会话吗？')) {
+    return;
+  }
+
+  try {
+    await chatApi.deleteConversation(sessionId);
+
+    if (currentSessionId.value === sessionId) {
+      startNewConversation();
+    }
+
+    await loadConversations(currentSessionId.value);
+
+    if (currentSessionId.value) {
+      await loadMessages(currentSessionId.value);
+    }
+  } catch (error) {
+    console.error('Delete conversation failed:', error);
+    alert(error.response?.data?.message || '删除会话失败');
+  }
+};
+
+const resolveRecommendationImage = (item = {}) =>
+  item.imageUrl || item.image || item.coverUrl || fallbackImage;
+
+const resolveRecommendationTitle = (item = {}) =>
+  item.name || item.title || item.category || '推荐单品';
+
+const resolveRecommendationSubtitle = (item = {}) => {
+  const values = [item.category, item.primaryColor || item.color, item.brand].filter(Boolean);
+  return values.join(' / ') || '来自你的衣橱推荐';
+};
+
+const formatTime = (value) => {
+  if (!value) {
+    return '刚刚';
+  }
+
+  return new Date(value).toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
+
+const goHome = () => {
+  router.push('/');
+};
+
+const goWardrobe = () => {
+  router.push('/wardrobe');
+};
+
+const goProfile = () => {
+  router.push('/profile');
+};
+
+const toggleSidebar = () => {
+  isSidebarOpen.value = !isSidebarOpen.value;
+};
+
+watch(
+  () => messages.value.length,
+  async () => {
+    await scrollToBottom();
+  }
+);
+
+onMounted(async () => {
+  await loadConversations(currentSessionId.value);
+
+  if (currentSessionId.value) {
+    await loadMessages(currentSessionId.value);
+  }
 });
 </script>
 
 <style scoped>
-.chat-view {
+.chat-page {
   min-height: 100vh;
-  background-color: #f9f3e6;
-  position: relative;
-  padding: 20px;
+  padding: 20px 16px 28px;
+  background:
+    radial-gradient(circle at top, rgba(255, 243, 214, 0.85), transparent 34%),
+    linear-gradient(180deg, #f8f1df 0%, #efe2ca 100%);
+}
+
+.chat-header,
+.panel-header,
+.header-actions,
+.composer-actions {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  transition: all 0.3s ease;
+  justify-content: space-between;
 }
 
-.chat-view.has-messages {
-  justify-content: flex-end;
-  padding-bottom: 40px;
+.chat-header {
+  gap: 12px;
+  margin-bottom: 18px;
 }
 
-/* 菜单图标 */
-.menu-icon {
-  position: absolute;
-  top: 20px;
-  left: 20px;
-  cursor: pointer;
-  z-index: 100;
-}
-
-.menu-line {
-  width: 24px;
-  height: 2px;
-  background-color: #8b7355;
+.eyebrow {
   margin-bottom: 6px;
-  transition: all 0.3s ease;
+  color: #8f6a37;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-/* 左侧抽屉菜单 */
-.drawer {
-  position: fixed;
-  top: 0;
-  left: -300px;
-  width: 250px;
-  height: 100vh;
-  background-color: rgba(253, 250, 245, 0.95);
-  backdrop-filter: blur(10px);
-  border-right: 1px solid #e8d5a2;
-  transition: left 0.3s ease;
-  z-index: 200;
-  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+.chat-header h1,
+.panel-header h2,
+.empty-state h2 {
+  color: #5d4523;
 }
 
-.drawer.open {
-  left: 0;
+.header-actions {
+  gap: 8px;
 }
 
-.drawer-content {
-  padding: 20px;
-  height: 100%;
+.chat-layout {
+  display: grid;
+  gap: 16px;
+}
+
+.conversation-panel,
+.chat-main {
+  border-radius: 24px;
+  background: rgba(255, 251, 244, 0.92);
+  border: 1px solid rgba(145, 104, 49, 0.14);
+  box-shadow: 0 18px 44px rgba(109, 78, 38, 0.08);
+}
+
+.conversation-panel {
+  padding: 18px;
+}
+
+.panel-header {
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.panel-state {
+  color: #7d6240;
+  padding: 18px 0 6px;
+}
+
+.conversation-list {
+  display: grid;
+  gap: 12px;
+}
+
+.conversation-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  background: #fffdf8;
+  border: 1px solid rgba(145, 104, 49, 0.14);
+  cursor: pointer;
+}
+
+.conversation-item.active {
+  border-color: #6b4b1f;
+  box-shadow: inset 0 0 0 1px #6b4b1f;
+}
+
+.conversation-copy {
+  min-width: 0;
+}
+
+.conversation-copy h3 {
+  color: #5d4523;
+  font-size: 15px;
+}
+
+.conversation-copy p,
+.conversation-copy span {
+  margin-top: 6px;
+  color: #8b6f48;
+  font-size: 12px;
+}
+
+.conversation-copy p {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.chat-main {
+  padding: 18px;
+  display: grid;
+  gap: 16px;
+}
+
+.empty-state {
+  padding: 8px 4px;
+  color: #6d573b;
+}
+
+.empty-state p:last-of-type {
+  margin-top: 8px;
+}
+
+.prompt-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.prompt-chip {
+  padding: 10px 14px;
+  border: 1px solid #d4bc93;
+  border-radius: 999px;
+  background: #fff8eb;
+  color: #6d573b;
+  cursor: pointer;
+}
+
+.message-list {
   display: flex;
   flex-direction: column;
-}
-
-.drawer-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 30px;
-  padding-bottom: 15px;
-  border-bottom: 1px solid #e8d5a2;
-}
-
-.drawer-header h3 {
-  color: #8b7355;
-  margin: 0;
-  font-size: 18px;
-}
-
-.close-icon {
-  font-size: 24px;
-  color: #8b7355;
-  cursor: pointer;
-}
-
-.drawer-menu {
-  flex: 1;
-}
-
-.menu-item {
-  display: flex;
-  align-items: center;
-  padding: 12px 0;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  color: #6d573b;
-}
-
-.menu-item:hover {
-  color: #8b7355;
-  padding-left: 10px;
-}
-
-.menu-icon-text {
-  font-size: 18px;
-  margin-right: 12px;
-  width: 24px;
-}
-
-/* 遮罩层 */
-.overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.3);
-  z-index: 150;
-}
-
-/* 核心交互区 */
-.prompt-area {
-  text-align: center;
-  max-width: 600px;
-  width: 100%;
-  transition: all 0.3s ease;
-}
-
-.chat-view.has-messages .prompt-area {
-  margin-top: 20px;
-}
-
-.prompt-text {
-  margin-bottom: 20px;
-}
-
-.typing-text {
-  font-size: 24px;
-  color: #8b7355;
-  font-weight: 300;
-  letter-spacing: 1px;
-}
-
-.input-area {
-  position: relative;
-  max-width: 400px;
-  margin: 0 auto;
-}
-
-.chat-input {
-  width: 100%;
-  padding: 12px 0;
-  border: none;
-  background: transparent;
-  font-size: 16px;
-  color: #8b7355;
-  outline: none;
-  text-align: center;
-}
-
-.input-line {
-  width: 100%;
-  height: 1px;
-  background-color: #e8d5a2;
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  transition: all 0.3s ease;
-}
-
-.chat-input:focus + .input-line {
-  background-color: #8b7355;
-  height: 2px;
-}
-
-/* 推荐流区域 */
-.recommendation-flow {
-  max-width: 600px;
-  width: 100%;
-  margin-top: 20px;
-  transition: all 0.3s ease;
-}
-
-.flow-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 0;
-  cursor: pointer;
-  margin-bottom: 20px;
-}
-
-.flow-title {
-  font-size: 16px;
-  color: #8b7355;
-  font-weight: 500;
-}
-
-.flow-arrow {
-  font-size: 20px;
-  color: #8b7355;
-  transition: transform 0.3s ease;
-}
-
-.flow-arrow.rotated {
-  transform: rotate(180deg);
-}
-
-.flow-content {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 20px;
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.3s ease;
-}
-
-.recommendation-flow.expanded .flow-content {
-  max-height: 500px;
-}
-
-.recommendation-card {
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.card-image {
-  position: relative;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-}
-
-.card-image img {
-  width: 100%;
-  height: 200px;
-  object-fit: cover;
-  transition: all 0.3s ease;
-}
-
-.recommendation-card:hover .card-image img {
-  transform: scale(1.05);
-}
-
-.like-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(255, 255, 255, 0.8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  animation: likeAnimation 0.5s ease;
-}
-
-@keyframes likeAnimation {
-  0% {
-    transform: scale(0);
-    opacity: 0;
-  }
-  50% {
-    transform: scale(1.2);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-.like-icon {
-  font-size: 40px;
-}
-
-.card-title {
-  margin-top: 10px;
-  font-size: 14px;
-  color: #6d573b;
-  text-align: center;
-}
-
-/* 聊天消息区域 */
-.chat-messages {
-  max-width: 600px;
-  width: 100%;
+  gap: 14px;
+  min-height: 220px;
   max-height: 60vh;
   overflow-y: auto;
-  margin-bottom: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  scroll-behavior: smooth;
+  padding-right: 2px;
 }
 
-.message {
-  max-width: 80%;
-  padding: 10px 14px;
-  border-radius: 18px;
-  animation: fadeIn 0.3s ease;
-  position: relative;
+.message-card {
+  max-width: 88%;
+  padding: 14px;
+  border-radius: 22px;
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.message.user {
+.message-card.user {
   align-self: flex-end;
-  background-color: #8b7355;
-  color: white;
-  border-bottom-right-radius: 4px;
+  background: #6b4b1f;
+  color: #fff8ef;
 }
 
-.message.ai {
+.message-card.assistant {
   align-self: flex-start;
-  background-color: #fdfaf5;
-  color: #6d573b;
-  border-bottom-left-radius: 4px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e8d5a2;
+  background: #fffdf8;
+  color: #5d4523;
+  border: 1px solid rgba(145, 104, 49, 0.14);
 }
 
-.message.loading {
-  align-self: flex-start;
-  background-color: #fdfaf5;
-  color: #6d573b;
-  border-bottom-left-radius: 4px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e8d5a2;
+.message-role {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.message-content {
+  margin-top: 8px;
+  line-height: 1.7;
+  white-space: pre-wrap;
 }
 
 .message-time {
-  font-size: 10px;
+  display: block;
+  margin-top: 10px;
+  font-size: 11px;
   opacity: 0.7;
-  margin-top: 4px;
-  text-align: right;
 }
 
-.message.user .message-time {
-  color: rgba(255, 255, 255, 0.7);
+.recommendation-grid {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
 }
 
-.message.ai .message-time {
-  color: rgba(109, 87, 59, 0.7);
-  text-align: left;
+.recommendation-card {
+  display: grid;
+  grid-template-columns: 76px 1fr;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 16px;
+  background: #f8f0df;
 }
 
-.loading-indicator {
+.recommendation-image {
+  border-radius: 12px;
+  overflow: hidden;
+  background: #ead7b8;
+}
+
+.recommendation-image img {
+  width: 100%;
+  height: 100%;
+  min-height: 88px;
+  object-fit: cover;
+}
+
+.recommendation-copy h4 {
+  color: #5d4523;
+  font-size: 14px;
+}
+
+.recommendation-copy p {
+  margin-top: 8px;
+  color: #8b6f48;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.composer {
+  display: grid;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.composer textarea {
+  width: 100%;
+  resize: none;
+  border: 1px solid #d9c39b;
+  border-radius: 18px;
+  padding: 14px;
+  background: #fffdf8;
+  color: #5d4523;
+}
+
+.composer-actions {
+  gap: 12px;
+}
+
+.composer-actions p {
+  color: #8b6f48;
+  font-size: 13px;
+}
+
+.loading-dots {
   display: flex;
-  gap: 4px;
+  gap: 8px;
+  margin-top: 10px;
 }
 
-.dot {
+.loading-dots span {
   width: 8px;
   height: 8px;
-  background-color: #8b7355;
   border-radius: 50%;
-  animation: pulse 1.4s infinite ease-in-out both;
+  background: #8b7355;
+  animation: pulse 1.2s infinite ease-in-out;
 }
 
-.dot:nth-child(1) {
-  animation-delay: -0.32s;
+.loading-dots span:nth-child(2) {
+  animation-delay: 0.15s;
 }
 
-.dot:nth-child(2) {
-  animation-delay: -0.16s;
+.loading-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.ghost-button,
+.primary-button,
+.text-danger {
+  border: none;
+  border-radius: 999px;
+  padding: 10px 16px;
+  cursor: pointer;
+}
+
+.ghost-button {
+  background: #ead7b8;
+  color: #5d4523;
+}
+
+.primary-button {
+  background: #6b4b1f;
+  color: #fff8ef;
+}
+
+.text-danger {
+  align-self: start;
+  padding: 6px 10px;
+  background: rgba(217, 93, 81, 0.12);
+  color: #b04d45;
+}
+
+.mobile-only {
+  display: inline-flex;
 }
 
 @keyframes pulse {
-  0%, 80%, 100% {
-    transform: scale(0);
+  0%,
+  80%,
+  100% {
+    transform: scale(0.8);
+    opacity: 0.5;
   }
   40% {
     transform: scale(1);
+    opacity: 1;
   }
 }
 
-/* 响应式设计 */
-@media (max-width: 768px) {
-  .chat-view {
-    padding: 15px;
+@media (max-width: 899px) {
+  .header-actions {
+    display: none;
   }
-  
-  .typing-text {
-    font-size: 20px;
+
+  .conversation-panel {
+    display: none;
   }
-  
-  .recommendation-flow {
-    max-width: 100%;
+
+  .conversation-panel.open {
+    display: block;
   }
-  
-  .flow-content {
-    grid-template-columns: repeat(2, 1fr);
+}
+
+@media (min-width: 900px) {
+  .chat-page {
+    padding: 28px 28px 32px;
   }
-  
-  .card-image img {
-    height: 150px;
+
+  .chat-layout {
+    grid-template-columns: 320px minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .mobile-only {
+    display: none;
   }
 }
 </style>
