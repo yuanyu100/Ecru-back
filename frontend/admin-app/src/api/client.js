@@ -26,6 +26,10 @@ export const deriveRole = (user) => {
     return 'USER';
   }
 
+  if (user.role) {
+    return user.role;
+  }
+
   return user.userId === 1 ? 'ADMIN' : 'USER';
 };
 

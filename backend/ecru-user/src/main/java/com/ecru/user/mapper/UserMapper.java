@@ -6,6 +6,8 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
+import java.util.List;
+
 @Mapper
 public interface UserMapper extends BaseMapper<User> {
 
@@ -44,4 +46,40 @@ public interface UserMapper extends BaseMapper<User> {
      */
     @Select("SELECT COUNT(*) > 0 FROM users WHERE phone = #{phone}")
     boolean existsByPhone(@Param("phone") String phone);
+
+    @Select({
+            "<script>",
+            "SELECT * FROM users",
+            "<where>",
+            "  <if test='keyword != null and keyword != \"\"'>",
+            "    (username LIKE CONCAT('%', #{keyword}, '%') OR email LIKE CONCAT('%', #{keyword}, '%'))",
+            "  </if>",
+            "  <if test='status != null'>",
+            "    AND status = #{status}",
+            "  </if>",
+            "</where>",
+            "ORDER BY created_at DESC",
+            "LIMIT #{size} OFFSET #{offset}",
+            "</script>"
+    })
+    List<User> selectAdminUsers(@Param("keyword") String keyword,
+                                @Param("status") Integer status,
+                                @Param("offset") long offset,
+                                @Param("size") long size);
+
+    @Select({
+            "<script>",
+            "SELECT COUNT(*) FROM users",
+            "<where>",
+            "  <if test='keyword != null and keyword != \"\"'>",
+            "    (username LIKE CONCAT('%', #{keyword}, '%') OR email LIKE CONCAT('%', #{keyword}, '%'))",
+            "  </if>",
+            "  <if test='status != null'>",
+            "    AND status = #{status}",
+            "  </if>",
+            "</where>",
+            "</script>"
+    })
+    long countAdminUsers(@Param("keyword") String keyword,
+                         @Param("status") Integer status);
 }

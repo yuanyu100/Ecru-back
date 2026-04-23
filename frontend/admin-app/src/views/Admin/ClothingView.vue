@@ -3,23 +3,28 @@
     <section class="panel-card">
       <div class="panel-head">
         <div>
-          <h2>当前账号衣物台账</h2>
-          <p class="panel-subtitle">后端目前按当前登录账号查询，不是全局衣柜管理。</p>
+          <h2>{{ isAdmin ? '全局衣物管理' : '我的衣物台账' }}</h2>
+          <p class="panel-subtitle">
+            {{ isAdmin ? '管理员可跨用户查看和删除衣物。' : '当前账号只能查看自己的衣物。' }}
+          </p>
         </div>
         <div class="toolbar">
-          <input v-model.trim="keyword" class="text-input" type="text" placeholder="搜索名称/分类/颜色" />
+          <input
+            v-model.trim="filters.keyword"
+            class="text-input"
+            type="text"
+            placeholder="搜索名称 / 分类 / 颜色"
+          />
+          <input
+            v-if="isAdmin"
+            v-model.trim="filters.ownerKeyword"
+            class="text-input"
+            type="text"
+            placeholder="搜索所属用户"
+          />
           <button class="secondary-button" type="button" @click="loadClothings">刷新</button>
         </div>
       </div>
-
-      <form class="inline-form" @submit.prevent="createItem">
-        <input v-model.trim="draft.name" class="text-input" type="text" placeholder="名称" required />
-        <input v-model.trim="draft.category" class="text-input" type="text" placeholder="分类" />
-        <input v-model.trim="draft.primaryColor" class="text-input" type="text" placeholder="主色" />
-        <button class="primary-button" type="submit" :disabled="creating">
-          {{ creating ? '创建中...' : '新增衣物' }}
-        </button>
-      </form>
 
       <div v-if="loading" class="empty-tip">加载中...</div>
       <div v-else-if="items.length" class="table-shell">
@@ -30,7 +35,9 @@
               <th>名称</th>
               <th>分类</th>
               <th>主色</th>
-              <th>风格标签</th>
+              <th v-if="isAdmin">所属用户</th>
+              <th>标签</th>
+              <th>来源</th>
               <th>创建时间</th>
               <th>操作</th>
             </tr>
@@ -41,7 +48,12 @@
               <td>{{ item.name }}</td>
               <td>{{ item.category || '-' }}</td>
               <td>{{ item.primaryColor || '-' }}</td>
-              <td>{{ item.styleTags?.join(' / ') || '-' }}</td>
+              <td v-if="isAdmin">
+                {{ item.ownerUsername || '-' }}
+                <span v-if="item.ownerNickname"> / {{ item.ownerNickname }}</span>
+              </td>
+              <td>{{ renderTags(item.styleTags) }}</td>
+              <td>{{ item.sourceType || '-' }}</td>
               <td>{{ formatDate(item.createdAt) }}</td>
               <td>
                 <button
@@ -57,7 +69,7 @@
           </tbody>
         </table>
       </div>
-      <p v-else class="empty-tip">当前账号还没有衣物记录。</p>
+      <p v-else class="empty-tip">当前没有可显示的衣物记录。</p>
     </section>
   </div>
 </template>
@@ -65,54 +77,62 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue';
 import { clothingApi } from '../../api/clothing';
+import { authApi } from '../../api/auth';
 
+const currentUser = authApi.getCurrentUser();
+const isAdmin = currentUser?.role === 'ADMIN';
 const items = ref([]);
-const keyword = ref('');
 const loading = ref(false);
-const creating = ref(false);
 const deletingId = ref(null);
-const draft = reactive({
-  name: '',
-  category: '',
-  primaryColor: ''
+const filters = reactive({
+  keyword: '',
+  ownerKeyword: ''
 });
 
 const formatDate = (value) => (value ? String(value).replace('T', ' ') : '-');
 
+const renderTags = (value) => {
+  if (!value) {
+    return '-';
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) && parsed.length ? parsed.join(' / ') : '-';
+  } catch {
+    return value;
+  }
+};
+
 const loadClothings = async () => {
   loading.value = true;
   try {
-    const result = await clothingApi.getClothings({ page: 1, size: 50, keyword: keyword.value });
+    const result = isAdmin
+      ? await clothingApi.getAdminClothings({
+          page: 1,
+          size: 50,
+          keyword: filters.keyword,
+          ownerKeyword: filters.ownerKeyword
+        })
+      : await clothingApi.getClothings({
+          page: 1,
+          size: 50,
+          keyword: filters.keyword
+        });
+
     items.value = result?.data?.list || [];
   } finally {
     loading.value = false;
   }
 };
 
-const createItem = async () => {
-  creating.value = true;
-  try {
-    const result = await clothingApi.createClothing({
-      name: draft.name,
-      category: draft.category || null,
-      primaryColor: draft.primaryColor || null
-    });
-
-    if (result?.code === 200) {
-      draft.name = '';
-      draft.category = '';
-      draft.primaryColor = '';
-      await loadClothings();
-    }
-  } finally {
-    creating.value = false;
-  }
-};
-
 const removeItem = async (id) => {
   deletingId.value = id;
   try {
-    const result = await clothingApi.deleteClothing(id, false);
+    const result = isAdmin
+      ? await clothingApi.deleteAdminClothing(id, false)
+      : await clothingApi.deleteClothing(id, false);
+
     if (result?.code === 200) {
       items.value = items.value.filter((item) => item.id !== id);
     }

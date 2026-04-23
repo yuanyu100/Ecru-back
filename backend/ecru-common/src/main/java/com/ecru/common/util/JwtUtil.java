@@ -27,6 +27,7 @@ public class JwtUtil {
 
     private static final String CLAIM_USER_ID = "userId";
     private static final String CLAIM_USERNAME = "username";
+    private static final String CLAIM_ROLE = "role";
     private static final String CLAIM_TOKEN_TYPE = "tokenType";
     private static final String TOKEN_TYPE_ACCESS = "access";
     private static final String TOKEN_TYPE_REFRESH = "refresh";
@@ -34,21 +35,22 @@ public class JwtUtil {
     // Token黑名单（实际生产环境应使用Redis）
     private final Set<String> tokenBlacklist = ConcurrentHashMap.newKeySet();
 
-    public String generateAccessToken(Long userId, String username) {
-        return generateToken(userId, username, TOKEN_TYPE_ACCESS, accessTokenExpire);
+    public String generateAccessToken(Long userId, String username, String role) {
+        return generateToken(userId, username, role, TOKEN_TYPE_ACCESS, accessTokenExpire);
     }
 
-    public String generateRefreshToken(Long userId, String username) {
-        return generateToken(userId, username, TOKEN_TYPE_REFRESH, refreshTokenExpire);
+    public String generateRefreshToken(Long userId, String username, String role) {
+        return generateToken(userId, username, role, TOKEN_TYPE_REFRESH, refreshTokenExpire);
     }
 
-    private String generateToken(Long userId, String username, String tokenType, Long expireSeconds) {
+    private String generateToken(Long userId, String username, String role, String tokenType, Long expireSeconds) {
         Date now = new Date();
         Date expireTime = new Date(now.getTime() + expireSeconds * 1000);
 
         return JWT.create()
                 .withClaim(CLAIM_USER_ID, userId)
                 .withClaim(CLAIM_USERNAME, username)
+                .withClaim(CLAIM_ROLE, role)
                 .withClaim(CLAIM_TOKEN_TYPE, tokenType)
                 .withIssuedAt(now)
                 .withExpiresAt(expireTime)
@@ -77,6 +79,11 @@ public class JwtUtil {
     public String getTokenType(String token) {
         DecodedJWT jwt = JWT.decode(token);
         return jwt.getClaim(CLAIM_TOKEN_TYPE).asString();
+    }
+
+    public String getRole(String token) {
+        DecodedJWT jwt = JWT.decode(token);
+        return jwt.getClaim(CLAIM_ROLE).asString();
     }
 
     public Date getExpiresAt(String token) {
@@ -111,9 +118,10 @@ public class JwtUtil {
 
         Long userId = decodedJWT.getClaim(CLAIM_USER_ID).asLong();
         String username = decodedJWT.getClaim(CLAIM_USERNAME).asString();
+        String role = decodedJWT.getClaim(CLAIM_ROLE).asString();
 
-        String newAccessToken = generateAccessToken(userId, username);
-        String newRefreshToken = generateRefreshToken(userId, username);
+        String newAccessToken = generateAccessToken(userId, username, role);
+        String newRefreshToken = generateRefreshToken(userId, username, role);
 
         // 将旧refreshToken加入黑名单
         blacklistToken(refreshToken);

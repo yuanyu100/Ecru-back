@@ -1,16 +1,16 @@
 package com.ecru.clothing.service;
 
+import com.ecru.clothing.dto.request.AdminClothingQueryRequest;
 import com.ecru.clothing.dto.request.ClothingQueryRequest;
 import com.ecru.clothing.dto.request.CreateClothingRequest;
 import com.ecru.clothing.dto.request.RecordWearRequest;
 import com.ecru.clothing.dto.request.UpdateClothingRequest;
+import com.ecru.clothing.dto.response.AdminClothingListVO;
 import com.ecru.clothing.dto.response.ClothingDetailVO;
 import com.ecru.clothing.dto.response.ClothingListVO;
 import com.ecru.clothing.dto.response.ClothingStatisticsVO;
 import com.github.pagehelper.PageInfo;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.util.List;
 
 public interface ClothingService {
 
@@ -23,11 +23,15 @@ public interface ClothingService {
             ClothingQueryRequest request
     );
 
+    PageInfo<AdminClothingListVO> getAdminClothingList(AdminClothingQueryRequest request);
+
     ClothingDetailVO getClothingDetail(Long userId, Long clothingId);
 
     ClothingDetailVO updateClothing(Long userId, Long clothingId, UpdateClothingRequest request);
 
     void deleteClothing(Long userId, Long clothingId, Boolean force);
+
+    void adminDeleteClothing(Long clothingId, Boolean force);
 
     ClothingDetailVO recognizeClothing(Long userId, Long clothingId);
 

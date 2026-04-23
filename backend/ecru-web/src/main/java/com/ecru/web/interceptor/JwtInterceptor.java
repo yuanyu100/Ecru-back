@@ -25,9 +25,11 @@ public class JwtInterceptor implements HandlerInterceptor {
                 DecodedJWT decodedJWT = jwtUtil.verifyToken(token);
                 Long userId = decodedJWT.getClaim("userId").asLong();
                 String username = decodedJWT.getClaim("username").asString();
+                String role = decodedJWT.getClaim("role").asString();
                 String tokenType = decodedJWT.getClaim("tokenType").asString();
                 request.setAttribute("userId", userId);
                 request.setAttribute("username", username);
+                request.setAttribute("role", role);
                 request.setAttribute("tokenType", tokenType);
                 request.setAttribute("token", token);
             } catch (Exception e) {

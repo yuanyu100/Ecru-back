@@ -52,6 +52,7 @@ public class UserServiceImpl implements UserService {
 
         User user = UserConverter.INSTANCE.toEntity(request);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setRole("USER");
         user.setStatus(1);
 
         userMapper.insert(user);
@@ -95,8 +96,8 @@ public class UserServiceImpl implements UserService {
         userMapper.updateById(user);
 
         // 生成Token
-        String accessToken = jwtUtil.generateAccessToken(user.getId(), user.getUsername());
-        String refreshToken = jwtUtil.generateRefreshToken(user.getId(), user.getUsername());
+        String accessToken = jwtUtil.generateAccessToken(user.getId(), user.getUsername(), user.getRole());
+        String refreshToken = jwtUtil.generateRefreshToken(user.getId(), user.getUsername(), user.getRole());
 
         // 记录登录成功日志
         // userLoginLogService.recordLoginLog(user.getId(), 1, loginIp, loginDevice, 1, null);
@@ -112,6 +113,7 @@ public class UserServiceImpl implements UserService {
                         .userId(user.getId())
                         .username(user.getUsername())
                         .nickname(user.getNickname())
+                        .role(user.getRole())
                         .avatarUrl(user.getAvatarUrl())
                         .build())
                 .build();

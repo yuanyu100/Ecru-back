@@ -2,6 +2,7 @@ package com.ecru.clothing.converter;
 
 import com.ecru.clothing.dto.request.CreateClothingRequest;
 import com.ecru.clothing.dto.request.UpdateClothingRequest;
+import com.ecru.clothing.dto.response.AdminClothingListVO;
 import com.ecru.clothing.dto.response.ClothingDetailVO;
 import com.ecru.clothing.dto.response.ClothingListVO;
 import com.ecru.clothing.entity.Clothing;
@@ -90,6 +91,31 @@ public class ClothingConverter {
         vo.setThumbnailUrl(clothing.getThumbnailUrl());
         vo.setCreatedAt(clothing.getCreatedAt());
         
+        return vo;
+    }
+
+    public AdminClothingListVO toAdminListVO(Clothing clothing, String ownerUsername, String ownerNickname, String ownerEmail) {
+        if (clothing == null) {
+            return null;
+        }
+
+        AdminClothingListVO vo = new AdminClothingListVO();
+        vo.setId(clothing.getId());
+        vo.setUserId(clothing.getUserId());
+        vo.setOwnerUsername(ownerUsername);
+        vo.setOwnerNickname(ownerNickname);
+        vo.setOwnerEmail(ownerEmail);
+        vo.setName(clothing.getName());
+        vo.setCategory(clothing.getCategory());
+        vo.setSubCategory(clothing.getSubCategory());
+        vo.setPrimaryColor(clothing.getPrimaryColor());
+        vo.setMaterial(clothing.getMaterial());
+        vo.setStyleTags(clothing.getStyleTags());
+        vo.setImageUrl(clothing.getImageUrl());
+        vo.setSourceType(clothing.getSourceType());
+        vo.setWearCount(clothing.getWearCount());
+        vo.setFrequencyLevel(clothing.getFrequencyLevel());
+        vo.setCreatedAt(clothing.getCreatedAt());
         return vo;
     }
 

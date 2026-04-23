@@ -21,6 +21,7 @@
               <th>用户名</th>
               <th>邮箱</th>
               <th>昵称</th>
+              <th>角色</th>
               <th>状态</th>
               <th>注册时间</th>
               <th>操作</th>
@@ -32,6 +33,7 @@
               <td>{{ user.username }}</td>
               <td>{{ user.email || '-' }}</td>
               <td>{{ user.nickname || '-' }}</td>
+              <td>{{ user.role || 'USER' }}</td>
               <td>
                 <span class="badge" :class="user.status === 1 ? 'badge-green' : 'badge-red'">
                   {{ user.status === 1 ? '启用' : '禁用' }}
@@ -72,7 +74,7 @@ const loadUsers = async () => {
   loading.value = true;
   try {
     const result = await adminApi.getUsers({ keyword: keyword.value, page: 1, size: 50 });
-    users.value = result?.data?.records || [];
+    users.value = result?.data?.list || result?.data?.records || [];
   } finally {
     loading.value = false;
   }

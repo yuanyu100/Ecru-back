@@ -8,6 +8,7 @@ public class UserContext {
 
     private static final String USER_ID_KEY = "userId";
     private static final String USERNAME_KEY = "username";
+    private static final String ROLE_KEY = "role";
     private static final String TOKEN_TYPE_KEY = "tokenType";
     private static final String TOKEN_KEY = "token";
 
@@ -25,6 +26,14 @@ public class UserContext {
             return null;
         }
         return (String) request.getAttribute(USERNAME_KEY);
+    }
+
+    public static String getCurrentRole() {
+        HttpServletRequest request = getCurrentRequest();
+        if (request == null) {
+            return null;
+        }
+        return (String) request.getAttribute(ROLE_KEY);
     }
 
     public static String getCurrentTokenType() {
@@ -57,6 +66,10 @@ public class UserContext {
 
     public static boolean isAuthenticated() {
         return getCurrentUserId() != null;
+    }
+
+    public static boolean isAdmin() {
+        return "ADMIN".equalsIgnoreCase(getCurrentRole());
     }
 
 }

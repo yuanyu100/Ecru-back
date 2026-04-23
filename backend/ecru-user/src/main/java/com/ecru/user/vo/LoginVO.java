@@ -37,6 +37,9 @@ public class LoginVO {
         @Schema(description = "昵称")
         private String nickname;
 
+        @Schema(description = "角色：ADMIN-管理员，USER-普通用户")
+        private String role;
+
         @Schema(description = "头像URL")
         private String avatarUrl;
     }

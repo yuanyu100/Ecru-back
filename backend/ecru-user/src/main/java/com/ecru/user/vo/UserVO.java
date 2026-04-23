@@ -30,6 +30,9 @@ public class UserVO {
     @Schema(description = "昵称")
     private String nickname;
 
+    @Schema(description = "角色：ADMIN-管理员，USER-普通用户")
+    private String role;
+
     @Schema(description = "性别：0-未知，1-男，2-女")
     private Integer gender;
 

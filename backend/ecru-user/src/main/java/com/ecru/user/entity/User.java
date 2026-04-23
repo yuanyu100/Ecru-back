@@ -25,6 +25,8 @@ public class User {
 
     private String nickname;
 
+    private String role;
+
     private Integer gender;
 
     private LocalDate birthday;

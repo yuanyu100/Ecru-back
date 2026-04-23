@@ -96,8 +96,7 @@ public class ClothingController {
     @Operation(summary = "AI识别衣物", description = "使用AI重新识别衣物的属性")
     public Result<ClothingDetailVO> recognizeClothing(
             @Parameter(description = "衣物ID") @PathVariable Long id) {
-        // 临时硬编码 userId 为 1 用于测试
-        Long userId = 1L;
+        Long userId = UserContext.getCurrentUserId();
         return Result.success(clothingService.recognizeClothing(userId, id));
     }
 
