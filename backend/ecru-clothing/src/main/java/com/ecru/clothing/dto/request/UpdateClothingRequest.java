@@ -20,6 +20,7 @@ public class UpdateClothingRequest {
     private List<String> styleTags;
     private List<String> occasionTags;
     private List<String> seasonTags;
+    private String imageUrl;
     private List<String> imageUrls;
     private Double purchasePrice;
     private String purchaseDate;

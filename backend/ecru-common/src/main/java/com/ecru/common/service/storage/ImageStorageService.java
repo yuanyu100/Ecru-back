@@ -5,91 +5,134 @@ import io.minio.BucketExistsArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
+import jakarta.annotation.PostConstruct;
+import jakarta.servlet.http.Part;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import jakarta.annotation.PostConstruct;
+import java.io.InputStream;
+import java.util.Base64;
 import java.util.UUID;
 
-/**
- * 图片存储服务
- */
 @Slf4j
 @Service
 public class ImageStorageService {
 
-    @Autowired
-    private MinioConfig minioConfig;
+    private final MinioConfig minioConfig;
+    private volatile MinioClient minioClient;
 
-    private MinioClient minioClient;
+    public ImageStorageService(MinioConfig minioConfig) {
+        this.minioConfig = minioConfig;
+    }
 
-    /**
-     * 初始化 MinIO 客户端
-     */
     @PostConstruct
     public void init() {
         try {
-            // 初始化 MinIO 客户端
-            minioClient = MinioClient.builder()
-                    .endpoint(minioConfig.getEndpoint())
-                    .credentials(minioConfig.getAccessKey(), minioConfig.getSecretKey())
-                    .build();
-
-            // 检查桶是否存在，不存在则创建
-            boolean bucketExists = minioClient.bucketExists(BucketExistsArgs.builder()
-                    .bucket(minioConfig.getBucketName())
-                    .build());
-            if (!bucketExists) {
-                minioClient.makeBucket(MakeBucketArgs.builder()
-                        .bucket(minioConfig.getBucketName())
-                        .build());
-                log.info("MinIO 桶创建成功: {}", minioConfig.getBucketName());
-            }
-            log.info("MinIO 客户端初始化成功");
+            ensureClient();
+            ensureBucket();
+            log.info("MinIO client initialized");
         } catch (Exception e) {
-            log.error("MinIO 客户端初始化失败: {}", e.getMessage());
+            log.warn("MinIO is not ready during startup: {}", e.getMessage());
         }
     }
 
-    /**
-     * 上传图片
-     * @param file 图片文件
-     * @param userId 用户ID
-     * @return 图片访问URL
-     */
     public String uploadImage(MultipartFile file, Long userId) {
+        if (file == null || file.isEmpty()) {
+            throw new RuntimeException("上传图片失败：文件为空");
+        }
+
         try {
-            // 生成唯一文件名
-            String fileName = userId + "/" + UUID.randomUUID().toString() +
-                    file.getOriginalFilename().substring(file.getOriginalFilename().lastIndexOf("."));
-
-            // 上传文件
-            minioClient.putObject(PutObjectArgs.builder()
-                    .bucket(minioConfig.getBucketName())
-                    .object(fileName)
-                    .stream(file.getInputStream(), file.getSize(), -1)
-                    .contentType(file.getContentType())
-                    .build());
-
-            // 返回访问URL
-            String url = minioConfig.getDomain() + "/" + minioConfig.getBucketName() + "/" + fileName;
-            log.info("上传图片成功，访问URL: {}", url);
-            return url;
+            return uploadStream(file.getInputStream(), file.getOriginalFilename(), file.getContentType(), file.getSize(), userId);
         } catch (Exception e) {
-            log.error("上传图片失败: {}", e.getMessage());
+            log.error("Upload image failed", e);
             throw new RuntimeException("上传图片失败", e);
         }
     }
 
-    /**
-     * 上传图片（无用户ID）
-     * @param file 图片文件
-     * @return 图片访问URL
-     */
+    public String uploadImage(Part file, Long userId) {
+        if (file == null || file.getSize() <= 0) {
+            throw new RuntimeException("上传图片失败：文件为空");
+        }
+
+        try {
+            return uploadStream(file.getInputStream(), file.getSubmittedFileName(), file.getContentType(), file.getSize(), userId);
+        } catch (Exception e) {
+            log.error("Upload image failed", e);
+            throw new RuntimeException("上传图片失败", e);
+        }
+    }
+
     public String uploadImage(MultipartFile file) {
         return uploadImage(file, 0L);
     }
 
+    public String uploadBase64Image(String base64Data, String filename, String contentType, Long userId) {
+        if (base64Data == null || base64Data.isBlank()) {
+            throw new RuntimeException("上传图片失败：缺少图片内容");
+        }
+
+        try {
+            String rawData = base64Data.contains(",")
+                    ? base64Data.substring(base64Data.indexOf(',') + 1)
+                    : base64Data;
+            byte[] bytes = Base64.getDecoder().decode(rawData);
+            return uploadStream(new java.io.ByteArrayInputStream(bytes), filename, contentType, bytes.length, userId);
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException("上传图片失败：Base64 内容无效", e);
+        } catch (Exception e) {
+            log.error("Upload base64 image failed", e);
+            throw new RuntimeException("上传图片失败", e);
+        }
+    }
+
+    private synchronized void ensureClient() {
+        if (minioClient != null) {
+            return;
+        }
+
+        minioClient = MinioClient.builder()
+                .endpoint(minioConfig.getEndpoint())
+                .credentials(minioConfig.getAccessKey(), minioConfig.getSecretKey())
+                .build();
+    }
+
+    private void ensureBucket() throws Exception {
+        boolean bucketExists = minioClient.bucketExists(BucketExistsArgs.builder()
+                .bucket(minioConfig.getBucketName())
+                .build());
+
+        if (!bucketExists) {
+            minioClient.makeBucket(MakeBucketArgs.builder()
+                    .bucket(minioConfig.getBucketName())
+                    .build());
+            log.info("Created MinIO bucket: {}", minioConfig.getBucketName());
+        }
+    }
+
+    private String uploadStream(InputStream inputStream,
+                                String originalFilename,
+                                String contentType,
+                                long size,
+                                Long userId) throws Exception {
+        ensureClient();
+        ensureBucket();
+
+        String safeFilename = originalFilename == null ? "image.jpg" : originalFilename;
+        String extension = safeFilename.contains(".")
+                ? safeFilename.substring(safeFilename.lastIndexOf("."))
+                : ".jpg";
+        String fileName = userId + "/" + UUID.randomUUID() + extension;
+
+        minioClient.putObject(PutObjectArgs.builder()
+                .bucket(minioConfig.getBucketName())
+                .object(fileName)
+                .stream(inputStream, size, -1)
+                .contentType(contentType == null ? "application/octet-stream" : contentType)
+                .build());
+
+        String url = minioConfig.getDomain() + "/" + minioConfig.getBucketName() + "/" + fileName;
+        log.info("Uploaded image to MinIO: {}", url);
+        return url;
+    }
 }

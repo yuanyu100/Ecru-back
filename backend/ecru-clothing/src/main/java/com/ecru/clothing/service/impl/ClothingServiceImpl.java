@@ -181,6 +181,9 @@ public class ClothingServiceImpl implements ClothingService {
         if (request.getImageUrls() != null) {
             clothing.setImageUrls(writeJson(request.getImageUrls()));
         }
+        if (StringUtils.isNotBlank(request.getImageUrl())) {
+            clothing.setImageUrl(request.getImageUrl());
+        }
         if (request.getPurchasePrice() != null) {
             clothing.setPurchasePrice(BigDecimal.valueOf(request.getPurchasePrice()));
         }

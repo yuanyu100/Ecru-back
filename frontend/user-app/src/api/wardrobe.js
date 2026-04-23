@@ -1,5 +1,29 @@
 import { apiClient } from './client';
 
+const fileToDataUrl = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('Read image failed'));
+    reader.readAsDataURL(file);
+  });
+
+const normalizeColor = (item = {}) => ({
+  primary: item.primaryColor || item.color?.primary || '',
+  secondary: item.secondaryColor || item.color?.secondary || ''
+});
+
+const normalizeItem = (item = {}) => ({
+  ...item,
+  itemId: item.id,
+  color: normalizeColor(item),
+  frequency: Number(item.frequencyLevel || item.frequency || 3),
+  purchaseChannel: item.purchaseLink || item.purchaseChannel || '',
+  purchaseTime: item.purchaseDate || item.purchaseTime || '',
+  createdTime: item.createdAt || item.createdTime || '',
+  updatedTime: item.updatedAt || item.updatedTime || ''
+});
+
 const toCreatePayload = (clothing = {}) => ({
   name: clothing.name,
   brand: clothing.brand,
@@ -11,7 +35,7 @@ const toCreatePayload = (clothing = {}) => ({
   purchaseDate: clothing.purchaseTime || clothing.purchaseDate,
   purchaseLink: clothing.purchaseChannel || clothing.purchaseLink,
   imageUrl: clothing.imageUrl,
-  autoRecognize: clothing.autoRecognize || false
+  autoRecognize: Boolean(clothing.autoRecognize)
 });
 
 const toUpdatePayload = (clothing = {}) => ({
@@ -24,98 +48,69 @@ const toUpdatePayload = (clothing = {}) => ({
   size: clothing.size,
   purchaseDate: clothing.purchaseTime || clothing.purchaseDate,
   purchaseLink: clothing.purchaseChannel || clothing.purchaseLink,
+  imageUrl: clothing.imageUrl,
   frequencyLevel: Number(clothing.frequency || clothing.frequencyLevel || 3)
 });
 
-const normalizeItem = (item = {}) => ({
-  ...item,
-  itemId: item.id,
-  color: {
-    primary: item.primaryColor || '',
-    secondary: item.secondaryColor || ''
-  }
-});
-
 export const wardrobeApi = {
-  addClothing: async (clothing) => {
-    try {
-      const response = await apiClient.post('/clothings', toCreatePayload(clothing));
-      return {
-        ...response.data,
-        data: {
-          ...response.data?.data,
-          itemId: response.data?.data?.id
-        }
-      };
-    } catch (error) {
-      console.error('Add clothing failed:', error);
-      throw error;
-    }
+  async addClothing(clothing) {
+    const response = await apiClient.post('/clothings', toCreatePayload(clothing));
+    return {
+      ...response.data,
+      data: normalizeItem(response.data?.data)
+    };
   },
 
-  getClothingList: async (params = {}) => {
-    try {
-      const response = await apiClient.get('/clothings', { params });
-      const pageInfo = response.data?.data || {};
-      return {
-        ...response.data,
-        data: {
-          ...pageInfo,
-          items: (pageInfo.list || []).map(normalizeItem),
-          total: pageInfo.total || 0
-        }
-      };
-    } catch (error) {
-      console.error('Get clothing list failed:', error);
-      throw error;
-    }
+  async getClothingList(params = {}) {
+    const response = await apiClient.get('/clothings', { params });
+    const pageInfo = response.data?.data || {};
+    return {
+      ...response.data,
+      data: {
+        ...pageInfo,
+        items: (pageInfo.list || []).map(normalizeItem),
+        total: pageInfo.total || 0
+      }
+    };
   },
 
-  updateClothing: async (itemId, clothing) => {
-    try {
-      const response = await apiClient.put(`/clothings/${itemId}`, toUpdatePayload(clothing));
-      return response.data;
-    } catch (error) {
-      console.error('Update clothing failed:', error);
-      throw error;
-    }
+  async getClothingDetail(itemId) {
+    const response = await apiClient.get(`/clothings/${itemId}`);
+    return {
+      ...response.data,
+      data: normalizeItem(response.data?.data)
+    };
   },
 
-  deleteClothing: async (itemId) => {
-    try {
-      const response = await apiClient.delete(`/clothings/${itemId}`);
-      return response.data;
-    } catch (error) {
-      console.error('Delete clothing failed:', error);
-      throw error;
-    }
+  async updateClothing(itemId, clothing) {
+    const response = await apiClient.put(`/clothings/${itemId}`, toUpdatePayload(clothing));
+    return {
+      ...response.data,
+      data: normalizeItem(response.data?.data)
+    };
   },
 
-  uploadImage: async (_itemId, image) => {
-    try {
-      const formData = new FormData();
-      formData.append('file', image);
-      const response = await apiClient.post('/images/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Upload image failed:', error);
-      throw error;
-    }
+  async deleteClothing(itemId, force = false) {
+    const response = await apiClient.delete(`/clothings/${itemId}`, {
+      params: { force }
+    });
+    return response.data;
   },
 
-  setFrequency: async (itemId, frequency) => {
-    try {
-      const response = await apiClient.put(`/clothings/${itemId}/frequency`, {
-        frequencyLevel: frequency
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Set frequency failed:', error);
-      throw error;
-    }
+  async uploadImage(_itemId, image) {
+    const data = await fileToDataUrl(image);
+    const response = await apiClient.post('/clothings/images/upload-base64', {
+      filename: image?.name || 'image.jpg',
+      contentType: image?.type || 'image/jpeg',
+      data
+    });
+    return response.data;
+  },
+
+  async setFrequency(itemId, frequency) {
+    const response = await apiClient.put(`/clothings/${itemId}/frequency`, {
+      frequencyLevel: frequency
+    });
+    return response.data;
   }
 };
