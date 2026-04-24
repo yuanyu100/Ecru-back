@@ -14,6 +14,10 @@
         <strong>{{ stats.aiCalls }}</strong>
       </article>
       <article v-if="isAdmin" class="stat-card">
+        <span class="stat-label">AI 会话数</span>
+        <strong>{{ stats.aiConversationCount }}</strong>
+      </article>
+      <article v-if="isAdmin" class="stat-card">
         <span class="stat-label">知识库条目</span>
         <strong>{{ stats.knowledgeCount }}</strong>
       </article>
@@ -71,6 +75,7 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue';
 import { adminApi } from '../../api/admin';
+import { aiChatAdminApi } from '../../api/aiChat';
 import { clothingApi } from '../../api/clothing';
 import { knowledgeAdminApi } from '../../api/knowledge';
 import { monitorApi } from '../../api/monitor';
@@ -81,32 +86,42 @@ const stats = reactive({
   userCount: 0,
   clothingCount: 0,
   aiCalls: 0,
+  aiConversationCount: 0,
   knowledgeCount: 0,
   healthUp: false
 });
 const recentCalls = ref([]);
 
 const loadDashboard = async () => {
-  const requests = [
-    clothingApi.getStatistics().catch(() => null),
-    monitorApi.getDashboard().catch(() => null),
-    monitorApi.getHealth().catch(() => null)
-  ];
-
-  if (isAdmin) {
-    requests.unshift(adminApi.getUsers({ page: 1, size: 1 }).catch(() => null));
-    requests.splice(1, 0, knowledgeAdminApi.getOverview().catch(() => null));
-  }
+  const requests = isAdmin
+    ? [
+        adminApi.getUsers({ page: 1, size: 1 }).catch(() => null),
+        aiChatAdminApi.getOverview().catch(() => null),
+        knowledgeAdminApi.getOverview().catch(() => null),
+        clothingApi.getStatistics().catch(() => null),
+        monitorApi.getDashboard().catch(() => null),
+        monitorApi.getHealth().catch(() => null)
+      ]
+    : [
+        clothingApi.getStatistics().catch(() => null),
+        monitorApi.getDashboard().catch(() => null),
+        monitorApi.getHealth().catch(() => null)
+      ];
 
   const results = await Promise.all(requests);
   const userResult = isAdmin ? results[0] : null;
-  const knowledgeResult = isAdmin ? results[1] : null;
-  const clothingResult = isAdmin ? results[2] : results[0];
-  const monitorResult = isAdmin ? results[3] : results[1];
-  const healthResult = isAdmin ? results[4] : results[2];
+  const aiConversationResult = isAdmin ? results[1] : null;
+  const knowledgeResult = isAdmin ? results[2] : null;
+  const clothingResult = isAdmin ? results[3] : results[0];
+  const monitorResult = isAdmin ? results[4] : results[1];
+  const healthResult = isAdmin ? results[5] : results[2];
 
   if (userResult?.code === 200) {
     stats.userCount = userResult.data?.total || 0;
+  }
+
+  if (aiConversationResult?.code === 200) {
+    stats.aiConversationCount = Number(aiConversationResult.data?.conversationTotal || 0);
   }
 
   if (knowledgeResult?.code === 200) {
