@@ -61,6 +61,13 @@
         <button class="ghost-button" type="button" @click.stop="navigateToWardrobe">去衣橱</button>
       </article>
 
+      <article class="action-card" @click="navigateToMaterials">
+        <p class="eyebrow">Material Lab</p>
+        <h2>识别材质与洗护</h2>
+        <p>上传成分标或面料图，直接问“这种材质好吗”“能不能机洗”“适合什么季节”。</p>
+        <button class="ghost-button" type="button" @click.stop="navigateToMaterials">去识别</button>
+      </article>
+
       <article class="action-card" @click="navigateToProfile">
         <p class="eyebrow">Profile</p>
         <h2>维护个人偏好</h2>
@@ -260,6 +267,7 @@ const navigateToProfile = () => router.push('/profile');
 const navigateToChat = () => router.push('/chat');
 const navigateToWardrobe = () => router.push('/wardrobe');
 const navigateToAddClothing = () => router.push('/wardrobe/add');
+const navigateToMaterials = () => router.push('/materials');
 const navigateToStyleLearning = () => router.push('/style-learning');
 
 const openConversation = (sessionId) => {
@@ -584,7 +592,7 @@ onMounted(loadDashboard);
   }
 
   .action-grid {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .content-grid {

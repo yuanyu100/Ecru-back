@@ -1,58 +1,53 @@
 <template>
   <div class="bottom-nav">
-    <div 
-      class="nav-item" 
-      :class="{ active: currentRoute === '/' || currentRoute === '/chat' }"
-      @click="navigateTo('/')"
+    <button
+      v-for="item in navItems"
+      :key="item.path"
+      type="button"
+      :class="['nav-item', isActive(item) ? 'active' : '']"
+      @click="navigateTo(item.path)"
     >
-      <div class="nav-icon">💬</div>
-      <div class="nav-text">聊天</div>
-    </div>
-    <div 
-      class="nav-item" 
-      :class="{ active: currentRoute.includes('/wardrobe') }"
-      @click="navigateTo('/wardrobe')"
-    >
-      <div class="nav-icon">👕</div>
-      <div class="nav-text">衣柜</div>
-    </div>
-    <div 
-      class="nav-item" 
-      :class="{ active: currentRoute === '/profile' || currentRoute === '/style-learning' || currentRoute === '/login' || currentRoute === '/register' }"
-      @click="navigateTo('/profile')"
-    >
-      <div class="nav-icon">⚙️</div>
-      <div class="nav-text">设置</div>
-    </div>
+      <span class="nav-icon">{{ item.icon }}</span>
+      <span class="nav-text">{{ item.label }}</span>
+    </button>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
+import { computed } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { authApi } from '../api/auth';
 
 const router = useRouter();
 const route = useRoute();
-const currentRoute = ref(route.path);
+
+const navItems = computed(() => [
+  { path: '/', label: '首页', icon: '首' },
+  { path: '/materials', label: '材质', icon: '料' },
+  { path: '/wardrobe', label: '衣橱', icon: '柜' },
+  { path: '/profile', label: '我的', icon: '我' }
+]);
 
 const navigateTo = (path) => {
-  if (path === '/profile' && !authApi.isAuthenticated()) {
+  if ((path === '/profile' || path === '/materials' || path === '/wardrobe') && !authApi.isAuthenticated()) {
     router.push('/login');
-  } else {
-    router.push(path);
+    return;
   }
+
+  router.push(path);
 };
 
-const updateCurrentRoute = () => {
-  currentRoute.value = route.path;
+const isActive = (item) => {
+  if (item.path === '/') {
+    return route.path === '/' || route.path === '/chat';
+  }
+
+  if (item.path === '/profile') {
+    return ['/profile', '/style-learning', '/login', '/register'].includes(route.path);
+  }
+
+  return route.path.startsWith(item.path);
 };
-
-watch(() => route.path, updateCurrentRoute);
-
-onMounted(() => {
-  updateCurrentRoute();
-});
 </script>
 
 <style scoped>
@@ -61,40 +56,45 @@ onMounted(() => {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 60px;
-  background-color: #f5e6c3;
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
-  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
-  z-index: 1000;
+  height: 64px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  background: rgba(247, 236, 213, 0.96);
   border-top: 1px solid #e8d5a2;
+  box-shadow: 0 -2px 16px rgba(87, 62, 25, 0.08);
+  backdrop-filter: blur(10px);
+  z-index: 1000;
 }
 
 .nav-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  flex: 1;
-  height: 100%;
-  cursor: pointer;
-  transition: all 0.3s ease;
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  border: none;
+  background: transparent;
   color: #8b7355;
-}
-
-.nav-item:hover {
-  background-color: rgba(255, 255, 255, 0.2);
+  cursor: pointer;
 }
 
 .nav-item.active {
-  color: #4a90e2;
+  color: #6b4b1f;
   font-weight: 600;
 }
 
 .nav-icon {
-  font-size: 20px;
-  margin-bottom: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(107, 75, 31, 0.08);
+  font-size: 13px;
+}
+
+.nav-item.active .nav-icon {
+  background: #6b4b1f;
+  color: #fff8ef;
 }
 
 .nav-text {

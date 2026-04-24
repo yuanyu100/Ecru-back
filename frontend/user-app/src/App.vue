@@ -24,6 +24,6 @@ body {
 
 .app-container {
   min-height: 100vh;
-  padding-bottom: 60px; /* 为底部导航栏留出空间 */
+  padding-bottom: 64px;
 }
 </style>
