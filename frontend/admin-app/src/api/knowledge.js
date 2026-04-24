@@ -28,6 +28,11 @@ export const knowledgeAdminApi = {
     return response.data;
   },
 
+  async deleteFabric(id) {
+    const response = await apiClient.delete(`/admin/knowledge/fabrics/${id}`);
+    return response.data;
+  },
+
   async getGuides(params = {}) {
     const response = await apiClient.get('/admin/knowledge/guides', {
       params: {
@@ -50,6 +55,11 @@ export const knowledgeAdminApi = {
     return response.data;
   },
 
+  async deleteGuide(id) {
+    const response = await apiClient.delete(`/admin/knowledge/guides/${id}`);
+    return response.data;
+  },
+
   async getCareLabels(params = {}) {
     const response = await apiClient.get('/admin/knowledge/care-labels', {
       params: {
@@ -69,6 +79,11 @@ export const knowledgeAdminApi = {
 
   async updateCareLabel(id, payload) {
     const response = await apiClient.put(`/admin/knowledge/care-labels/${id}`, payload);
+    return response.data;
+  },
+
+  async deleteCareLabel(id) {
+    const response = await apiClient.delete(`/admin/knowledge/care-labels/${id}`);
     return response.data;
   }
 };

@@ -77,7 +77,12 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in fabrics" :key="item.fabricId">
+              <tr
+                v-for="item in fabrics"
+                :key="item.fabricId"
+                :class="{ 'active-row': selectedItemId === item.fabricId }"
+                @click="previewItem(item)"
+              >
                 <td>{{ item.fabricId }}</td>
                 <td>{{ item.name }}</td>
                 <td>{{ item.fabricType || '-' }}</td>
@@ -89,8 +94,16 @@
                   </span>
                 </td>
                 <td>{{ formatDateTime(item.updatedAt) }}</td>
-                <td>
+                <td class="action-cell">
                   <button class="secondary-button" type="button" @click="editItem(item)">编辑</button>
+                  <button
+                    class="danger-button"
+                    type="button"
+                    :disabled="deletingId === item.fabricId"
+                    @click="removeItem(item)"
+                  >
+                    {{ deletingId === item.fabricId ? '删除中...' : '删除' }}
+                  </button>
                 </td>
               </tr>
             </tbody>
@@ -112,7 +125,12 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in guides" :key="item.guideId">
+              <tr
+                v-for="item in guides"
+                :key="item.guideId"
+                :class="{ 'active-row': selectedItemId === item.guideId }"
+                @click="previewItem(item)"
+              >
                 <td>{{ item.guideId }}</td>
                 <td>{{ item.title }}</td>
                 <td>{{ item.guideType || '-' }}</td>
@@ -124,8 +142,16 @@
                   </span>
                 </td>
                 <td>{{ formatDateTime(item.updatedAt) }}</td>
-                <td>
+                <td class="action-cell">
                   <button class="secondary-button" type="button" @click="editItem(item)">编辑</button>
+                  <button
+                    class="danger-button"
+                    type="button"
+                    :disabled="deletingId === item.guideId"
+                    @click="removeItem(item)"
+                  >
+                    {{ deletingId === item.guideId ? '删除中...' : '删除' }}
+                  </button>
                 </td>
               </tr>
             </tbody>
@@ -147,7 +173,12 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in careLabels" :key="item.careLabelId">
+              <tr
+                v-for="item in careLabels"
+                :key="item.careLabelId"
+                :class="{ 'active-row': selectedItemId === item.careLabelId }"
+                @click="previewItem(item)"
+              >
                 <td>{{ item.careLabelId }}</td>
                 <td>{{ item.symbolCode }}</td>
                 <td>{{ item.symbolName }}</td>
@@ -159,8 +190,16 @@
                   </span>
                 </td>
                 <td>{{ formatDateTime(item.updatedAt) }}</td>
-                <td>
+                <td class="action-cell">
                   <button class="secondary-button" type="button" @click="editItem(item)">编辑</button>
+                  <button
+                    class="danger-button"
+                    type="button"
+                    :disabled="deletingId === item.careLabelId"
+                    @click="removeItem(item)"
+                  >
+                    {{ deletingId === item.careLabelId ? '删除中...' : '删除' }}
+                  </button>
                 </td>
               </tr>
             </tbody>
@@ -177,6 +216,52 @@
             <p class="panel-subtitle">保存后会直接写入知识库表，可立刻被用户端搜索与问答命中。</p>
           </div>
           <button class="secondary-button" type="button" @click="resetDraft">清空</button>
+        </div>
+
+        <div class="preview-card">
+          <div class="preview-head">
+            <strong>当前选中预览</strong>
+            <span>{{ selectedItem ? '已选中列表条目' : '未选中' }}</span>
+          </div>
+
+          <div v-if="selectedItem" class="preview-body">
+            <template v-if="activeTab === 'fabric'">
+              <h3>{{ selectedItem.name }}</h3>
+              <p>{{ selectedItem.summary || '暂无摘要' }}</p>
+              <div class="preview-tags">
+                <span class="mini-chip">{{ selectedItem.fabricType || '未分类' }}</span>
+                <span class="mini-chip">{{ selectedItem.isActive ? '启用' : '停用' }}</span>
+              </div>
+              <p class="preview-text">特性：{{ selectedItem.properties || '暂无' }}</p>
+              <p class="preview-text">洗护：{{ selectedItem.careGuide || '暂无' }}</p>
+            </template>
+
+            <template v-else-if="activeTab === 'guide'">
+              <h3>{{ selectedItem.title }}</h3>
+              <p>{{ selectedItem.summary || '暂无摘要' }}</p>
+              <div class="preview-tags">
+                <span class="mini-chip">{{ selectedItem.guideType || '未分类' }}</span>
+                <span class="mini-chip">{{ selectedItem.isActive ? '启用' : '停用' }}</span>
+              </div>
+              <p class="preview-text">副标题：{{ selectedItem.subtitle || '暂无' }}</p>
+              <p class="preview-text">正文：{{ selectedItem.content || '暂无' }}</p>
+            </template>
+
+            <template v-else>
+              <h3>{{ selectedItem.symbolName }}</h3>
+              <p>{{ selectedItem.instruction || '暂无说明' }}</p>
+              <div class="preview-tags">
+                <span class="mini-chip">{{ selectedItem.symbolCode || '未编码' }}</span>
+                <span class="mini-chip">{{ selectedItem.category || '未分类' }}</span>
+                <span class="mini-chip">{{ selectedItem.isActive ? '启用' : '停用' }}</span>
+              </div>
+              <p class="preview-text">解释：{{ selectedItem.explanation || '暂无' }}</p>
+              <p class="preview-text">建议：{{ selectedItem.doText || '暂无' }}</p>
+              <p class="preview-text">避免：{{ selectedItem.dontText || '暂无' }}</p>
+            </template>
+          </div>
+
+          <p v-else class="empty-tip">点击左侧表格任意一行，可以先预览，再决定是否编辑或删除。</p>
         </div>
 
         <form class="knowledge-form" @submit.prevent="submitDraft">
@@ -417,8 +502,11 @@ const overview = reactive({
 
 const activeTab = ref('fabric');
 const editingId = ref(null);
+const selectedItem = ref(null);
+const selectedItemId = ref(null);
 const loading = ref(false);
 const saving = ref(false);
+const deletingId = ref(null);
 const fabrics = ref([]);
 const guides = ref([]);
 const careLabels = ref([]);
@@ -455,6 +543,11 @@ const assignDraft = (nextDraft) => {
 const resetDraft = () => {
   editingId.value = null;
   assignDraft({ ...defaultDrafts[activeTab.value] });
+};
+
+const resetSelection = () => {
+  selectedItem.value = null;
+  selectedItemId.value = null;
 };
 
 const loadOverview = async () => {
@@ -499,14 +592,23 @@ const loadCurrentTab = async () => {
 const switchTab = async (tab) => {
   activeTab.value = tab;
   resetDraft();
+  resetSelection();
   await loadCurrentTab();
 };
 
 const createNew = () => {
   resetDraft();
+  resetSelection();
+};
+
+const previewItem = (item) => {
+  selectedItem.value = item;
+  selectedItemId.value =
+    activeTab.value === 'fabric' ? item.fabricId : activeTab.value === 'guide' ? item.guideId : item.careLabelId;
 };
 
 const editItem = (item) => {
+  previewItem(item);
   if (activeTab.value === 'fabric') {
     editingId.value = item.fabricId;
     assignDraft({
@@ -562,6 +664,44 @@ const editItem = (item) => {
     source: item.source || '',
     active: Boolean(item.isActive)
   });
+};
+
+const removeItem = async (item) => {
+  const itemId = activeTab.value === 'fabric' ? item.fabricId : activeTab.value === 'guide' ? item.guideId : item.careLabelId;
+  const itemTitle = activeTab.value === 'fabric' ? item.name : activeTab.value === 'guide' ? item.title : item.symbolName;
+
+  if (!window.confirm(`确认删除「${itemTitle || '该条目'}」吗？`)) {
+    return;
+  }
+
+  deletingId.value = itemId;
+  try {
+    let result;
+    if (activeTab.value === 'fabric') {
+      result = await knowledgeAdminApi.deleteFabric(itemId);
+    } else if (activeTab.value === 'guide') {
+      result = await knowledgeAdminApi.deleteGuide(itemId);
+    } else {
+      result = await knowledgeAdminApi.deleteCareLabel(itemId);
+    }
+
+    if (result?.code === 200) {
+      await Promise.all([loadOverview(), loadCurrentTab()]);
+
+      if (editingId.value === itemId) {
+        resetDraft();
+      }
+      if (selectedItemId.value === itemId) {
+        resetSelection();
+      }
+      alert(result.message || '知识条目删除成功');
+    }
+  } catch (error) {
+    console.error('Delete knowledge item failed:', error);
+    alert(error.response?.data?.message || '删除知识条目失败');
+  } finally {
+    deletingId.value = null;
+  }
 };
 
 const submitDraft = async () => {
@@ -651,6 +791,16 @@ onMounted(async () => {
   color: #5f6b7a;
 }
 
+.action-cell {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.active-row {
+  background: rgba(29, 78, 216, 0.05);
+}
+
 .accent-card {
   background: linear-gradient(135deg, rgba(29, 78, 216, 0.96), rgba(59, 130, 246, 0.92));
 }
@@ -694,6 +844,55 @@ onMounted(async () => {
 
 .compact-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.preview-card {
+  margin-bottom: 18px;
+  padding: 16px;
+  border-radius: 16px;
+  background: #f8fbff;
+  border: 1px solid #dbe6f7;
+}
+
+.preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.preview-head span {
+  color: #5f6b7a;
+  font-size: 12px;
+}
+
+.preview-body h3 {
+  margin: 0 0 8px;
+}
+
+.preview-body p {
+  margin: 0;
+}
+
+.preview-tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 10px 0;
+}
+
+.mini-chip {
+  display: inline-flex;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #e7edf7;
+  color: #1e3a5f;
+  font-size: 12px;
+}
+
+.preview-text + .preview-text {
+  margin-top: 8px;
 }
 
 @media (max-width: 1100px) {

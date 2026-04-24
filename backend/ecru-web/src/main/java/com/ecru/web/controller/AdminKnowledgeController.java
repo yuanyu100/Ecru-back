@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -60,6 +61,14 @@ public class AdminKnowledgeController {
         return Result.success("面料知识更新成功", knowledgeAdminService.updateFabric(id, request));
     }
 
+    @DeleteMapping("/fabrics/{id}")
+    @Operation(summary = "删除面料知识")
+    public Result<Void> deleteFabric(@PathVariable Long id) {
+        requireAdmin();
+        knowledgeAdminService.deleteFabric(id);
+        return Result.success("面料知识删除成功", null);
+    }
+
     @GetMapping("/guides")
     @Operation(summary = "获取指南知识列表")
     public Result<Map<String, Object>> listGuides(AdminKnowledgeListRequest request) {
@@ -82,6 +91,14 @@ public class AdminKnowledgeController {
         return Result.success("指南知识更新成功", knowledgeAdminService.updateGuide(id, request));
     }
 
+    @DeleteMapping("/guides/{id}")
+    @Operation(summary = "删除指南知识")
+    public Result<Void> deleteGuide(@PathVariable Long id) {
+        requireAdmin();
+        knowledgeAdminService.deleteGuide(id);
+        return Result.success("指南知识删除成功", null);
+    }
+
     @GetMapping("/care-labels")
     @Operation(summary = "获取洗护知识列表")
     public Result<Map<String, Object>> listCareLabels(AdminKnowledgeListRequest request) {
@@ -102,6 +119,14 @@ public class AdminKnowledgeController {
                                                        @Valid @RequestBody CareLabelKnowledgeUpsertRequest request) {
         requireAdmin();
         return Result.success("洗护知识更新成功", knowledgeAdminService.updateCareLabel(id, request));
+    }
+
+    @DeleteMapping("/care-labels/{id}")
+    @Operation(summary = "删除洗护知识")
+    public Result<Void> deleteCareLabel(@PathVariable Long id) {
+        requireAdmin();
+        knowledgeAdminService.deleteCareLabel(id);
+        return Result.success("洗护知识删除成功", null);
     }
 
     private void requireAdmin() {

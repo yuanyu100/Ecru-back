@@ -180,6 +180,11 @@ public class KnowledgeAdminService {
         return getFabricById(id);
     }
 
+    public void deleteFabric(Long id) {
+        requireExists("knowledge_fabrics", id, "面料知识不存在");
+        jdbcTemplate.update("DELETE FROM knowledge_fabrics WHERE id = ?", id);
+    }
+
     public Map<String, Object> createGuide(GuideKnowledgeUpsertRequest request) {
         ensureUnique("knowledge_guides", "title", request.getTitle(), null);
 
@@ -228,6 +233,11 @@ public class KnowledgeAdminService {
         return getGuideById(id);
     }
 
+    public void deleteGuide(Long id) {
+        requireExists("knowledge_guides", id, "搭配指南不存在");
+        jdbcTemplate.update("DELETE FROM knowledge_guides WHERE id = ?", id);
+    }
+
     public Map<String, Object> createCareLabel(CareLabelKnowledgeUpsertRequest request) {
         ensureUnique("knowledge_care_labels", "symbol_code", request.getSymbolCode(), null);
 
@@ -268,6 +278,11 @@ public class KnowledgeAdminService {
                 toActiveFlag(request.getActive()),
                 id);
         return getCareLabelById(id);
+    }
+
+    public void deleteCareLabel(Long id) {
+        requireExists("knowledge_care_labels", id, "洗护标知识不存在");
+        jdbcTemplate.update("DELETE FROM knowledge_care_labels WHERE id = ?", id);
     }
 
     private Map<String, Object> getFabricById(Long id) {
