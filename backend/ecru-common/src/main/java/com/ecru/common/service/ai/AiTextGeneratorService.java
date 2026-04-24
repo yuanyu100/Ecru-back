@@ -126,6 +126,62 @@ public class AiTextGeneratorService {
     }
 
     /**
+     * 鐢熸垚鑷畾涔夌郴缁熸彁绀虹殑鏂囨湰鍝嶅簲锛屽け璐ユ椂杩斿洖 null锛屼氦鐢变笂灞傚喅瀹氬洖閫€绛栫暐銆?
+     */
+    public String generateCustomResponse(String systemPrompt, String prompt,
+                                         Map<String, Object> context, Long userId) {
+        AiApiCallContext monitorContext = AiApiCallContext.create(
+                AiApiMonitorWrapper.Scene.CHAT_GENERATE, modelName, userId);
+
+        try {
+            String endpoint = "/chat/completions";
+            String fullUrl = baseUrl + endpoint;
+
+            JSONObject requestBody = buildCustomChatRequestBody(systemPrompt, prompt, context);
+            monitorContext.setPromptLength(requestBody.toJSONString().length());
+
+            RequestBody body = RequestBody.create(
+                    requestBody.toJSONString(),
+                    MediaType.parse("application/json")
+            );
+
+            Request request = new Request.Builder()
+                    .url(fullUrl)
+                    .post(body)
+                    .addHeader("Authorization", "Bearer " + apiKey)
+                    .addHeader("Content-Type", "application/json")
+                    .build();
+
+            try (Response response = okHttpClient.newCall(request).execute()) {
+                String responseBody = response.body().string();
+
+                if (!response.isSuccessful()) {
+                    monitorContext.markFailed(AiApiMonitorWrapper.ErrorType.HTTP_ERROR,
+                            "API璋冪敤澶辫触: " + response.code(), response.code());
+                    throw new IOException("API璋冪敤澶辫触: " + response.code() + " " + response.message() + " - " + responseBody);
+                }
+
+                JSONObject responseJson = JSON.parseObject(responseBody);
+                monitorService.extractTokenUsage(monitorContext, responseJson);
+                monitorContext.markSuccess(response.code());
+
+                String content = parseChatResponse(responseJson);
+                monitorContext.setResponseLength(content != null ? content.length() : 0);
+                return content;
+            }
+        } catch (Exception e) {
+            log.error("鐢熸垚鑷畾涔夋枃鏈洖澶嶅け璐? {}", e.getMessage(), e);
+            if (monitorContext.getStatus() == 1) {
+                monitorContext.markFailed(AiApiMonitorWrapper.ErrorType.BUSINESS_ERROR,
+                        e.getMessage(), null);
+            }
+            return null;
+        } finally {
+            monitorService.recordApiCall(monitorContext);
+        }
+    }
+
+    /**
      * 分析用户查询意图。
      */
     public Map<String, Object> analyzeQueryIntent(String query, Long userId) {
@@ -246,6 +302,39 @@ public class AiTextGeneratorService {
             userContent = userContent.substring(0, 1000) + "...";
         }
         userMessage.put("content", userContent);
+        messages.add(userMessage);
+
+        requestBody.put("messages", messages);
+        return requestBody;
+    }
+
+    private JSONObject buildCustomChatRequestBody(String systemPrompt, String prompt,
+                                                  Map<String, Object> context) {
+        JSONObject requestBody = new JSONObject();
+        requestBody.put("model", modelName);
+        requestBody.put("temperature", 0.4);
+        requestBody.put("max_tokens", 1024);
+
+        JSONArray messages = new JSONArray();
+
+        JSONObject systemMessage = new JSONObject();
+        systemMessage.put("role", "system");
+        systemMessage.put("content", systemPrompt);
+        messages.add(systemMessage);
+
+        JSONObject userMessage = new JSONObject();
+        userMessage.put("role", "user");
+
+        StringBuilder userContent = new StringBuilder();
+        userContent.append(prompt == null ? "" : prompt);
+        if (context != null && !context.isEmpty()) {
+            userContent.append("\n\n鍙傝€冧笂涓嬫枃锛?").append(JSON.toJSONString(context));
+        }
+        String finalContent = userContent.toString();
+        if (finalContent.length() > 3000) {
+            finalContent = finalContent.substring(0, 3000) + "...";
+        }
+        userMessage.put("content", finalContent);
         messages.add(userMessage);
 
         requestBody.put("messages", messages);

@@ -253,7 +253,7 @@ DELETE FROM knowledge_guides
 WHERE id IN (2001, 2002, 2003);
 
 DELETE FROM knowledge_fabrics
-WHERE id IN (1001, 1002, 1003, 1004);
+WHERE id IN (1001, 1002, 1003, 1004, 1005, 1006, 1007);
 
 DELETE FROM knowledge_care_labels
 WHERE id IN (3001, 3002, 3003, 3004, 3005, 3006);
@@ -368,33 +368,33 @@ INSERT INTO knowledge_fabrics (
     created_at, updated_at
 ) VALUES
     (
-        1001, 'Wool', 'merino,wool blend', 'natural_fiber', 92, 70, 85, 78,
-        'Warm and structured fabric that works well for cold weather tailoring.',
-        'Wool keeps heat well, recovers shape after wear, and suits coats, knitwear, and formal trousers.',
+        1001, 'Wool', 'wool,merino,wool blend,merino wool', 'natural_fiber', 92, 70, 85, 78,
+        'Warm and structured fabric for cold-weather tailoring and knitwear.',
+        'Wool keeps heat well, recovers shape after wear, and works for coats, sweaters, and formal trousers.',
         'Use gentle detergent, avoid high heat, and dry flat or hang with shoulder support.',
         'autumn,winter',
         'commute,business,formal',
-        'wool,warm,winter,coat,sweater,formal',
+        'wool,merino,wool blend,warm,winter,coat,sweater,formal',
         'demo-seed',
         1,
         NOW(),
         NOW()
     ),
     (
-        1002, 'Cotton', 'cotton poplin,jersey', 'natural_fiber', 58, 92, 90, 82,
-        'Balanced daily fabric with strong breathability and easy maintenance.',
-        'Cotton is comfortable on skin, works across shirts and tees, and handles frequent wear well.',
-        'Machine wash in mild cycle, separate dark colors first, and avoid over-drying.',
+        1002, 'Cotton', 'cotton,cotton poplin,jersey,pure cotton', 'natural_fiber', 58, 92, 90, 82,
+        'Balanced daily fabric with strong breathability and skin comfort.',
+        'Cotton is comfortable on skin, suits shirts and tees, and handles frequent wear well, though it can wrinkle.',
+        'Machine wash in a mild cycle, separate dark colors first, and avoid over-drying.',
         'spring,summer,autumn',
         'daily,commute,weekend',
-        'cotton,shirt,tshirt,breathable,daily,office',
+        'cotton,pure cotton,shirt,tshirt,breathable,daily,office',
         'demo-seed',
         1,
         NOW(),
         NOW()
     ),
     (
-        1003, 'Linen', 'linen blend', 'natural_fiber', 42, 95, 82, 68,
+        1003, 'Linen', 'linen,linen blend', 'natural_fiber', 42, 95, 82, 68,
         'Dry and airy fabric suited to hot weather and relaxed summer outfits.',
         'Linen releases heat quickly, has a natural texture, and creates an effortless seasonal look.',
         'Wash with cold water, do not over-spin, and steam lightly to keep texture natural.',
@@ -407,13 +407,52 @@ INSERT INTO knowledge_fabrics (
         NOW()
     ),
     (
-        1004, 'Denim', 'rigid denim,washed denim', 'woven_fabric', 64, 66, 78, 90,
+        1004, 'Denim', 'denim,rigid denim,washed denim', 'woven_fabric', 64, 66, 78, 90,
         'Durable fabric for casual outfits, outer layers, and structured bottoms.',
         'Denim is sturdy, resistant to abrasion, and easy to pair with shirts, knits, and sneakers.',
         'Wash inside out, reduce wash frequency, and air dry to preserve color and shape.',
         'spring,autumn,winter',
         'daily,casual,weekend',
         'denim,jeans,jacket,casual,durable,weekend',
+        'demo-seed',
+        1,
+        NOW(),
+        NOW()
+    ),
+    (
+        1005, 'Polyester', 'polyester,poly', 'synthetic_fiber', 56, 58, 70, 88,
+        'Durable and quick-drying synthetic fabric often seen in sportswear and blended basics.',
+        'Polyester resists wrinkles and keeps shape well, but it usually feels less breathable than natural fibers.',
+        'Machine wash normally and avoid high ironing temperature, especially on coated or printed garments.',
+        'spring,summer,autumn,winter',
+        'daily,commute,sport',
+        'polyester,poly,quick dry,durable,easy care,sport',
+        'demo-seed',
+        1,
+        NOW(),
+        NOW()
+    ),
+    (
+        1006, 'Silk', 'silk,mulberry silk', 'natural_fiber', 48, 78, 88, 52,
+        'Soft and refined fabric with elegant drape, suited to delicate and dressier pieces.',
+        'Silk feels smooth and comfortable, works for blouses and dresses, but its abrasion resistance is limited.',
+        'Use cold gentle hand wash or professional dry cleaning, and avoid direct sunlight and high heat.',
+        'spring,summer,autumn',
+        'formal,commute,date',
+        'silk,mulberry silk,elegant,soft,dress,blouse',
+        'demo-seed',
+        1,
+        NOW(),
+        NOW()
+    ),
+    (
+        1007, 'Viscose', 'viscose,rayon', 'regenerated_fiber', 50, 76, 84, 60,
+        'Soft fabric with smooth hand feel and good drape, common in light blouses and dresses.',
+        'Viscose feels comfortable and fluid, but loses strength when wet and is not the most durable option.',
+        'Wash gently, avoid soaking for too long, and support the garment while drying.',
+        'spring,summer,autumn',
+        'daily,commute,smart_casual',
+        'viscose,rayon,soft,drape,blouse,dress',
         'demo-seed',
         1,
         NOW(),

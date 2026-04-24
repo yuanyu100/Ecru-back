@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import javax.sql.DataSource;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -20,6 +21,7 @@ import java.util.Set;
 public class KnowledgeBaseService {
 
     private static final int DEFAULT_LIMIT = 10;
+    private static final int DEFAULT_MATCH_LIMIT = 5;
     private static final int MAX_LIMIT = 20;
 
     private final JdbcTemplate jdbcTemplate;
@@ -35,7 +37,7 @@ public class KnowledgeBaseService {
         }
 
         SearchType searchType = SearchType.from(type);
-        int safeLimit = Math.max(1, Math.min(limit == null ? DEFAULT_LIMIT : limit, MAX_LIMIT));
+        int safeLimit = clampLimit(limit, DEFAULT_LIMIT);
         List<String> expandedTerms = expandTerms(trimmedQuery);
         List<Map<String, Object>> results = new ArrayList<>();
 
@@ -75,9 +77,7 @@ public class KnowledgeBaseService {
             }
         }
 
-        results.sort(Comparator
-                .comparing((Map<String, Object> item) -> asInt(item.get("relevance")), Comparator.reverseOrder())
-                .thenComparing(item -> StringUtils.defaultString((String) item.get("title")), String.CASE_INSENSITIVE_ORDER));
+        results.sort(searchItemComparator());
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("total", results.size());
@@ -96,27 +96,7 @@ public class KnowledgeBaseService {
         if (rows.isEmpty()) {
             throw new BusinessException(404, "面料知识不存在");
         }
-
-        Map<String, Object> row = rows.get(0);
-        Map<String, Object> characteristics = new LinkedHashMap<>();
-        characteristics.put("warmth", asInt(row.get("warmth_score")));
-        characteristics.put("breathability", asInt(row.get("breathability_score")));
-        characteristics.put("comfort", asInt(row.get("comfort_score")));
-        characteristics.put("durability", asInt(row.get("durability_score")));
-
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("fabricId", asLong(row.get("id")));
-        result.put("name", row.get("name"));
-        result.put("alias", row.get("alias"));
-        result.put("type", row.get("fabric_type"));
-        result.put("characteristics", characteristics);
-        result.put("summary", row.get("summary"));
-        result.put("properties", row.get("properties"));
-        result.put("careGuide", row.get("care_guide"));
-        result.put("suitableSeasons", splitCsv((String) row.get("suitable_seasons")));
-        result.put("suitableOccasions", splitCsv((String) row.get("suitable_occasions")));
-        result.put("keywords", splitCsv((String) row.get("keywords")));
-        return result;
+        return toFabricDetail(rows.get(0));
     }
 
     public Map<String, Object> getGuideDetail(Long guideId) {
@@ -141,8 +121,8 @@ public class KnowledgeBaseService {
         result.put("content", row.get("content"));
         result.put("author", row.get("author"));
         result.put("publishDate", row.get("publish_date"));
-        result.put("tags", splitCsv((String) row.get("tags")));
-        result.put("images", StringUtils.isBlank((String) row.get("cover_image_url")) ? List.of() : List.of(image));
+        result.put("tags", splitCsv(asString(row.get("tags"))));
+        result.put("images", StringUtils.isBlank(asString(row.get("cover_image_url"))) ? List.of() : List.of(image));
         return result;
     }
 
@@ -154,19 +134,54 @@ public class KnowledgeBaseService {
         if (rows.isEmpty()) {
             throw new BusinessException(404, "水洗标知识不存在");
         }
+        return toCareLabelDetail(rows.get(0), 0);
+    }
 
-        Map<String, Object> row = rows.get(0);
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("careLabelId", asLong(row.get("id")));
-        result.put("symbolCode", row.get("symbol_code"));
-        result.put("symbolName", row.get("symbol_name"));
-        result.put("category", row.get("category"));
-        result.put("instruction", row.get("instruction_text"));
-        result.put("explanation", row.get("explanation"));
-        result.put("doText", row.get("do_text"));
-        result.put("dontText", row.get("dont_text"));
-        result.put("keywords", splitCsv((String) row.get("keywords")));
-        return result;
+    public List<Map<String, Object>> matchFabrics(List<String> keywords, Integer limit) {
+        List<String> normalizedTerms = normalizeKeywords(keywords);
+        if (normalizedTerms.isEmpty()) {
+            return List.of();
+        }
+
+        String combinedQuery = String.join(" ", keywords);
+        List<Map<String, Object>> fabrics = jdbcTemplate.queryForList(
+                "SELECT id, name, alias, fabric_type, warmth_score, breathability_score, comfort_score, durability_score, " +
+                        "summary, properties, care_guide, suitable_seasons, suitable_occasions, keywords " +
+                        "FROM knowledge_fabrics WHERE is_active = 1 ORDER BY updated_at DESC, id ASC");
+
+        List<Map<String, Object>> matched = new ArrayList<>();
+        for (Map<String, Object> fabric : fabrics) {
+            Map<String, Object> item = toMatchedFabricItem(fabric, combinedQuery, normalizedTerms);
+            if (item != null) {
+                matched.add(item);
+            }
+        }
+
+        matched.sort(matchItemComparator("name"));
+        return matched.stream().limit(clampLimit(limit, DEFAULT_MATCH_LIMIT)).toList();
+    }
+
+    public List<Map<String, Object>> matchCareLabels(List<String> keywords, Integer limit) {
+        List<String> normalizedTerms = normalizeKeywords(keywords);
+        if (normalizedTerms.isEmpty()) {
+            return List.of();
+        }
+
+        String combinedQuery = String.join(" ", keywords);
+        List<Map<String, Object>> careLabels = jdbcTemplate.queryForList(
+                "SELECT id, symbol_code, symbol_name, category, instruction_text, explanation, do_text, dont_text, keywords " +
+                        "FROM knowledge_care_labels WHERE is_active = 1 ORDER BY category ASC, id ASC");
+
+        List<Map<String, Object>> matched = new ArrayList<>();
+        for (Map<String, Object> careLabel : careLabels) {
+            Map<String, Object> item = toMatchedCareLabelItem(careLabel, combinedQuery, normalizedTerms);
+            if (item != null) {
+                matched.add(item);
+            }
+        }
+
+        matched.sort(matchItemComparator("symbolName"));
+        return matched.stream().limit(clampLimit(limit, DEFAULT_MATCH_LIMIT)).toList();
     }
 
     private Map<String, Object> toFabricSearchItem(Map<String, Object> fabric, String query, List<String> terms) {
@@ -192,7 +207,9 @@ public class KnowledgeBaseService {
         item.put("content", buildSnippet(asString(fabric.get("summary")), asString(fabric.get("properties"))));
         item.put("source", StringUtils.defaultIfBlank(asString(fabric.get("source")), "knowledge-fabric"));
         item.put("relevance", relevance);
-        item.put("tags", mergeTags(splitCsv(asString(fabric.get("suitable_seasons"))), splitCsv(asString(fabric.get("suitable_occasions")))));
+        item.put("tags", mergeTags(
+                splitCsv(asString(fabric.get("suitable_seasons"))),
+                splitCsv(asString(fabric.get("suitable_occasions")))));
         return item;
     }
 
@@ -243,8 +260,88 @@ public class KnowledgeBaseService {
         item.put("content", buildSnippet(asString(careLabel.get("instruction_text")), asString(careLabel.get("explanation"))));
         item.put("source", StringUtils.defaultIfBlank(asString(careLabel.get("source")), "knowledge-care-label"));
         item.put("relevance", relevance);
-        item.put("tags", mergeTags(List.of(asString(careLabel.get("category"))), splitCsv(asString(careLabel.get("keywords")))));
+        item.put("tags", mergeTags(
+                List.of(asString(careLabel.get("category"))),
+                splitCsv(asString(careLabel.get("keywords")))));
         return item;
+    }
+
+    private Map<String, Object> toMatchedFabricItem(Map<String, Object> row, String query, List<String> terms) {
+        String title = asString(row.get("name"));
+        String body = String.join(" ",
+                asString(row.get("alias")),
+                asString(row.get("fabric_type")),
+                asString(row.get("summary")),
+                asString(row.get("properties")),
+                asString(row.get("care_guide")),
+                asString(row.get("suitable_seasons")),
+                asString(row.get("suitable_occasions")),
+                asString(row.get("keywords")));
+        int relevance = calculateRelevance(query, title, body, terms);
+        if (relevance <= 0) {
+            return null;
+        }
+
+        Map<String, Object> detail = toFabricDetail(row);
+        detail.put("relevance", relevance);
+        return detail;
+    }
+
+    private Map<String, Object> toMatchedCareLabelItem(Map<String, Object> row, String query, List<String> terms) {
+        String title = asString(row.get("symbol_name"));
+        String body = String.join(" ",
+                asString(row.get("symbol_code")),
+                asString(row.get("category")),
+                asString(row.get("instruction_text")),
+                asString(row.get("explanation")),
+                asString(row.get("do_text")),
+                asString(row.get("dont_text")),
+                asString(row.get("keywords")));
+        int relevance = calculateRelevance(query, title, body, terms);
+        if (relevance <= 0) {
+            return null;
+        }
+
+        return toCareLabelDetail(row, relevance);
+    }
+
+    private Map<String, Object> toFabricDetail(Map<String, Object> row) {
+        Map<String, Object> characteristics = new LinkedHashMap<>();
+        characteristics.put("warmth", asInt(row.get("warmth_score")));
+        characteristics.put("breathability", asInt(row.get("breathability_score")));
+        characteristics.put("comfort", asInt(row.get("comfort_score")));
+        characteristics.put("durability", asInt(row.get("durability_score")));
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("fabricId", asLong(row.get("id")));
+        result.put("name", row.get("name"));
+        result.put("alias", splitCsv(asString(row.get("alias"))));
+        result.put("type", row.get("fabric_type"));
+        result.put("characteristics", characteristics);
+        result.put("summary", row.get("summary"));
+        result.put("properties", row.get("properties"));
+        result.put("careGuide", row.get("care_guide"));
+        result.put("suitableSeasons", splitCsv(asString(row.get("suitable_seasons"))));
+        result.put("suitableOccasions", splitCsv(asString(row.get("suitable_occasions"))));
+        result.put("keywords", splitCsv(asString(row.get("keywords"))));
+        return result;
+    }
+
+    private Map<String, Object> toCareLabelDetail(Map<String, Object> row, int relevance) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("careLabelId", asLong(row.get("id")));
+        result.put("symbolCode", row.get("symbol_code"));
+        result.put("symbolName", row.get("symbol_name"));
+        result.put("category", row.get("category"));
+        result.put("instruction", row.get("instruction_text"));
+        result.put("explanation", row.get("explanation"));
+        result.put("doText", row.get("do_text"));
+        result.put("dontText", row.get("dont_text"));
+        result.put("keywords", splitCsv(asString(row.get("keywords"))));
+        if (relevance > 0) {
+            result.put("relevance", relevance);
+        }
+        return result;
     }
 
     private int calculateRelevance(String query, String title, String body, List<String> terms) {
@@ -283,6 +380,27 @@ public class KnowledgeBaseService {
         return Math.min(score, 99);
     }
 
+    private List<String> normalizeKeywords(List<String> keywords) {
+        if (keywords == null || keywords.isEmpty()) {
+            return List.of();
+        }
+
+        Set<String> terms = new LinkedHashSet<>();
+        for (String keyword : keywords) {
+            String trimmed = StringUtils.trimToEmpty(keyword);
+            if (StringUtils.isBlank(trimmed)) {
+                continue;
+            }
+            terms.addAll(expandTerms(trimmed));
+            Arrays.stream(trimmed.split("[\\s,，。；;/]+"))
+                    .map(String::trim)
+                    .filter(StringUtils::isNotBlank)
+                    .map(this::safeLower)
+                    .forEach(terms::add);
+        }
+        return new ArrayList<>(terms);
+    }
+
     private List<String> expandTerms(String query) {
         Set<String> terms = new LinkedHashSet<>();
         terms.add(safeLower(query));
@@ -292,11 +410,13 @@ public class KnowledgeBaseService {
             }
         }
 
-        addIfMatched(terms, query, List.of("羊毛", "毛呢", "wool"), List.of("wool", "warm", "winter", "coat", "sweater"));
-        addIfMatched(terms, query, List.of("棉", "纯棉", "cotton"), List.of("cotton", "shirt", "tshirt", "breathable", "daily"));
-        addIfMatched(terms, query, List.of("亚麻", "linen"), List.of("linen", "summer", "cool", "breathable"));
-        addIfMatched(terms, query, List.of("牛仔", "denim"), List.of("denim", "casual", "daily", "jacket", "pants"));
-        addIfMatched(terms, query, List.of("真丝", "丝绸", "silk"), List.of("silk", "elegant", "dress", "formal"));
+        addIfMatched(terms, query, List.of("羊毛", "毛呢", "wool"), List.of("wool", "羊毛", "毛呢", "warm", "winter", "coat", "sweater"));
+        addIfMatched(terms, query, List.of("棉", "纯棉", "cotton"), List.of("cotton", "棉", "纯棉", "shirt", "tshirt", "breathable", "daily"));
+        addIfMatched(terms, query, List.of("亚麻", "linen"), List.of("linen", "亚麻", "summer", "cool", "breathable"));
+        addIfMatched(terms, query, List.of("牛仔", "denim"), List.of("denim", "牛仔", "casual", "daily", "jacket", "pants"));
+        addIfMatched(terms, query, List.of("真丝", "丝绸", "silk"), List.of("silk", "真丝", "丝绸", "elegant", "dress", "formal"));
+        addIfMatched(terms, query, List.of("涤纶", "聚酯纤维", "polyester"), List.of("polyester", "涤纶", "聚酯纤维", "durable", "quick dry"));
+        addIfMatched(terms, query, List.of("粘胶", "人棉", "viscose", "rayon"), List.of("viscose", "rayon", "粘胶", "人棉", "soft", "drape"));
         addIfMatched(terms, query, List.of("通勤", "上班", "职场", "office", "commute"), List.of("commute", "office", "formal", "layering"));
         addIfMatched(terms, query, List.of("面试", "interview"), List.of("interview", "commute", "shirt", "formal"));
         addIfMatched(terms, query, List.of("冬天", "冬季", "保暖", "winter"), List.of("winter", "warm", "coat", "wool"));
@@ -323,11 +443,27 @@ public class KnowledgeBaseService {
         }
     }
 
+    private Comparator<Map<String, Object>> searchItemComparator() {
+        return Comparator
+                .comparing((Map<String, Object> item) -> asInt(item.get("relevance")), Comparator.reverseOrder())
+                .thenComparing(item -> StringUtils.defaultString(asString(item.get("title"))), String.CASE_INSENSITIVE_ORDER);
+    }
+
+    private Comparator<Map<String, Object>> matchItemComparator(String nameKey) {
+        return Comparator
+                .comparing((Map<String, Object> item) -> asInt(item.get("relevance")), Comparator.reverseOrder())
+                .thenComparing(item -> StringUtils.defaultString(asString(item.get(nameKey))), String.CASE_INSENSITIVE_ORDER);
+    }
+
+    private int clampLimit(Integer limit, int defaultLimit) {
+        return Math.max(1, Math.min(limit == null ? defaultLimit : limit, MAX_LIMIT));
+    }
+
     private List<String> splitCsv(String value) {
         if (StringUtils.isBlank(value)) {
             return List.of();
         }
-        return java.util.Arrays.stream(value.split(","))
+        return Arrays.stream(value.split(","))
                 .map(String::trim)
                 .filter(StringUtils::isNotBlank)
                 .distinct()
