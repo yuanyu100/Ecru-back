@@ -13,6 +13,10 @@
         <span class="stat-label">今日 AI 调用</span>
         <strong>{{ stats.aiCalls }}</strong>
       </article>
+      <article v-if="isAdmin" class="stat-card">
+        <span class="stat-label">知识库条目</span>
+        <strong>{{ stats.knowledgeCount }}</strong>
+      </article>
       <article class="stat-card">
         <span class="stat-label">监控健康状态</span>
         <strong :class="stats.healthUp ? 'status-up' : 'status-down'">
@@ -27,9 +31,10 @@
           <h2>系统说明</h2>
         </div>
         <ul class="plain-list">
-          <li>当前后台已经接入真实登录、用户列表、衣物列表和 AI 监控接口。</li>
+          <li>当前后台已经接入真实登录、用户列表、衣物列表、知识库管理和 AI 监控接口。</li>
           <li>用户管理仅管理员可见，后端当前以 `userId = 1` 识别管理员。</li>
           <li>衣物页当前是“当前登录账号视角”，后端暂时没有完整的全局衣物管理接口。</li>
+          <li>知识库页已支持面料、指南、洗护标的新增、编辑和启停用维护。</li>
         </ul>
       </section>
 
@@ -67,13 +72,16 @@
 import { onMounted, reactive, ref } from 'vue';
 import { adminApi } from '../../api/admin';
 import { clothingApi } from '../../api/clothing';
+import { knowledgeAdminApi } from '../../api/knowledge';
 import { monitorApi } from '../../api/monitor';
 import { authApi } from '../../api/auth';
 
+const isAdmin = authApi.getCurrentUser()?.role === 'ADMIN';
 const stats = reactive({
   userCount: 0,
   clothingCount: 0,
   aiCalls: 0,
+  knowledgeCount: 0,
   healthUp: false
 });
 const recentCalls = ref([]);
@@ -85,18 +93,26 @@ const loadDashboard = async () => {
     monitorApi.getHealth().catch(() => null)
   ];
 
-  if (authApi.getCurrentUser()?.role === 'ADMIN') {
+  if (isAdmin) {
     requests.unshift(adminApi.getUsers({ page: 1, size: 1 }).catch(() => null));
+    requests.splice(1, 0, knowledgeAdminApi.getOverview().catch(() => null));
   }
 
   const results = await Promise.all(requests);
-  const userResult = authApi.getCurrentUser()?.role === 'ADMIN' ? results[0] : null;
-  const clothingResult = authApi.getCurrentUser()?.role === 'ADMIN' ? results[1] : results[0];
-  const monitorResult = authApi.getCurrentUser()?.role === 'ADMIN' ? results[2] : results[1];
-  const healthResult = authApi.getCurrentUser()?.role === 'ADMIN' ? results[3] : results[2];
+  const userResult = isAdmin ? results[0] : null;
+  const knowledgeResult = isAdmin ? results[1] : null;
+  const clothingResult = isAdmin ? results[2] : results[0];
+  const monitorResult = isAdmin ? results[3] : results[1];
+  const healthResult = isAdmin ? results[4] : results[2];
 
   if (userResult?.code === 200) {
     stats.userCount = userResult.data?.total || 0;
+  }
+
+  if (knowledgeResult?.code === 200) {
+    const payload = knowledgeResult.data || {};
+    stats.knowledgeCount =
+      Number(payload.fabricTotal || 0) + Number(payload.guideTotal || 0) + Number(payload.careLabelTotal || 0);
   }
 
   if (clothingResult?.code === 200) {

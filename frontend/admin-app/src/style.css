@@ -20,7 +20,9 @@ body {
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 
@@ -88,13 +90,20 @@ a {
 }
 
 .text-input,
-.auth-form input {
+.auth-form input,
+.auth-form textarea,
+.auth-form select {
   width: 100%;
   min-height: 44px;
   padding: 0 14px;
   border: 1px solid #d7dee7;
   border-radius: 12px;
   background: #fff;
+}
+
+textarea.text-input,
+.auth-form textarea {
+  padding: 12px 14px;
 }
 
 .primary-button,

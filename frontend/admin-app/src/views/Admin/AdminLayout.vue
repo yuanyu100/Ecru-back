@@ -11,6 +11,7 @@
         <router-link v-if="isAdmin" to="/users" class="nav-link">用户管理</router-link>
         <router-link to="/clothing" class="nav-link">衣物台账</router-link>
         <router-link v-if="isAdmin" to="/api-monitor" class="nav-link">AI 监控</router-link>
+        <router-link v-if="isAdmin" to="/knowledge" class="nav-link">知识库管理</router-link>
       </nav>
 
       <div class="sidebar-footer">

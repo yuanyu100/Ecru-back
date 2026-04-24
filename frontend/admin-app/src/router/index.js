@@ -44,6 +44,12 @@ const routes = [
         name: 'admin-api-monitor',
         component: () => import('../views/Admin/ApiMonitorView.vue'),
         meta: { requiresAdmin: true, title: 'AI 监控' }
+      },
+      {
+        path: 'knowledge',
+        name: 'admin-knowledge',
+        component: () => import('../views/Admin/KnowledgeView.vue'),
+        meta: { requiresAdmin: true, title: '知识库管理' }
       }
     ]
   }
