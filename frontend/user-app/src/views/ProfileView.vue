@@ -152,6 +152,7 @@
         </dl>
 
         <div class="account-actions">
+          <button class="ghost-button" type="button" @click="goStyleLearning">风格学习</button>
           <button class="ghost-button" type="button" @click="goWardrobe">我的衣橱</button>
           <button class="danger-button" type="button" @click="logout">退出登录</button>
         </div>
@@ -378,6 +379,10 @@ const goHome = () => {
 
 const goWardrobe = () => {
   router.push('/wardrobe');
+};
+
+const goStyleLearning = () => {
+  router.push('/style-learning');
 };
 
 const formatDate = (value) => {

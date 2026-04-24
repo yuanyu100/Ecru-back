@@ -25,6 +25,12 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/style-learning',
+    name: 'style-learning',
+    component: () => import('../views/StyleLearningView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/chat',
     name: 'chat',
     component: () => import('../views/ChatView.vue'),

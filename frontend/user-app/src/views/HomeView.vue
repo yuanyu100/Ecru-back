@@ -67,6 +67,12 @@
         <p>同步风格偏好、尺码、地区和头像，便于后续推荐更稳定。</p>
         <button class="ghost-button" type="button" @click.stop="navigateToProfile">去设置</button>
       </article>
+      <article class="action-card" @click="navigateToStyleLearning">
+        <p class="eyebrow">Taste Lab</p>
+        <h2>训练风格画像</h2>
+        <p>快速标记喜欢与不喜欢的风格图，让后续 AI 推荐更贴近你的真实审美。</p>
+        <button class="ghost-button" type="button" @click.stop="navigateToStyleLearning">开始学习</button>
+      </article>
     </section>
 
     <div v-if="isLoading" class="state-card">正在加载首页数据...</div>
@@ -254,6 +260,7 @@ const navigateToProfile = () => router.push('/profile');
 const navigateToChat = () => router.push('/chat');
 const navigateToWardrobe = () => router.push('/wardrobe');
 const navigateToAddClothing = () => router.push('/wardrobe/add');
+const navigateToStyleLearning = () => router.push('/style-learning');
 
 const openConversation = (sessionId) => {
   if (sessionId) {
@@ -577,7 +584,7 @@ onMounted(loadDashboard);
   }
 
   .action-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 
   .content-grid {

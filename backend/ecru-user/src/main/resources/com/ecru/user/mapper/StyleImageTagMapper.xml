@@ -3,18 +3,18 @@
 <mapper namespace="com.ecru.user.mapper.StyleImageTagMapper">
 
     <select id="selectByImageId" resultType="com.ecru.user.entity.StyleImageTag">
-        SELECT * FROM style_image_tag WHERE image_id = #{imageId}
+        SELECT * FROM style_image_tags WHERE image_id = #{imageId}
     </select>
 
     <select id="selectByStyleTagId" resultType="com.ecru.user.entity.StyleImageTag">
-        SELECT * FROM style_image_tag WHERE style_tag_id = #{styleTagId}
+        SELECT * FROM style_image_tags WHERE style_tag_id = #{styleTagId}
     </select>
 
     <insert id="batchInsert" parameterType="java.util.List">
-        INSERT INTO style_image_tag (image_id, style_tag_id, created_at)
+        INSERT INTO style_image_tags (image_id, style_tag_id, confidence, created_at)
         VALUES
         <foreach collection="tags" item="tag" separator=",">
-            (#{tag.imageId}, #{tag.styleTagId}, #{tag.createdAt})
+            (#{tag.imageId}, #{tag.styleTagId}, #{tag.confidence}, #{tag.createdAt})
         </foreach>
     </insert>
 

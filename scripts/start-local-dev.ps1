@@ -116,11 +116,15 @@ if (-not $SkipMinio) {
 
 if (-not $SkipBackend) {
     $mavenCommand = (Get-Command 'mvn.cmd' -ErrorAction Stop).Source
+    $javaCommand = (Get-Command 'java.exe' -ErrorAction Stop).Source
+    $backendJar = Join-Path $repoRoot 'backend/ecru-web/target/ecru-web-1.0.0.jar'
+    Write-Host 'Preparing backend modules with Maven install (-pl ecru-web -am -DskipTests) ...'
+    & $mavenCommand '-pl' 'ecru-web' '-am' '-DskipTests' 'install'
     Start-ManagedProcess `
         -Name 'backend' `
-        -WorkingDirectory (Join-Path $repoRoot 'backend') `
-        -Executable $mavenCommand `
-        -Arguments @('spring-boot:run', '-pl', 'ecru-web') `
+        -WorkingDirectory (Join-Path $repoRoot 'backend/ecru-web') `
+        -Executable $javaCommand `
+        -Arguments @('-jar', $backendJar) `
         -Port 8081
 }
 

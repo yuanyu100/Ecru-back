@@ -103,6 +103,30 @@ export const chatApi = {
     }
   },
 
+  updateConversationTitle: async (sessionId, title) => {
+    try {
+      const response = await apiClient.put(`/ai-chat/conversations/${sessionId}/title`, null, {
+        params: { title }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Update conversation title failed:', error);
+      throw error;
+    }
+  },
+
+  setConversationActive: async (sessionId, isActive) => {
+    try {
+      const response = await apiClient.put(`/ai-chat/conversations/${sessionId}/active`, null, {
+        params: { isActive }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Set conversation active failed:', error);
+      throw error;
+    }
+  },
+
   getConversationMessages: async (sessionId) => {
     try {
       const response = await apiClient.get(`/ai-chat/conversations/${sessionId}/messages/all`);

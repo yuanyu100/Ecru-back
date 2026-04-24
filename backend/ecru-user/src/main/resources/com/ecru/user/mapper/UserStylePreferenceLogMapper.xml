@@ -3,19 +3,19 @@
 <mapper namespace="com.ecru.user.mapper.UserStylePreferenceLogMapper">
 
     <select id="selectByUserIdAndImageId" resultType="com.ecru.user.entity.UserStylePreferenceLog">
-        SELECT * FROM user_style_preference_log WHERE user_id = #{userId} AND image_id = #{imageId}
+        SELECT * FROM user_style_preference_logs WHERE user_id = #{userId} AND image_id = #{imageId}
     </select>
 
     <select id="selectByUserId" resultType="com.ecru.user.entity.UserStylePreferenceLog">
-        SELECT * FROM user_style_preference_log WHERE user_id = #{userId} ORDER BY created_at DESC LIMIT #{limit}
+        SELECT * FROM user_style_preference_logs WHERE user_id = #{userId} ORDER BY created_at DESC LIMIT #{limit}
     </select>
 
     <select id="countByUserId" resultType="java.lang.Integer">
-        SELECT COUNT(*) FROM user_style_preference_log WHERE user_id = #{userId}
+        SELECT COUNT(*) FROM user_style_preference_logs WHERE user_id = #{userId}
     </select>
 
     <select id="countByUserIdAndType" resultType="java.lang.Integer">
-        SELECT COUNT(*) FROM user_style_preference_log WHERE user_id = #{userId} AND preference_type = #{preferenceType}
+        SELECT COUNT(*) FROM user_style_preference_logs WHERE user_id = #{userId} AND preference_type = #{preferenceType}
     </select>
 
 </mapper>

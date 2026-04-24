@@ -86,6 +86,111 @@ ON DUPLICATE KEY UPDATE
 SET @admin_id = (SELECT id FROM users WHERE username = 'zhangsan' LIMIT 1);
 SET @user_id = (SELECT id FROM users WHERE username = 'testuser' LIMIT 1);
 
+CREATE TABLE IF NOT EXISTS style_tags (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(50) NOT NULL,
+    category VARCHAR(50) NULL,
+    is_preset TINYINT(1) NOT NULL DEFAULT 1,
+    description VARCHAR(255) NULL,
+    usage_count INT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_style_tags_name_category (name, category)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS style_images (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    image_url VARCHAR(500) NOT NULL,
+    title VARCHAR(200) NULL,
+    source VARCHAR(50) NULL,
+    source_url VARCHAR(500) NULL,
+    price DECIMAL(10,2) NULL,
+    style_category VARCHAR(50) NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS style_image_tags (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    image_id BIGINT NOT NULL,
+    style_tag_id BIGINT NOT NULL,
+    confidence DECIMAL(3,2) NOT NULL DEFAULT 1.00,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_style_image_tags_image_tag (image_id, style_tag_id),
+    KEY idx_style_image_tags_image_id (image_id),
+    KEY idx_style_image_tags_tag_id (style_tag_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS user_style_preference_logs (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    image_id BIGINT NOT NULL,
+    preference_type TINYINT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_user_style_preference_logs_user_image (user_id, image_id),
+    KEY idx_user_style_preference_logs_user_id (user_id),
+    KEY idx_user_style_preference_logs_image_id (image_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS user_style_profile (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    style_tag_id BIGINT NOT NULL,
+    preference_score DECIMAL(5,4) NOT NULL DEFAULT 0.0000,
+    interaction_count INT NOT NULL DEFAULT 0,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_user_style_profile_user_tag (user_id, style_tag_id),
+    KEY idx_user_style_profile_user_id (user_id),
+    KEY idx_user_style_profile_tag_id (style_tag_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS knowledge_fabrics (
+    id BIGINT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    alias VARCHAR(255) NULL,
+    fabric_type VARCHAR(50) NULL,
+    warmth_score INT NOT NULL DEFAULT 0,
+    breathability_score INT NOT NULL DEFAULT 0,
+    comfort_score INT NOT NULL DEFAULT 0,
+    durability_score INT NOT NULL DEFAULT 0,
+    summary VARCHAR(255) NULL,
+    properties TEXT NULL,
+    care_guide TEXT NULL,
+    suitable_seasons VARCHAR(100) NULL,
+    suitable_occasions VARCHAR(255) NULL,
+    keywords VARCHAR(255) NULL,
+    source VARCHAR(100) NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_knowledge_fabrics_name (name),
+    KEY idx_knowledge_fabrics_type (fabric_type),
+    KEY idx_knowledge_fabrics_active (is_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS knowledge_guides (
+    id BIGINT PRIMARY KEY,
+    title VARCHAR(200) NOT NULL,
+    subtitle VARCHAR(255) NULL,
+    guide_type VARCHAR(50) NULL,
+    summary VARCHAR(255) NULL,
+    content TEXT NULL,
+    author VARCHAR(100) NULL,
+    publish_date DATE NULL,
+    tags VARCHAR(255) NULL,
+    cover_image_url VARCHAR(500) NULL,
+    cover_image_caption VARCHAR(255) NULL,
+    keywords VARCHAR(255) NULL,
+    source VARCHAR(100) NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_knowledge_guides_title (title),
+    KEY idx_knowledge_guides_type (guide_type),
+    KEY idx_knowledge_guides_active (is_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 DELETE m
 FROM ai_chat_messages m
 JOIN ai_conversations c ON c.id = m.conversation_id
@@ -113,11 +218,278 @@ WHERE user_id IN (@admin_id, @user_id);
 DELETE FROM user_style_profiles
 WHERE user_id IN (@admin_id, @user_id);
 
+DELETE FROM user_style_profile
+WHERE user_id IN (@admin_id, @user_id);
+
+DELETE FROM user_style_preference_logs
+WHERE user_id IN (@admin_id, @user_id);
+
 DELETE FROM user_settings
 WHERE user_id IN (@admin_id, @user_id);
 
 DELETE FROM ai_api_call_record
 WHERE user_id IN (@admin_id, @user_id);
+
+DELETE FROM knowledge_guides
+WHERE id IN (2001, 2002, 2003);
+
+DELETE FROM knowledge_fabrics
+WHERE id IN (1001, 1002, 1003, 1004);
+
+DELETE sit
+FROM style_image_tags sit
+JOIN style_images si ON si.id = sit.image_id
+WHERE si.title IN (
+    'Demo Commute Minimal',
+    'Demo Soft Office',
+    'Demo Clean Academia',
+    'Demo Weekend Casual',
+    'Demo Vintage Layering',
+    'Demo Sharp Tailoring'
+);
+
+DELETE FROM style_images
+WHERE title IN (
+    'Demo Commute Minimal',
+    'Demo Soft Office',
+    'Demo Clean Academia',
+    'Demo Weekend Casual',
+    'Demo Vintage Layering',
+    'Demo Sharp Tailoring'
+);
+
+INSERT INTO style_tags (name, category, is_preset, description, usage_count, created_at, updated_at) VALUES
+    ('commute', 'style', 1, 'Looks suited for weekday commute and office scenes', 12, NOW(), NOW()),
+    ('minimal', 'style', 1, 'Low saturation and clean silhouette direction', 9, NOW(), NOW()),
+    ('soft', 'mood', 1, 'Gentle and light visual impression', 7, NOW(), NOW()),
+    ('academia', 'style', 1, 'Bookish and clean campus-inspired styling', 6, NOW(), NOW()),
+    ('casual', 'style', 1, 'Relaxed and everyday weekend direction', 10, NOW(), NOW()),
+    ('vintage', 'style', 1, 'Layered styling with a retro tone', 5, NOW(), NOW()),
+    ('sharp', 'mood', 1, 'Crisp lines and tailored visual impression', 8, NOW(), NOW())
+ON DUPLICATE KEY UPDATE
+    is_preset = VALUES(is_preset),
+    description = VALUES(description),
+    usage_count = VALUES(usage_count),
+    updated_at = NOW();
+
+SET @style_img_commute_minimal = 'https://dummyimage.com/900x1200/e9dcc7/624720.png&text=COMMUTE';
+SET @style_img_soft_office = 'https://dummyimage.com/900x1200/ecd8d5/71544f.png&text=SOFT';
+SET @style_img_clean_academia = 'https://dummyimage.com/900x1200/dbe4ef/3a4c63.png&text=ACADEMIA';
+SET @style_img_weekend_casual = 'https://dummyimage.com/900x1200/e7dfd4/54402b.png&text=CASUAL';
+SET @style_img_vintage_layering = 'https://dummyimage.com/900x1200/d7cbbf/573e2a.png&text=VINTAGE';
+SET @style_img_sharp_tailoring = 'https://dummyimage.com/900x1200/d8dde5/384557.png&text=SHARP';
+
+INSERT INTO style_images (image_url, title, source, source_url, price, style_category, is_active, created_at, updated_at) VALUES
+    (@style_img_commute_minimal, 'Demo Commute Minimal', 'demo-seed', 'https://example.com/style/commute-minimal', 299.00, 'commute', 1, NOW(), NOW()),
+    (@style_img_soft_office, 'Demo Soft Office', 'demo-seed', 'https://example.com/style/soft-office', 269.00, 'commute', 1, NOW(), NOW()),
+    (@style_img_clean_academia, 'Demo Clean Academia', 'demo-seed', 'https://example.com/style/clean-academia', 329.00, 'academia', 1, NOW(), NOW()),
+    (@style_img_weekend_casual, 'Demo Weekend Casual', 'demo-seed', 'https://example.com/style/weekend-casual', 219.00, 'casual', 1, NOW(), NOW()),
+    (@style_img_vintage_layering, 'Demo Vintage Layering', 'demo-seed', 'https://example.com/style/vintage-layering', 359.00, 'vintage', 1, NOW(), NOW()),
+    (@style_img_sharp_tailoring, 'Demo Sharp Tailoring', 'demo-seed', 'https://example.com/style/sharp-tailoring', 399.00, 'commute', 1, NOW(), NOW());
+
+SET @style_image_1 = (SELECT id FROM style_images WHERE title = 'Demo Commute Minimal' ORDER BY id DESC LIMIT 1);
+SET @style_image_2 = (SELECT id FROM style_images WHERE title = 'Demo Soft Office' ORDER BY id DESC LIMIT 1);
+SET @style_image_3 = (SELECT id FROM style_images WHERE title = 'Demo Clean Academia' ORDER BY id DESC LIMIT 1);
+SET @style_image_4 = (SELECT id FROM style_images WHERE title = 'Demo Weekend Casual' ORDER BY id DESC LIMIT 1);
+SET @style_image_5 = (SELECT id FROM style_images WHERE title = 'Demo Vintage Layering' ORDER BY id DESC LIMIT 1);
+SET @style_image_6 = (SELECT id FROM style_images WHERE title = 'Demo Sharp Tailoring' ORDER BY id DESC LIMIT 1);
+
+SET @style_tag_commute = (SELECT id FROM style_tags WHERE name = 'commute' AND category = 'style' LIMIT 1);
+SET @style_tag_minimal = (SELECT id FROM style_tags WHERE name = 'minimal' AND category = 'style' LIMIT 1);
+SET @style_tag_soft = (SELECT id FROM style_tags WHERE name = 'soft' AND category = 'mood' LIMIT 1);
+SET @style_tag_academia = (SELECT id FROM style_tags WHERE name = 'academia' AND category = 'style' LIMIT 1);
+SET @style_tag_casual = (SELECT id FROM style_tags WHERE name = 'casual' AND category = 'style' LIMIT 1);
+SET @style_tag_vintage = (SELECT id FROM style_tags WHERE name = 'vintage' AND category = 'style' LIMIT 1);
+SET @style_tag_sharp = (SELECT id FROM style_tags WHERE name = 'sharp' AND category = 'mood' LIMIT 1);
+
+INSERT INTO style_image_tags (image_id, style_tag_id, confidence, created_at) VALUES
+    (@style_image_1, @style_tag_commute, 0.98, NOW()),
+    (@style_image_1, @style_tag_minimal, 0.94, NOW()),
+    (@style_image_2, @style_tag_commute, 0.92, NOW()),
+    (@style_image_2, @style_tag_soft, 0.88, NOW()),
+    (@style_image_3, @style_tag_academia, 0.97, NOW()),
+    (@style_image_3, @style_tag_minimal, 0.78, NOW()),
+    (@style_image_4, @style_tag_casual, 0.96, NOW()),
+    (@style_image_4, @style_tag_soft, 0.72, NOW()),
+    (@style_image_5, @style_tag_vintage, 0.98, NOW()),
+    (@style_image_5, @style_tag_soft, 0.64, NOW()),
+    (@style_image_6, @style_tag_commute, 0.91, NOW()),
+    (@style_image_6, @style_tag_sharp, 0.96, NOW())
+ON DUPLICATE KEY UPDATE
+    confidence = VALUES(confidence);
+
+INSERT INTO user_style_preference_logs (user_id, image_id, preference_type, created_at) VALUES
+    (@user_id, @style_image_1, 1, DATE_SUB(NOW(), INTERVAL 3 DAY)),
+    (@user_id, @style_image_2, 1, DATE_SUB(NOW(), INTERVAL 2 DAY)),
+    (@user_id, @style_image_4, 0, DATE_SUB(NOW(), INTERVAL 1 DAY)),
+    (@user_id, @style_image_5, 2, DATE_SUB(NOW(), INTERVAL 20 HOUR)),
+    (@admin_id, @style_image_6, 1, DATE_SUB(NOW(), INTERVAL 10 HOUR))
+ON DUPLICATE KEY UPDATE
+    preference_type = VALUES(preference_type),
+    created_at = VALUES(created_at);
+
+INSERT INTO user_style_profile (user_id, style_tag_id, preference_score, interaction_count, updated_at) VALUES
+    (@user_id, @style_tag_commute, 0.2800, 2, NOW()),
+    (@user_id, @style_tag_minimal, 0.1800, 2, NOW()),
+    (@user_id, @style_tag_soft, 0.0800, 2, NOW()),
+    (@user_id, @style_tag_vintage, -0.1000, 1, NOW()),
+    (@admin_id, @style_tag_sharp, 0.1000, 1, NOW()),
+    (@admin_id, @style_tag_commute, 0.0900, 1, NOW())
+ON DUPLICATE KEY UPDATE
+    preference_score = VALUES(preference_score),
+    interaction_count = VALUES(interaction_count),
+    updated_at = NOW();
+
+INSERT INTO knowledge_fabrics (
+    id, name, alias, fabric_type, warmth_score, breathability_score, comfort_score, durability_score,
+    summary, properties, care_guide, suitable_seasons, suitable_occasions, keywords, source, is_active,
+    created_at, updated_at
+) VALUES
+    (
+        1001, 'Wool', 'merino,wool blend', 'natural_fiber', 92, 70, 85, 78,
+        'Warm and structured fabric that works well for cold weather tailoring.',
+        'Wool keeps heat well, recovers shape after wear, and suits coats, knitwear, and formal trousers.',
+        'Use gentle detergent, avoid high heat, and dry flat or hang with shoulder support.',
+        'autumn,winter',
+        'commute,business,formal',
+        'wool,warm,winter,coat,sweater,formal',
+        'demo-seed',
+        1,
+        NOW(),
+        NOW()
+    ),
+    (
+        1002, 'Cotton', 'cotton poplin,jersey', 'natural_fiber', 58, 92, 90, 82,
+        'Balanced daily fabric with strong breathability and easy maintenance.',
+        'Cotton is comfortable on skin, works across shirts and tees, and handles frequent wear well.',
+        'Machine wash in mild cycle, separate dark colors first, and avoid over-drying.',
+        'spring,summer,autumn',
+        'daily,commute,weekend',
+        'cotton,shirt,tshirt,breathable,daily,office',
+        'demo-seed',
+        1,
+        NOW(),
+        NOW()
+    ),
+    (
+        1003, 'Linen', 'linen blend', 'natural_fiber', 42, 95, 82, 68,
+        'Dry and airy fabric suited to hot weather and relaxed summer outfits.',
+        'Linen releases heat quickly, has a natural texture, and creates an effortless seasonal look.',
+        'Wash with cold water, do not over-spin, and steam lightly to keep texture natural.',
+        'spring,summer',
+        'daily,vacation,smart_casual',
+        'linen,summer,cool,breathable,shirt,relaxed',
+        'demo-seed',
+        1,
+        NOW(),
+        NOW()
+    ),
+    (
+        1004, 'Denim', 'rigid denim,washed denim', 'woven_fabric', 64, 66, 78, 90,
+        'Durable fabric for casual outfits, outer layers, and structured bottoms.',
+        'Denim is sturdy, resistant to abrasion, and easy to pair with shirts, knits, and sneakers.',
+        'Wash inside out, reduce wash frequency, and air dry to preserve color and shape.',
+        'spring,autumn,winter',
+        'daily,casual,weekend',
+        'denim,jeans,jacket,casual,durable,weekend',
+        'demo-seed',
+        1,
+        NOW(),
+        NOW()
+    )
+ON DUPLICATE KEY UPDATE
+    alias = VALUES(alias),
+    fabric_type = VALUES(fabric_type),
+    warmth_score = VALUES(warmth_score),
+    breathability_score = VALUES(breathability_score),
+    comfort_score = VALUES(comfort_score),
+    durability_score = VALUES(durability_score),
+    summary = VALUES(summary),
+    properties = VALUES(properties),
+    care_guide = VALUES(care_guide),
+    suitable_seasons = VALUES(suitable_seasons),
+    suitable_occasions = VALUES(suitable_occasions),
+    keywords = VALUES(keywords),
+    source = VALUES(source),
+    is_active = VALUES(is_active),
+    updated_at = NOW();
+
+SET @guide_img_layering = 'https://dummyimage.com/900x600/e6dccf/4e4030.png&text=LAYERING';
+SET @guide_img_wool = 'https://dummyimage.com/900x600/dfe2ea/33445a.png&text=WOOL';
+SET @guide_img_interview = 'https://dummyimage.com/900x600/e9eef3/446074.png&text=INTERVIEW';
+
+INSERT INTO knowledge_guides (
+    id, title, subtitle, guide_type, summary, content, author, publish_date, tags,
+    cover_image_url, cover_image_caption, keywords, source, is_active, created_at, updated_at
+) VALUES
+    (
+        2001,
+        'Spring Commute Layering Guide',
+        'Light office layering for 16C to 24C weekdays',
+        'match',
+        'A quick guide for building clean commute outfits with one light extra layer.',
+        'Start with a breathable base such as a cotton shirt or fine knit. Add one light cardigan or unstructured blazer, keep the palette within two to three low saturation colors, and let trousers or skirts provide a stable line. This approach keeps the outfit sharp in transit and adaptable once you enter strong indoor air conditioning.',
+        'Ecru Demo Editorial',
+        '2026-04-18',
+        'spring,commute,layering,minimal',
+        @guide_img_layering,
+        'Light layering reference for weekday commute looks',
+        'commute,office,layering,shirt,cardigan,formal',
+        'demo-seed',
+        1,
+        NOW(),
+        NOW()
+    ),
+    (
+        2002,
+        'Winter Wool Care and Styling Notes',
+        'How to keep wool pieces warm, sharp, and easy to maintain',
+        'fabric',
+        'Practical notes for using wool in winter outfits without making the silhouette heavy.',
+        'Choose wool outerwear when you need warmth with structure. If the coat already carries visual weight, keep the inner layer lighter and cleaner, such as a fine knit or plain shirt. For care, reduce unnecessary washing, use steam between wears, and store with shoulder support so the shape stays stable through the season.',
+        'Ecru Demo Editorial',
+        '2026-04-12',
+        'winter,wool,care,formal,coat',
+        @guide_img_wool,
+        'Wool coat and knit styling reference',
+        'wool,winter,care,coat,warm,formal',
+        'demo-seed',
+        1,
+        NOW(),
+        NOW()
+    ),
+    (
+        2003,
+        'Interview White Shirt Pairing Notes',
+        'Simple combinations for a reliable first impression',
+        'style',
+        'A compact checklist for pairing a white shirt in interview and formal commute scenes.',
+        'A white shirt works best when the lower piece is darker and cleaner in line, such as charcoal trousers or a navy skirt. Avoid adding too many strong accessories. If the weather is cool, choose a thin neutral cardigan or blazer instead of a bulky hoodie. Shoes and bag should stay quiet so the overall message remains professional and controlled.',
+        'Ecru Demo Editorial',
+        '2026-04-20',
+        'interview,shirt,formal,commute',
+        @guide_img_interview,
+        'White shirt pairing example for formal scenarios',
+        'interview,shirt,white,formal,commute,office',
+        'demo-seed',
+        1,
+        NOW(),
+        NOW()
+    )
+ON DUPLICATE KEY UPDATE
+    subtitle = VALUES(subtitle),
+    guide_type = VALUES(guide_type),
+    summary = VALUES(summary),
+    content = VALUES(content),
+    author = VALUES(author),
+    publish_date = VALUES(publish_date),
+    tags = VALUES(tags),
+    cover_image_url = VALUES(cover_image_url),
+    cover_image_caption = VALUES(cover_image_caption),
+    keywords = VALUES(keywords),
+    source = VALUES(source),
+    is_active = VALUES(is_active),
+    updated_at = NOW();
 
 INSERT INTO user_settings (user_id, setting_key, setting_value, created_at, updated_at) VALUES
     (@user_id, 'stylePreferences', '["commute","minimal","casual"]', NOW(), NOW()),

@@ -1,10 +1,13 @@
 package com.ecru.outfit.service.rag;
 
+import com.ecru.clothing.mapper.ClothingMapper;
 import com.ecru.common.service.vector.EmbeddingService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * RAG检索服务
@@ -17,6 +20,9 @@ public class RagService {
 
     @Autowired
     private VectorSearchServiceV3 vectorSearchService;
+
+    @Autowired
+    private ClothingMapper clothingMapper;
 
     /**
      * 语义检索衣物
@@ -95,7 +101,18 @@ public class RagService {
      * @return 统计信息
      */
     public java.util.Map<String, Object> getClothingStatistics(Long userId) {
-        return new java.util.HashMap<>();
+        Map<String, Object> statistics = new HashMap<>();
+        try {
+            statistics.put("overview", clothingMapper.selectClothingStatistics(userId, null));
+            statistics.put("byCategory", clothingMapper.selectClothingCountByCategory(userId));
+            statistics.put("byColor", clothingMapper.selectClothingCountByColor(userId));
+            statistics.put("byFrequency", clothingMapper.selectClothingCountByFrequency(userId));
+            statistics.put("wearTrend", clothingMapper.selectWearTrend(userId, null));
+            return statistics;
+        } catch (Exception e) {
+            System.err.println("鑾峰彇琛ｆ┍缁熻淇℃伅澶辫触: " + e.getMessage());
+            return new HashMap<>();
+        }
     }
 
 }

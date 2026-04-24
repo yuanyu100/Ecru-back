@@ -18,7 +18,7 @@
     </div>
     <div 
       class="nav-item" 
-      :class="{ active: currentRoute === '/profile' || currentRoute === '/login' || currentRoute === '/register' }"
+      :class="{ active: currentRoute === '/profile' || currentRoute === '/style-learning' || currentRoute === '/login' || currentRoute === '/register' }"
       @click="navigateTo('/profile')"
     >
       <div class="nav-icon">⚙️</div>

@@ -27,24 +27,50 @@
 
         <div v-if="isConversationLoading" class="panel-state">正在加载会话...</div>
         <div v-else-if="conversations.length === 0" class="panel-state">还没有会话，直接开始提问即可。</div>
-
-        <div v-else class="conversation-list">
-          <article
-            v-for="conversation in conversations"
-            :key="conversation.sessionId"
-            :class="['conversation-item', currentSessionId === conversation.sessionId ? 'active' : '']"
-            @click="selectConversation(conversation.sessionId)"
-          >
-            <div class="conversation-copy">
-              <h3>{{ conversation.title }}</h3>
-              <p>{{ conversation.lastMessagePreview || '暂无摘要' }}</p>
-              <span>{{ formatTime(conversation.updatedAt || conversation.createdAt) }}</span>
-            </div>
-            <button class="text-danger" type="button" @click.stop="removeConversation(conversation.sessionId)">
-              删除
+        <template v-else>
+          <div class="conversation-filter">
+            <button
+              v-for="item in filterOptions"
+              :key="item.value"
+              :class="['filter-chip', activeFilter === item.value ? 'active' : '']"
+              type="button"
+              @click="activeFilter = item.value"
+            >
+              {{ item.label }}
             </button>
-          </article>
-        </div>
+          </div>
+
+          <div v-if="filteredConversations.length === 0" class="panel-state">当前筛选下没有会话。</div>
+
+          <div v-else class="conversation-list">
+            <article
+              v-for="conversation in filteredConversations"
+              :key="conversation.sessionId"
+              :class="['conversation-item', currentSessionId === conversation.sessionId ? 'active' : '']"
+              @click="selectConversation(conversation.sessionId)"
+            >
+              <div class="conversation-copy">
+                <div class="conversation-title-row">
+                  <h3>{{ conversation.title }}</h3>
+                  <span :class="['status-badge', conversation.isActive ? 'active' : 'archived']">
+                    {{ conversation.isActive ? '活跃' : '已归档' }}
+                  </span>
+                </div>
+                <p>{{ conversation.lastMessagePreview || '暂无摘要' }}</p>
+                <span>{{ formatTime(conversation.updatedAt || conversation.createdAt) }}</span>
+              </div>
+              <div class="conversation-actions">
+                <button class="text-link" type="button" @click.stop="renameConversation(conversation)">改名</button>
+                <button class="text-link" type="button" @click.stop="toggleConversationActive(conversation)">
+                  {{ conversation.isActive ? '归档' : '恢复' }}
+                </button>
+                <button class="text-danger" type="button" @click.stop="removeConversation(conversation.sessionId)">
+                  删除
+                </button>
+              </div>
+            </article>
+          </div>
+        </template>
       </aside>
 
       <main class="chat-main">
@@ -116,7 +142,7 @@
 </template>
 
 <script setup>
-import { nextTick, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { chatApi } from '../api/chat';
 
@@ -130,16 +156,35 @@ const userInput = ref('');
 const isSending = ref(false);
 const isConversationLoading = ref(false);
 const isSidebarOpen = ref(false);
+const activeFilter = ref('active');
+
+const filterOptions = [
+  { label: '活跃', value: 'active' },
+  { label: '全部', value: 'all' },
+  { label: '已归档', value: 'archived' }
+];
 
 const quickPrompts = [
   '今天下雨，帮我搭一套通勤穿搭',
   '周末出游，想穿得轻松一点',
-  '面试场景，需要稳重但不老气',
+  '面试场景，需要稳重但不要老气',
   '我想用衣橱里的黑白单品做搭配'
 ];
 
 const fallbackImage =
   'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="320" height="420"><rect width="100%" height="100%" fill="%23f0e4cf"/><text x="50%" y="50%" text-anchor="middle" fill="%238b7355" font-size="24">LOOK</text></svg>';
+
+const filteredConversations = computed(() => {
+  if (activeFilter.value === 'all') {
+    return conversations.value;
+  }
+
+  if (activeFilter.value === 'archived') {
+    return conversations.value.filter((item) => !item.isActive);
+  }
+
+  return conversations.value.filter((item) => item.isActive !== false);
+});
 
 const scrollToBottom = async () => {
   await nextTick();
@@ -265,6 +310,52 @@ const submitMessage = async () => {
 const sendQuickPrompt = async (prompt) => {
   userInput.value = prompt;
   await submitMessage();
+};
+
+const renameConversation = async (conversation) => {
+  const nextTitle = window.prompt('请输入新的会话标题', conversation.title || '');
+  if (nextTitle === null) {
+    return;
+  }
+
+  const title = nextTitle.trim();
+  if (!title) {
+    alert('会话标题不能为空');
+    return;
+  }
+
+  try {
+    const result = await chatApi.updateConversationTitle(conversation.sessionId, title);
+    if (result?.code === 200) {
+      conversation.title = title;
+      syncConversationLabel();
+    }
+  } catch (error) {
+    console.error('Rename conversation failed:', error);
+    alert(error.response?.data?.message || '修改会话标题失败');
+  }
+};
+
+const toggleConversationActive = async (conversation) => {
+  const nextActive = !conversation.isActive;
+  const actionLabel = nextActive ? '恢复' : '归档';
+
+  if (!window.confirm(`确认${actionLabel}这个会话吗？`)) {
+    return;
+  }
+
+  try {
+    const result = await chatApi.setConversationActive(conversation.sessionId, nextActive);
+    if (result?.code === 200) {
+      conversation.isActive = nextActive;
+      if (!nextActive && activeFilter.value === 'active' && currentSessionId.value === conversation.sessionId) {
+        activeFilter.value = 'all';
+      }
+    }
+  } catch (error) {
+    console.error('Toggle conversation active failed:', error);
+    alert(error.response?.data?.message || `${actionLabel}会话失败`);
+  }
 };
 
 const removeConversation = async (sessionId) => {
@@ -414,6 +505,23 @@ onMounted(async () => {
   padding: 18px 0 6px;
 }
 
+.conversation-filter,
+.conversation-title-row,
+.conversation-actions {
+  display: flex;
+  align-items: center;
+}
+
+.conversation-filter,
+.conversation-actions {
+  gap: 8px;
+}
+
+.conversation-filter {
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
 .conversation-list {
   display: grid;
   gap: 12px;
@@ -444,6 +552,11 @@ onMounted(async () => {
   font-size: 15px;
 }
 
+.conversation-title-row {
+  gap: 8px;
+  justify-content: space-between;
+}
+
 .conversation-copy p,
 .conversation-copy span {
   margin-top: 6px;
@@ -456,6 +569,28 @@ onMounted(async () => {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.conversation-actions {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.status-badge {
+  flex-shrink: 0;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
+.status-badge.active {
+  background: rgba(83, 148, 103, 0.16);
+  color: #2f7a47;
+}
+
+.status-badge.archived {
+  background: rgba(139, 115, 85, 0.16);
+  color: #7d6240;
 }
 
 .chat-main {
@@ -625,7 +760,9 @@ onMounted(async () => {
 
 .ghost-button,
 .primary-button,
-.text-danger {
+.text-danger,
+.text-link,
+.filter-chip {
   border: none;
   border-radius: 999px;
   padding: 10px 16px;
@@ -642,8 +779,24 @@ onMounted(async () => {
   color: #fff8ef;
 }
 
+.filter-chip {
+  padding: 8px 12px;
+  background: #f1e2c7;
+  color: #6b4b1f;
+}
+
+.filter-chip.active {
+  background: #6b4b1f;
+  color: #fff8ef;
+}
+
+.text-link {
+  padding: 6px 10px;
+  background: rgba(107, 75, 31, 0.1);
+  color: #6b4b1f;
+}
+
 .text-danger {
-  align-self: start;
   padding: 6px 10px;
   background: rgba(217, 93, 81, 0.12);
   color: #b04d45;
