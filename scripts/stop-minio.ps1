@@ -1,11 +1,9 @@
 $ErrorActionPreference = 'Stop'
 
-$targets = Get-CimInstance Win32_Process | Where-Object {
-    $_.Name -eq 'minio.exe' -and $_.CommandLine -like '*D:\Tools\minIO\data*'
-}
+$targets = Get-Process -Name 'minio' -ErrorAction SilentlyContinue
 
 if ($targets) {
-    $targets | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+    $targets | ForEach-Object { Stop-Process -Id $_.Id -Force }
     Write-Host 'MinIO stopped.'
 } else {
     Write-Host 'MinIO is not running.'
