@@ -43,4 +43,10 @@ public class KnowledgeController {
     public Result<Map<String, Object>> getGuideDetail(@PathVariable Long guideId) {
         return Result.success(knowledgeBaseService.getGuideDetail(guideId));
     }
+
+    @GetMapping("/care-labels/{symbolCode}")
+    @Operation(summary = "获取水洗标详情", description = "根据水洗标编码获取洗护说明")
+    public Result<Map<String, Object>> getCareLabelDetail(@PathVariable String symbolCode) {
+        return Result.success(knowledgeBaseService.getCareLabelDetail(symbolCode));
+    }
 }

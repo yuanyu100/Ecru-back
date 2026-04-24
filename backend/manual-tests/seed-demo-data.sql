@@ -191,6 +191,25 @@ CREATE TABLE IF NOT EXISTS knowledge_guides (
     KEY idx_knowledge_guides_active (is_active)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS knowledge_care_labels (
+    id BIGINT PRIMARY KEY,
+    symbol_code VARCHAR(50) NOT NULL,
+    symbol_name VARCHAR(100) NOT NULL,
+    category VARCHAR(50) NOT NULL,
+    instruction_text VARCHAR(255) NOT NULL,
+    explanation TEXT NULL,
+    do_text VARCHAR(255) NULL,
+    dont_text VARCHAR(255) NULL,
+    keywords VARCHAR(255) NULL,
+    source VARCHAR(100) NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_knowledge_care_labels_code (symbol_code),
+    KEY idx_knowledge_care_labels_category (category),
+    KEY idx_knowledge_care_labels_active (is_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 DELETE m
 FROM ai_chat_messages m
 JOIN ai_conversations c ON c.id = m.conversation_id
@@ -235,6 +254,9 @@ WHERE id IN (2001, 2002, 2003);
 
 DELETE FROM knowledge_fabrics
 WHERE id IN (1001, 1002, 1003, 1004);
+
+DELETE FROM knowledge_care_labels
+WHERE id IN (3001, 3002, 3003, 3004, 3005, 3006);
 
 DELETE sit
 FROM style_image_tags sit
@@ -486,6 +508,113 @@ ON DUPLICATE KEY UPDATE
     tags = VALUES(tags),
     cover_image_url = VALUES(cover_image_url),
     cover_image_caption = VALUES(cover_image_caption),
+    keywords = VALUES(keywords),
+    source = VALUES(source),
+    is_active = VALUES(is_active),
+    updated_at = NOW();
+
+INSERT INTO knowledge_care_labels (
+    id, symbol_code, symbol_name, category, instruction_text, explanation,
+    do_text, dont_text, keywords, source, is_active, created_at, updated_at
+) VALUES
+    (
+        3001,
+        'wash-30',
+        'Wash at or below 30C',
+        'wash',
+        'Use water temperature up to 30C for normal washing.',
+        'Suitable for daily garments that may shrink or fade under higher temperature.',
+        'Use mild detergent and short cycle when possible.',
+        'Do not use hot water or long high-speed washing by default.',
+        'wash,30c,machine wash,cold water,daily',
+        'demo-seed',
+        1,
+        NOW(),
+        NOW()
+    ),
+    (
+        3002,
+        'hand-wash',
+        'Hand wash only',
+        'wash',
+        'Gently hand wash the garment in cool or lukewarm water.',
+        'Usually used for delicate fabric, structured trims, or items that deform easily in machines.',
+        'Soak briefly and press water out gently.',
+        'Do not twist hard or machine wash.',
+        'hand wash,delicate,wash,gentle',
+        'demo-seed',
+        1,
+        NOW(),
+        NOW()
+    ),
+    (
+        3003,
+        'no-bleach',
+        'Do not bleach',
+        'bleach',
+        'Avoid chlorine and oxygen bleach on this garment.',
+        'Bleach may damage dye, weaken fiber, or leave uneven color marks.',
+        'Use neutral detergent for stain treatment first.',
+        'Do not use bleach products directly on fabric.',
+        'bleach,no bleach,stain,color care',
+        'demo-seed',
+        1,
+        NOW(),
+        NOW()
+    ),
+    (
+        3004,
+        'low-iron',
+        'Iron at low temperature',
+        'iron',
+        'Iron the garment at low temperature, ideally with steam cloth protection.',
+        'Best for blended, silk-like, printed, or heat-sensitive fabrics.',
+        'Test a hidden corner first and iron from the reverse side when possible.',
+        'Do not use high direct heat on the fabric surface.',
+        'iron,low heat,press,wrinkle care',
+        'demo-seed',
+        1,
+        NOW(),
+        NOW()
+    ),
+    (
+        3005,
+        'no-tumble-dry',
+        'Do not tumble dry',
+        'dry',
+        'Do not use tumble dryer; air dry the garment instead.',
+        'High heat may shrink knitwear, damage elastane, or make the surface feel rough.',
+        'Lay flat or hang according to garment weight and structure.',
+        'Do not dry with high heat machine drying.',
+        'dry,tumble dry,no tumble dry,air dry',
+        'demo-seed',
+        1,
+        NOW(),
+        NOW()
+    ),
+    (
+        3006,
+        'dry-clean',
+        'Professional dry clean recommended',
+        'clean',
+        'Send the garment to professional dry cleaning when routine care is needed.',
+        'Often used for wool coats, tailored pieces, lined garments, or items with complex structure.',
+        'Store with breathable garment bag between wears.',
+        'Do not repeatedly home wash unless the fabric and construction clearly allow it.',
+        'dry clean,coat,wool,tailoring,formal',
+        'demo-seed',
+        1,
+        NOW(),
+        NOW()
+    )
+ON DUPLICATE KEY UPDATE
+    symbol_code = VALUES(symbol_code),
+    symbol_name = VALUES(symbol_name),
+    category = VALUES(category),
+    instruction_text = VALUES(instruction_text),
+    explanation = VALUES(explanation),
+    do_text = VALUES(do_text),
+    dont_text = VALUES(dont_text),
     keywords = VALUES(keywords),
     source = VALUES(source),
     is_active = VALUES(is_active),

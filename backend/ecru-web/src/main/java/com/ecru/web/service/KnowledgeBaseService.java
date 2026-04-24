@@ -63,6 +63,18 @@ public class KnowledgeBaseService {
             }
         }
 
+        if (searchType.includeCareLabel()) {
+            List<Map<String, Object>> careLabels = jdbcTemplate.queryForList(
+                    "SELECT id, symbol_code, symbol_name, category, instruction_text, explanation, do_text, dont_text, keywords, source " +
+                            "FROM knowledge_care_labels WHERE is_active = 1 ORDER BY category ASC, id ASC");
+            for (Map<String, Object> careLabel : careLabels) {
+                Map<String, Object> item = toCareLabelSearchItem(careLabel, trimmedQuery, expandedTerms);
+                if (item != null) {
+                    results.add(item);
+                }
+            }
+        }
+
         results.sort(Comparator
                 .comparing((Map<String, Object> item) -> asInt(item.get("relevance")), Comparator.reverseOrder())
                 .thenComparing(item -> StringUtils.defaultString((String) item.get("title")), String.CASE_INSENSITIVE_ORDER));
@@ -134,6 +146,29 @@ public class KnowledgeBaseService {
         return result;
     }
 
+    public Map<String, Object> getCareLabelDetail(String symbolCode) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT id, symbol_code, symbol_name, category, instruction_text, explanation, do_text, dont_text, keywords " +
+                        "FROM knowledge_care_labels WHERE symbol_code = ? AND is_active = 1",
+                symbolCode);
+        if (rows.isEmpty()) {
+            throw new BusinessException(404, "水洗标知识不存在");
+        }
+
+        Map<String, Object> row = rows.get(0);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("careLabelId", asLong(row.get("id")));
+        result.put("symbolCode", row.get("symbol_code"));
+        result.put("symbolName", row.get("symbol_name"));
+        result.put("category", row.get("category"));
+        result.put("instruction", row.get("instruction_text"));
+        result.put("explanation", row.get("explanation"));
+        result.put("doText", row.get("do_text"));
+        result.put("dontText", row.get("dont_text"));
+        result.put("keywords", splitCsv((String) row.get("keywords")));
+        return result;
+    }
+
     private Map<String, Object> toFabricSearchItem(Map<String, Object> fabric, String query, List<String> terms) {
         String title = asString(fabric.get("name"));
         String body = String.join(" ",
@@ -183,6 +218,32 @@ public class KnowledgeBaseService {
         item.put("source", StringUtils.defaultIfBlank(asString(guide.get("source")), "knowledge-guide"));
         item.put("relevance", relevance);
         item.put("tags", splitCsv(asString(guide.get("tags"))));
+        return item;
+    }
+
+    private Map<String, Object> toCareLabelSearchItem(Map<String, Object> careLabel, String query, List<String> terms) {
+        String title = asString(careLabel.get("symbol_name"));
+        String body = String.join(" ",
+                asString(careLabel.get("symbol_code")),
+                asString(careLabel.get("category")),
+                asString(careLabel.get("instruction_text")),
+                asString(careLabel.get("explanation")),
+                asString(careLabel.get("do_text")),
+                asString(careLabel.get("dont_text")),
+                asString(careLabel.get("keywords")));
+        int relevance = calculateRelevance(query, title, body, terms);
+        if (relevance <= 0) {
+            return null;
+        }
+
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("documentId", "care-label-" + careLabel.get("id"));
+        item.put("title", title);
+        item.put("type", "care-label");
+        item.put("content", buildSnippet(asString(careLabel.get("instruction_text")), asString(careLabel.get("explanation"))));
+        item.put("source", StringUtils.defaultIfBlank(asString(careLabel.get("source")), "knowledge-care-label"));
+        item.put("relevance", relevance);
+        item.put("tags", mergeTags(List.of(asString(careLabel.get("category"))), splitCsv(asString(careLabel.get("keywords")))));
         return item;
     }
 
@@ -241,6 +302,13 @@ public class KnowledgeBaseService {
         addIfMatched(terms, query, List.of("冬天", "冬季", "保暖", "winter"), List.of("winter", "warm", "coat", "wool"));
         addIfMatched(terms, query, List.of("夏天", "夏季", "透气", "summer"), List.of("summer", "cool", "linen", "breathable"));
         addIfMatched(terms, query, List.of("搭配", "指南", "guide"), List.of("guide", "match", "pairing", "layering"));
+        addIfMatched(terms, query, List.of("水洗标", "洗护", "洗标", "care label", "laundry"), List.of("care", "wash", "laundry", "label", "instruction"));
+        addIfMatched(terms, query, List.of("机洗", "machine wash"), List.of("machine wash", "wash", "care"));
+        addIfMatched(terms, query, List.of("手洗", "hand wash"), List.of("hand wash", "wash", "care"));
+        addIfMatched(terms, query, List.of("不可漂白", "bleach"), List.of("bleach", "do not bleach", "care"));
+        addIfMatched(terms, query, List.of("熨烫", "iron"), List.of("iron", "low heat", "care"));
+        addIfMatched(terms, query, List.of("干洗", "dry clean"), List.of("dry clean", "care", "clean"));
+        addIfMatched(terms, query, List.of("不可烘干", "tumble dry"), List.of("tumble dry", "do not tumble dry", "care"));
 
         return new ArrayList<>(terms);
     }
@@ -300,7 +368,8 @@ public class KnowledgeBaseService {
     private enum SearchType {
         ALL,
         FABRIC,
-        GUIDE;
+        GUIDE,
+        CARE_LABEL;
 
         static SearchType from(String type) {
             String normalized = StringUtils.trimToEmpty(type).toLowerCase(Locale.ROOT);
@@ -308,6 +377,7 @@ public class KnowledgeBaseService {
                 case "", "all" -> ALL;
                 case "fabric", "material" -> FABRIC;
                 case "guide", "guides", "style", "match" -> GUIDE;
+                case "care", "care-label", "care_label", "label", "washing" -> CARE_LABEL;
                 default -> throw new BusinessException(400, "不支持的知识库类型");
             };
         }
@@ -320,11 +390,16 @@ public class KnowledgeBaseService {
             return this == ALL || this == GUIDE;
         }
 
+        boolean includeCareLabel() {
+            return this == ALL || this == CARE_LABEL;
+        }
+
         String apiValue() {
             return switch (this) {
                 case ALL -> "all";
                 case FABRIC -> "fabric";
                 case GUIDE -> "guide";
+                case CARE_LABEL -> "care-label";
             };
         }
     }
