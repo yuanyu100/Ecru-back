@@ -56,6 +56,12 @@ const routes = [
         name: 'admin-knowledge',
         component: () => import('../views/Admin/KnowledgeView.vue'),
         meta: { requiresAdmin: true, title: '知识库管理' }
+      },
+      {
+        path: 'outfit-records',
+        name: 'admin-outfit-records',
+        component: () => import('../views/Admin/OutfitRecordsView.vue'),
+        meta: { requiresAdmin: true, title: '穿搭记录管理' }
       }
     ]
   }

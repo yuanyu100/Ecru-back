@@ -13,6 +13,7 @@
         <router-link v-if="isAdmin" to="/api-monitor" class="nav-link">AI 监控</router-link>
         <router-link v-if="isAdmin" to="/ai-conversations" class="nav-link">AI 会话管理</router-link>
         <router-link v-if="isAdmin" to="/knowledge" class="nav-link">知识库管理</router-link>
+        <router-link v-if="isAdmin" to="/outfit-records" class="nav-link">穿搭记录管理</router-link>
       </nav>
 
       <div class="sidebar-footer">
