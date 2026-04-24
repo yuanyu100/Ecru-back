@@ -23,6 +23,11 @@ export const knowledgeAdminApi = {
     return response.data;
   },
 
+  async importFabrics(payload) {
+    const response = await apiClient.post('/admin/knowledge/fabrics/import', payload);
+    return response.data;
+  },
+
   async updateFabric(id, payload) {
     const response = await apiClient.put(`/admin/knowledge/fabrics/${id}`, payload);
     return response.data;
@@ -50,6 +55,11 @@ export const knowledgeAdminApi = {
     return response.data;
   },
 
+  async importGuides(payload) {
+    const response = await apiClient.post('/admin/knowledge/guides/import', payload);
+    return response.data;
+  },
+
   async updateGuide(id, payload) {
     const response = await apiClient.put(`/admin/knowledge/guides/${id}`, payload);
     return response.data;
@@ -74,6 +84,11 @@ export const knowledgeAdminApi = {
 
   async createCareLabel(payload) {
     const response = await apiClient.post('/admin/knowledge/care-labels', payload);
+    return response.data;
+  },
+
+  async importCareLabels(payload) {
+    const response = await apiClient.post('/admin/knowledge/care-labels/import', payload);
     return response.data;
   },
 

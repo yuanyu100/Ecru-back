@@ -214,6 +214,30 @@ npm run dev
 
 如果你要准备答辩演示，建议直接按 [最短联调与演示流程](./docs/technical/联调与演示流程.md) 走一遍。
 
+如果你要维护或批量补充材质 / 洗护 / 指南知识库，直接看：
+
+- [知识库批量导入与维护说明](./docs/technical/知识库批量导入与维护说明.md)
+
+### Demo 数据导入
+
+如果你希望一次性导入演示账号、知识库、风格学习和基础演示数据，可以直接运行：
+
+```powershell
+.\backend\manual-tests\prepare-demo-data.ps1 -Password 你的MySQL密码
+```
+
+如果执行策略拦截，改用：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\backend\manual-tests\prepare-demo-data.ps1 -Password 你的MySQL密码
+```
+
+脚本说明：
+
+- SQL 来源：`backend/manual-tests/seed-demo-data.sql`
+- 默认会往本地 `localhost:3306/ecru` 导入演示数据
+- 导入完成后会输出演示账号信息
+
 ## 协作约定
 
 - git 提交描述使用中文

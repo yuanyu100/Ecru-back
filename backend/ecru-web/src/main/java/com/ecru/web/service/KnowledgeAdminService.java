@@ -2,13 +2,17 @@ package com.ecru.web.service;
 
 import com.ecru.common.exception.BusinessException;
 import com.ecru.web.dto.request.AdminKnowledgeListRequest;
+import com.ecru.web.dto.request.CareLabelKnowledgeBatchImportRequest;
 import com.ecru.web.dto.request.CareLabelKnowledgeUpsertRequest;
+import com.ecru.web.dto.request.FabricKnowledgeBatchImportRequest;
 import com.ecru.web.dto.request.FabricKnowledgeUpsertRequest;
+import com.ecru.web.dto.request.GuideKnowledgeBatchImportRequest;
 import com.ecru.web.dto.request.GuideKnowledgeUpsertRequest;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.sql.DataSource;
 import java.sql.Date;
@@ -153,6 +157,37 @@ public class KnowledgeAdminService {
         return getFabricById(id);
     }
 
+    @Transactional
+    public Map<String, Object> importFabrics(FabricKnowledgeBatchImportRequest request) {
+        List<FabricKnowledgeUpsertRequest> items = request == null ? List.of() : defaultList(request.getItems());
+        if (items.isEmpty()) {
+            throw new BusinessException(400, "导入数据不能为空");
+        }
+
+        int created = 0;
+        int updated = 0;
+        int skipped = 0;
+        boolean updateExisting = !Boolean.FALSE.equals(request.getUpdateExisting());
+
+        for (FabricKnowledgeUpsertRequest item : items) {
+            Long existingId = findExistingId("knowledge_fabrics", "name", item.getName());
+            if (existingId != null) {
+                if (updateExisting) {
+                    updateFabric(existingId, item);
+                    updated++;
+                } else {
+                    skipped++;
+                }
+                continue;
+            }
+
+            createFabric(item);
+            created++;
+        }
+
+        return buildImportResult(items.size(), created, updated, skipped);
+    }
+
     public Map<String, Object> updateFabric(Long id, FabricKnowledgeUpsertRequest request) {
         requireExists("knowledge_fabrics", id, "面料知识不存在");
         ensureUnique("knowledge_fabrics", "name", request.getName(), id);
@@ -209,6 +244,37 @@ public class KnowledgeAdminService {
         return getGuideById(id);
     }
 
+    @Transactional
+    public Map<String, Object> importGuides(GuideKnowledgeBatchImportRequest request) {
+        List<GuideKnowledgeUpsertRequest> items = request == null ? List.of() : defaultList(request.getItems());
+        if (items.isEmpty()) {
+            throw new BusinessException(400, "导入数据不能为空");
+        }
+
+        int created = 0;
+        int updated = 0;
+        int skipped = 0;
+        boolean updateExisting = !Boolean.FALSE.equals(request.getUpdateExisting());
+
+        for (GuideKnowledgeUpsertRequest item : items) {
+            Long existingId = findExistingId("knowledge_guides", "title", item.getTitle());
+            if (existingId != null) {
+                if (updateExisting) {
+                    updateGuide(existingId, item);
+                    updated++;
+                } else {
+                    skipped++;
+                }
+                continue;
+            }
+
+            createGuide(item);
+            created++;
+        }
+
+        return buildImportResult(items.size(), created, updated, skipped);
+    }
+
     public Map<String, Object> updateGuide(Long id, GuideKnowledgeUpsertRequest request) {
         requireExists("knowledge_guides", id, "搭配指南不存在");
         ensureUnique("knowledge_guides", "title", request.getTitle(), id);
@@ -257,6 +323,37 @@ public class KnowledgeAdminService {
                 defaultSource(request.getSource()),
                 toActiveFlag(request.getActive()));
         return getCareLabelById(id);
+    }
+
+    @Transactional
+    public Map<String, Object> importCareLabels(CareLabelKnowledgeBatchImportRequest request) {
+        List<CareLabelKnowledgeUpsertRequest> items = request == null ? List.of() : defaultList(request.getItems());
+        if (items.isEmpty()) {
+            throw new BusinessException(400, "导入数据不能为空");
+        }
+
+        int created = 0;
+        int updated = 0;
+        int skipped = 0;
+        boolean updateExisting = !Boolean.FALSE.equals(request.getUpdateExisting());
+
+        for (CareLabelKnowledgeUpsertRequest item : items) {
+            Long existingId = findExistingId("knowledge_care_labels", "symbol_code", item.getSymbolCode());
+            if (existingId != null) {
+                if (updateExisting) {
+                    updateCareLabel(existingId, item);
+                    updated++;
+                } else {
+                    skipped++;
+                }
+                continue;
+            }
+
+            createCareLabel(item);
+            created++;
+        }
+
+        return buildImportResult(items.size(), created, updated, skipped);
     }
 
     public Map<String, Object> updateCareLabel(Long id, CareLabelKnowledgeUpsertRequest request) {
@@ -349,6 +446,15 @@ public class KnowledgeAdminService {
         return result;
     }
 
+    private Map<String, Object> buildImportResult(int total, int created, int updated, int skipped) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("total", total);
+        result.put("created", created);
+        result.put("updated", updated);
+        result.put("skipped", skipped);
+        return result;
+    }
+
     private Map<String, Object> toAdminFabricItem(Map<String, Object> row) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("fabricId", asLong(row.get("id")));
@@ -421,6 +527,19 @@ public class KnowledgeAdminService {
         return count == null ? 0L : count;
     }
 
+    private Long findExistingId(String tableName, String columnName, String value) {
+        String trimmed = StringUtils.trimToEmpty(value);
+        if (StringUtils.isBlank(trimmed)) {
+            return null;
+        }
+
+        List<Long> ids = jdbcTemplate.query(
+                "SELECT id FROM " + tableName + " WHERE " + columnName + " = ? LIMIT 1",
+                (rs, rowNum) -> rs.getLong("id"),
+                trimmed);
+        return ids.isEmpty() ? null : ids.get(0);
+    }
+
     private void ensureUnique(String tableName, String columnName, String value, Long excludeId) {
         String trimmed = StringUtils.trimToEmpty(value);
         if (StringUtils.isBlank(trimmed)) {
@@ -475,6 +594,10 @@ public class KnowledgeAdminService {
 
     private String defaultSource(String source) {
         return StringUtils.defaultIfBlank(trim(source), "admin-console");
+    }
+
+    private <T> List<T> defaultList(List<T> items) {
+        return items == null ? List.of() : items;
     }
 
     private String trim(String value) {

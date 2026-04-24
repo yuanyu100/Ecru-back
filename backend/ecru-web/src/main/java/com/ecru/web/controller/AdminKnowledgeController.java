@@ -5,8 +5,11 @@ import com.ecru.common.result.ErrorCode;
 import com.ecru.common.result.Result;
 import com.ecru.common.util.UserContext;
 import com.ecru.web.dto.request.AdminKnowledgeListRequest;
+import com.ecru.web.dto.request.CareLabelKnowledgeBatchImportRequest;
 import com.ecru.web.dto.request.CareLabelKnowledgeUpsertRequest;
+import com.ecru.web.dto.request.FabricKnowledgeBatchImportRequest;
 import com.ecru.web.dto.request.FabricKnowledgeUpsertRequest;
+import com.ecru.web.dto.request.GuideKnowledgeBatchImportRequest;
 import com.ecru.web.dto.request.GuideKnowledgeUpsertRequest;
 import com.ecru.web.service.KnowledgeAdminService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -53,6 +56,13 @@ public class AdminKnowledgeController {
         return Result.success("面料知识新增成功", knowledgeAdminService.createFabric(request));
     }
 
+    @PostMapping("/fabrics/import")
+    @Operation(summary = "批量导入面料知识")
+    public Result<Map<String, Object>> importFabrics(@RequestBody FabricKnowledgeBatchImportRequest request) {
+        requireAdmin();
+        return Result.success("面料知识批量导入成功", knowledgeAdminService.importFabrics(request));
+    }
+
     @PutMapping("/fabrics/{id}")
     @Operation(summary = "更新面料知识")
     public Result<Map<String, Object>> updateFabric(@PathVariable Long id,
@@ -83,6 +93,13 @@ public class AdminKnowledgeController {
         return Result.success("指南知识新增成功", knowledgeAdminService.createGuide(request));
     }
 
+    @PostMapping("/guides/import")
+    @Operation(summary = "批量导入指南知识")
+    public Result<Map<String, Object>> importGuides(@RequestBody GuideKnowledgeBatchImportRequest request) {
+        requireAdmin();
+        return Result.success("指南知识批量导入成功", knowledgeAdminService.importGuides(request));
+    }
+
     @PutMapping("/guides/{id}")
     @Operation(summary = "更新指南知识")
     public Result<Map<String, Object>> updateGuide(@PathVariable Long id,
@@ -111,6 +128,13 @@ public class AdminKnowledgeController {
     public Result<Map<String, Object>> createCareLabel(@Valid @RequestBody CareLabelKnowledgeUpsertRequest request) {
         requireAdmin();
         return Result.success("洗护知识新增成功", knowledgeAdminService.createCareLabel(request));
+    }
+
+    @PostMapping("/care-labels/import")
+    @Operation(summary = "批量导入洗护知识")
+    public Result<Map<String, Object>> importCareLabels(@RequestBody CareLabelKnowledgeBatchImportRequest request) {
+        requireAdmin();
+        return Result.success("洗护知识批量导入成功", knowledgeAdminService.importCareLabels(request));
     }
 
     @PutMapping("/care-labels/{id}")

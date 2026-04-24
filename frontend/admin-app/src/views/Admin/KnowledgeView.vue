@@ -264,6 +264,36 @@
           <p v-else class="empty-tip">点击左侧表格任意一行，可以先预览，再决定是否编辑或删除。</p>
         </div>
 
+        <div class="preview-card">
+          <div class="preview-head">
+            <strong>批量导入 {{ currentTabLabel }}</strong>
+            <span>支持 JSON 数组</span>
+          </div>
+
+          <div class="toolbar import-toolbar">
+            <label class="checkbox-row">
+              <input v-model="importUpdateExisting" type="checkbox" />
+              <span>遇到同名 / 同编码时自动更新旧数据</span>
+            </label>
+            <button class="secondary-button" type="button" @click="fillImportTemplate">填入模板</button>
+            <button class="secondary-button" type="button" @click="clearImportPayload">清空导入区</button>
+          </div>
+
+          <textarea
+            v-model.trim="importPayload"
+            class="text-input textarea-input import-textarea"
+            rows="10"
+            :placeholder="importPlaceholder"
+          ></textarea>
+
+          <div class="import-footer">
+            <p class="panel-subtitle">直接粘贴 JSON 数组即可，例如 `[{"name":"棉",...}]`。</p>
+            <button class="primary-button" type="button" :disabled="importing || !importPayload" @click="submitImport">
+              {{ importing ? '导入中...' : '开始批量导入' }}
+            </button>
+          </div>
+        </div>
+
         <form class="knowledge-form" @submit.prevent="submitDraft">
           <template v-if="activeTab === 'fabric'">
             <div class="form-grid">
@@ -507,6 +537,7 @@ const selectedItemId = ref(null);
 const loading = ref(false);
 const saving = ref(false);
 const deletingId = ref(null);
+const importing = ref(false);
 const fabrics = ref([]);
 const guides = ref([]);
 const careLabels = ref([]);
@@ -515,6 +546,8 @@ const filters = reactive({
   active: ''
 });
 const draft = reactive({ ...defaultDrafts.fabric });
+const importPayload = ref('');
+const importUpdateExisting = ref(true);
 
 const currentTabLabel = computed(() => {
   return tabs.find((item) => item.value === activeTab.value)?.label || '知识';
@@ -528,6 +561,18 @@ const currentTotal = computed(() => {
     return careLabels.value.length;
   }
   return fabrics.value.length;
+});
+
+const importPlaceholder = computed(() => {
+  if (activeTab.value === 'guide') {
+    return '[\n  {\n    "title": "春秋通勤衬衫搭配",\n    "subtitle": "基础款也能更利落",\n    "guideType": "通勤穿搭",\n    "summary": "适合春秋上班场景的衬衫搭配建议",\n    "content": "可搭配西裤或半裙，外层叠西装。",\n    "author": "运营后台",\n    "publishDate": "2026-04-24",\n    "tags": "通勤,衬衫,春秋",\n    "keywords": "通勤,衬衫,西装"\n  }\n]';
+  }
+
+  if (activeTab.value === 'care-label') {
+    return '[\n  {\n    "symbolCode": "DO_NOT_BLEACH",\n    "symbolName": "不可漂白",\n    "category": "漂白",\n    "instruction": "请勿使用含氯漂白剂",\n    "explanation": "会破坏纤维与染料稳定性",\n    "doText": "使用中性洗涤剂",\n    "dontText": "避免漂白液",\n    "keywords": "漂白,洗护,不可漂白"\n  }\n]';
+  }
+
+  return '[\n  {\n    "name": "棉麻混纺",\n    "alias": "cotton linen blend,棉麻",\n    "fabricType": "混纺面料",\n    "warmthScore": 48,\n    "breathabilityScore": 88,\n    "comfortScore": 82,\n    "durabilityScore": 70,\n    "summary": "兼顾棉的舒适与亚麻的清爽",\n    "properties": "透气、自然纹理明显，但较易起皱。",\n    "careGuide": "建议轻柔机洗或手洗，阴干。",\n    "suitableSeasons": "春,夏",\n    "suitableOccasions": "日常,通勤,度假",\n    "keywords": "棉麻,透气,夏季"\n  }\n]';
 });
 
 const formatDateTime = (value) => (value ? String(value).replace('T', ' ') : '-');
@@ -599,6 +644,14 @@ const switchTab = async (tab) => {
 const createNew = () => {
   resetDraft();
   resetSelection();
+};
+
+const fillImportTemplate = () => {
+  importPayload.value = importPlaceholder.value;
+};
+
+const clearImportPayload = () => {
+  importPayload.value = '';
 };
 
 const previewItem = (item) => {
@@ -701,6 +754,56 @@ const removeItem = async (item) => {
     alert(error.response?.data?.message || '删除知识条目失败');
   } finally {
     deletingId.value = null;
+  }
+};
+
+const submitImport = async () => {
+  if (!importPayload.value) {
+    return;
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(importPayload.value);
+  } catch {
+    alert('导入内容不是合法 JSON，请检查格式');
+    return;
+  }
+
+  if (!Array.isArray(parsed) || parsed.length === 0) {
+    alert('导入内容必须是非空 JSON 数组');
+    return;
+  }
+
+  importing.value = true;
+  try {
+    const payload = {
+      updateExisting: Boolean(importUpdateExisting.value),
+      items: parsed
+    };
+
+    let result;
+    if (activeTab.value === 'fabric') {
+      result = await knowledgeAdminApi.importFabrics(payload);
+    } else if (activeTab.value === 'guide') {
+      result = await knowledgeAdminApi.importGuides(payload);
+    } else {
+      result = await knowledgeAdminApi.importCareLabels(payload);
+    }
+
+    if (result?.code === 200) {
+      const summary = result.data || {};
+      await Promise.all([loadOverview(), loadCurrentTab()]);
+      clearImportPayload();
+      alert(
+        `${result.message || '批量导入成功'}\n新增 ${summary.created || 0} 条，更新 ${summary.updated || 0} 条，跳过 ${summary.skipped || 0} 条`
+      );
+    }
+  } catch (error) {
+    console.error('Import knowledge data failed:', error);
+    alert(error.response?.data?.message || '批量导入失败');
+  } finally {
+    importing.value = false;
   }
 };
 
@@ -895,9 +998,42 @@ onMounted(async () => {
   margin-top: 8px;
 }
 
+.import-toolbar {
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #4b5563;
+}
+
+.import-textarea {
+  min-height: 220px;
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 13px;
+}
+
+.import-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+}
+
 @media (max-width: 1100px) {
   .knowledge-grid {
     grid-template-columns: 1fr;
+  }
+
+  .import-footer,
+  .import-toolbar {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 </style>
