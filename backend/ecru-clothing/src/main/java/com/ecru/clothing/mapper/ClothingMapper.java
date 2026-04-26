@@ -183,6 +183,27 @@ public interface ClothingMapper extends BaseMapper<Clothing> {
     })
     long countAdminClothingList(@Param("request") AdminClothingQueryRequest request);
 
+    @Select({
+            "<script>",
+            "SELECT * FROM clothings",
+            "WHERE user_id = #{userId} AND is_deleted = 0",
+            "<if test='purchaseLink != null and purchaseLink != \"\"'>",
+            "AND purchase_link = #{purchaseLink}",
+            "</if>",
+            "<if test='sourceOrderId != null and sourceOrderId != \"\"'>",
+            "AND source_order_id = #{sourceOrderId}",
+            "</if>",
+            "<if test='imageUrl != null and imageUrl != \"\" and (purchaseLink == null or purchaseLink == \"\") and (sourceOrderId == null or sourceOrderId == \"\")'>",
+            "AND image_url = #{imageUrl}",
+            "</if>",
+            "LIMIT 1",
+            "</script>"
+    })
+    Clothing selectPossibleDuplicate(@Param("userId") Long userId,
+                                     @Param("purchaseLink") String purchaseLink,
+                                     @Param("sourceOrderId") String sourceOrderId,
+                                     @Param("imageUrl") String imageUrl);
+
     @Select("SELECT COUNT(*) as totalClothings, COUNT(DISTINCT wear_log.clothing_id) as totalWorn, " +
             "MAX(wear_log.clothing_id) as mostWornClothingId, MAX(wear_log.wear_count) as mostWornCount " +
             "FROM clothings " +

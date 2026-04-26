@@ -5,6 +5,7 @@ import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.*;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -36,6 +37,9 @@ public class AiTextGeneratorStreamService {
 
     @Value("${ai.siliconflow.timeout:300000}")
     private Integer timeout;
+
+    @Autowired
+    private AiPromptSettingsService promptSettingsService;
 
     private OkHttpClient okHttpClient;
 
@@ -190,9 +194,12 @@ public class AiTextGeneratorStreamService {
      */
     private String buildSystemPrompt(Map<String, Object> context) {
         StringBuilder prompt = new StringBuilder();
+        prompt.append(promptSettingsService.getChatSystemPrompt());
         prompt.append("你是一位专业的时尚搭配顾问。");
 
         // 根据是否需要检索衣柜调整提示
+        prompt.setLength(0);
+        prompt.append(promptSettingsService.getChatSystemPrompt());
         Boolean needClothingSearch = context != null && Boolean.TRUE.equals(context.get("needClothingSearch"));
         if (needClothingSearch != null && !needClothingSearch) {
             prompt.append("用户只是打招呼或闲聊，请友好地回应，不需要推荐衣物。");

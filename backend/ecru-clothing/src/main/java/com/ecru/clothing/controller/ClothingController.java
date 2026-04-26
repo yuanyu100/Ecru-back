@@ -3,12 +3,17 @@ package com.ecru.clothing.controller;
 import com.ecru.clothing.dto.request.ClothingQueryRequest;
 import com.ecru.clothing.dto.request.CreateClothingRequest;
 import com.ecru.clothing.dto.request.ImageUploadRequest;
+import com.ecru.clothing.dto.request.PinduoduoImportCommitRequest;
+import com.ecru.clothing.dto.request.PinduoduoImportPreviewRequest;
 import com.ecru.clothing.dto.request.RecordWearRequest;
 import com.ecru.clothing.dto.request.SetFrequencyRequest;
 import com.ecru.clothing.dto.request.UpdateClothingRequest;
 import com.ecru.clothing.dto.response.ClothingDetailVO;
 import com.ecru.clothing.dto.response.ClothingListVO;
 import com.ecru.clothing.dto.response.ClothingStatisticsVO;
+import com.ecru.clothing.dto.response.PinduoduoImportPreviewVO;
+import com.ecru.clothing.dto.response.PinduoduoImportResultVO;
+import com.ecru.clothing.service.ClothingImportService;
 import com.ecru.clothing.service.ClothingService;
 import com.ecru.common.result.Result;
 import com.ecru.common.service.storage.ImageStorageService;
@@ -38,6 +43,9 @@ public class ClothingController {
 
     @Autowired
     private ClothingService clothingService;
+
+    @Autowired
+    private ClothingImportService clothingImportService;
 
     @Autowired
     private ImageStorageService imageStorageService;
@@ -156,5 +164,18 @@ public class ClothingController {
                                                               @RequestParam(value = "period", defaultValue = "all") String period) {
         Long userId = UserContext.getCurrentUserId();
         return Result.success(clothingService.getClothingStatistics(userId, period));
+    }
+    @PostMapping("/imports/pinduoduo/preview")
+    @Operation(summary = "预览拼多多订单导入", description = "解析浏览器提取 JSON、HAR 或页面 HTML，返回候选衣物")
+    public Result<PinduoduoImportPreviewVO> previewPinduoduoImport(@RequestBody PinduoduoImportPreviewRequest request) {
+        Long userId = UserContext.getCurrentUserId();
+        return Result.success(clothingImportService.previewPinduoduoImport(userId, request));
+    }
+
+    @PostMapping("/imports/pinduoduo")
+    @Operation(summary = "导入拼多多订单衣物", description = "将预览后选中的拼多多订单商品批量导入到个人衣橱")
+    public Result<PinduoduoImportResultVO> importPinduoduoItems(@RequestBody PinduoduoImportCommitRequest request) {
+        Long userId = UserContext.getCurrentUserId();
+        return Result.success(clothingImportService.importPinduoduoItems(userId, request));
     }
 }

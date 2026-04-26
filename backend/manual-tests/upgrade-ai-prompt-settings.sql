@@ -1,0 +1,10 @@
+CREATE TABLE IF NOT EXISTS ai_prompt_settings (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    setting_key VARCHAR(128) NOT NULL,
+    setting_value LONGTEXT NOT NULL,
+    description VARCHAR(255) NULL,
+    updated_by BIGINT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_ai_prompt_settings_key (setting_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

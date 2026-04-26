@@ -19,7 +19,12 @@ const normalizeItem = (item = {}) => ({
   color: normalizeColor(item),
   frequency: Number(item.frequencyLevel || item.frequency || 3),
   purchaseChannel: item.purchaseLink || item.purchaseChannel || '',
+  purchasePrice: item.purchasePrice ?? '',
   purchaseTime: item.purchaseDate || item.purchaseTime || '',
+  shopName: item.sourceShopName || item.shopName || '',
+  skuText: item.sourceSkuText || item.skuText || '',
+  sourcePlatform: item.sourcePlatform || '',
+  sourceOrderId: item.sourceOrderId || '',
   createdTime: item.createdAt || item.createdTime || '',
   updatedTime: item.updatedAt || item.updatedTime || ''
 });
@@ -110,6 +115,20 @@ export const wardrobeApi = {
   async setFrequency(itemId, frequency) {
     const response = await apiClient.put(`/clothings/${itemId}/frequency`, {
       frequencyLevel: frequency
+    });
+    return response.data;
+  },
+
+  async previewPinduoduoImport(payload) {
+    const response = await apiClient.post('/clothings/imports/pinduoduo/preview', payload);
+    return response.data;
+  },
+
+  async importPinduoduoItems(items, options = {}) {
+    const response = await apiClient.post('/clothings/imports/pinduoduo', {
+      items,
+      autoRecognize: Boolean(options.autoRecognize),
+      skipExisting: options.skipExisting !== false
     });
     return response.data;
   }

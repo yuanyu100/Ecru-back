@@ -1,9 +1,11 @@
 <template>
   <div class="detail-page">
     <header class="detail-header">
-      <button class="ghost-button" type="button" @click="goBack">返回</button>
+      <button class="icon-back" type="button" aria-label="返回" @click="goBack">
+        <span></span>
+      </button>
       <div>
-        <p class="eyebrow">Wardrobe Detail</p>
+        <p class="eyebrow">衣物详情</p>
         <h1>衣物详情</h1>
       </div>
     </header>
@@ -16,7 +18,7 @@
 
       <div class="info-panel">
         <h2>{{ clothingData.name || '未命名衣物' }}</h2>
-        <p class="subline">{{ clothingData.brand || '未填写品牌' }}</p>
+        <p class="subline">{{ clothingData.brand || clothingData.shopName || '未填写品牌/店铺' }}</p>
 
         <div class="info-list">
           <div><span>分类</span><strong>{{ clothingData.category || '-' }}</strong></div>
@@ -24,10 +26,14 @@
           <div><span>材质</span><strong>{{ clothingData.material || '-' }}</strong></div>
           <div><span>尺码</span><strong>{{ clothingData.size || '-' }}</strong></div>
           <div><span>购买日期</span><strong>{{ clothingData.purchaseTime || '-' }}</strong></div>
-          <div><span>购买渠道</span><strong>{{ clothingData.purchaseChannel || '-' }}</strong></div>
+          <div><span>购买价格</span><strong>{{ formatPrice(clothingData.purchasePrice) }}</strong></div>
+          <div><span>购买链接</span><strong>{{ clothingData.purchaseChannel || '-' }}</strong></div>
+          <div><span>来源平台</span><strong>{{ clothingData.sourcePlatform || clothingData.sourceType || '-' }}</strong></div>
+          <div><span>店铺</span><strong>{{ clothingData.shopName || '-' }}</strong></div>
+          <div><span>订单号</span><strong>{{ clothingData.sourceOrderId || '-' }}</strong></div>
+          <div><span>规格</span><strong>{{ clothingData.skuText || '-' }}</strong></div>
           <div><span>搭配频率</span><strong>{{ clothingData.frequency || 3 }}</strong></div>
           <div><span>穿着次数</span><strong>{{ clothingData.wearCount ?? 0 }}</strong></div>
-          <div><span>来源</span><strong>{{ clothingData.sourceType || 'manual' }}</strong></div>
           <div><span>创建时间</span><strong>{{ formatDate(clothingData.createdTime) }}</strong></div>
         </div>
 
@@ -67,6 +73,13 @@ const fetchClothingData = async () => {
 
 const formatDate = (value) => (value ? String(value).replace('T', ' ') : '-');
 
+const formatPrice = (value) => {
+  if (value == null || value === '') {
+    return '-';
+  }
+  return `¥${Number(value).toFixed(2)}`;
+};
+
 const navigateToEdit = () => {
   router.push(`/wardrobe/edit/${itemId}`);
 };
@@ -104,6 +117,26 @@ onMounted(fetchClothingData);
   gap: 14px;
   align-items: center;
   margin-bottom: 18px;
+}
+
+.icon-back {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(145, 104, 49, 0.14);
+  border-radius: 50%;
+  background: rgba(255, 251, 244, 0.88);
+  cursor: pointer;
+}
+
+.icon-back span {
+  width: 10px;
+  height: 10px;
+  border-left: 1.5px solid #5d4523;
+  border-bottom: 1.5px solid #5d4523;
+  transform: rotate(45deg);
+  margin-left: 4px;
 }
 
 .eyebrow {
@@ -168,6 +201,7 @@ onMounted(fetchClothingData);
 .info-list strong {
   color: #5d4523;
   text-align: right;
+  word-break: break-word;
 }
 
 .action-row {

@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +38,7 @@ public class UserSettingsServiceImpl extends ServiceImpl<UserSettingsMapper, Use
     @Transactional(rollbackFor = Exception.class)
     public void updateUserSettings(Long userId, Map<String, String> settings) {
         for (Map.Entry<String, String> entry : settings.entrySet()) {
+            LocalDateTime now = LocalDateTime.now();
             LambdaQueryWrapper<UserSettings> wrapper = new LambdaQueryWrapper<>();
             wrapper.eq(UserSettings::getUserId, userId)
                    .eq(UserSettings::getSettingKey, entry.getKey());
@@ -44,12 +46,15 @@ public class UserSettingsServiceImpl extends ServiceImpl<UserSettingsMapper, Use
             UserSettings existing = baseMapper.selectOne(wrapper);
             if (existing != null) {
                 existing.setSettingValue(entry.getValue());
+                existing.setUpdatedAt(now);
                 baseMapper.updateById(existing);
             } else {
                 UserSettings newSetting = new UserSettings();
                 newSetting.setUserId(userId);
                 newSetting.setSettingKey(entry.getKey());
                 newSetting.setSettingValue(entry.getValue());
+                newSetting.setCreatedAt(now);
+                newSetting.setUpdatedAt(now);
                 baseMapper.insert(newSetting);
             }
         }

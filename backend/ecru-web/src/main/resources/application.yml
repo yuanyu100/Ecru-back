@@ -112,7 +112,7 @@ ai:
 mcp:
   # 天气服务配置
   weather:
-    api-key: ${MCP_WEATHER_API_KEY:your-api-key}
+    api-key: ${MCP_WEATHER_API_KEY:037b942502085f4227b9bd3dfdc0575c}
     base-url: https://restapi.amap.com/v3
     timeout: 10000
 

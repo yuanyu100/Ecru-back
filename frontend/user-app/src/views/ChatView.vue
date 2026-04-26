@@ -1,207 +1,318 @@
 <template>
-  <div class="chat-page">
-    <header class="chat-header">
-      <button class="ghost-button mobile-only" type="button" @click="toggleSidebar">
-        {{ isSidebarOpen ? '收起会话' : '查看会话' }}
+  <div ref="chatPageRef" class="chat-page">
+    <div v-if="historyOpen" class="history-mask" @click="historyOpen = false"></div>
+
+    <aside :class="['history-panel', historyOpen ? 'open' : '']">
+      <div class="history-head">
+        <div>
+          <p class="history-caption">会话</p>
+          <h2>最近对话</h2>
+        </div>
+        <button class="text-button" type="button" @click="startNewConversation">新建</button>
+      </div>
+
+      <div v-if="isConversationLoading" class="history-state">正在读取会话...</div>
+      <div v-else-if="conversations.length === 0" class="history-state">还没有历史对话。</div>
+      <div v-else class="history-list">
+        <article
+          v-for="conversation in conversations"
+          :key="conversation.sessionId"
+          :class="['history-item', currentSessionId === conversation.sessionId ? 'active' : '']"
+          @click="selectConversation(conversation.sessionId)"
+        >
+          <div class="history-copy">
+            <strong>{{ conversation.title || '新的对话' }}</strong>
+            <p>{{ conversation.lastMessagePreview || '继续和 Ecru 聊穿搭、面料或天气。' }}</p>
+            <span>{{ formatTime(conversation.updatedAt || conversation.createdAt) }}</span>
+          </div>
+          <button class="delete-button" type="button" @click.stop="removeConversation(conversation.sessionId)">删除</button>
+        </article>
+      </div>
+    </aside>
+
+    <header ref="chatHeadRef" class="chat-head">
+      <button class="icon-button" type="button" aria-label="打开会话列表" @click="historyOpen = true">
+        <span></span>
+        <span></span>
       </button>
-      <div>
-        <p class="eyebrow">AI Stylist</p>
-        <h1>搭配助手</h1>
+      <div class="head-copy">
+        <p>对话</p>
+        <h1>{{ currentConversationLabel }}</h1>
       </div>
-      <div class="header-actions">
-        <button class="ghost-button" type="button" @click="goHome">首页</button>
-        <button class="ghost-button" type="button" @click="goWardrobe">衣橱</button>
-        <button class="ghost-button" type="button" @click="goProfile">个人页</button>
-      </div>
+      <button class="text-button light" type="button" @click="startNewConversation">新建</button>
     </header>
 
-    <div class="chat-layout">
-      <aside class="conversation-panel" :class="{ open: isSidebarOpen }">
-        <div class="panel-header">
-          <div>
-            <p class="eyebrow">Conversation</p>
-            <h2>会话列表</h2>
-          </div>
-          <button class="primary-button" type="button" @click="startNewConversation">新会话</button>
+    <section
+      ref="messageListRef"
+      class="message-list"
+      :class="{ empty: messages.length === 0 }"
+      @scroll="handleMessageListScroll"
+    >
+      <div v-if="messages.length === 0" class="empty-state">
+        <p class="empty-caption">Ecru</p>
+        <h2>说一句今天想怎么穿，或者上传一张水洗标图片。</h2>
+        <div class="prompt-list">
+          <button v-for="item in quickPrompts" :key="item" class="prompt-chip" type="button" @click="sendQuickPrompt(item)">
+            {{ item }}
+          </button>
+        </div>
+      </div>
+
+      <article
+        v-for="message in messages"
+        :key="message.id"
+        :class="['message-card', message.role === 'user' ? 'user' : 'assistant']"
+      >
+        <div v-if="message.imagePreview" class="image-preview">
+          <img :src="message.imagePreview" alt="上传图片" />
         </div>
 
-        <div v-if="isConversationLoading" class="panel-state">正在加载会话...</div>
-        <div v-else-if="conversations.length === 0" class="panel-state">还没有会话，直接开始提问即可。</div>
-        <template v-else>
-          <div class="conversation-filter">
-            <button
-              v-for="item in filterOptions"
-              :key="item.value"
-              :class="['filter-chip', activeFilter === item.value ? 'active' : '']"
-              type="button"
-              @click="activeFilter = item.value"
-            >
-              {{ item.label }}
-            </button>
-          </div>
+        <p v-if="message.content && message.role === 'user'" class="message-content">{{ message.content }}</p>
+        <div
+          v-else-if="message.content"
+          class="message-content rich-content"
+          v-html="formatAssistantMessage(message.content)"
+        ></div>
 
-          <div v-if="filteredConversations.length === 0" class="panel-state">当前筛选下没有会话。</div>
+        <div v-if="message.analysisTags?.length" class="tag-row">
+          <span v-for="tag in message.analysisTags" :key="`${message.id}-${tag}`">{{ tag }}</span>
+        </div>
 
-          <div v-else class="conversation-list">
-            <article
-              v-for="conversation in filteredConversations"
-              :key="conversation.sessionId"
-              :class="['conversation-item', currentSessionId === conversation.sessionId ? 'active' : '']"
-              @click="selectConversation(conversation.sessionId)"
-            >
-              <div class="conversation-copy">
-                <div class="conversation-title-row">
-                  <h3>{{ conversation.title }}</h3>
-                  <span :class="['status-badge', conversation.isActive ? 'active' : 'archived']">
-                    {{ conversation.isActive ? '活跃' : '已归档' }}
-                  </span>
-                </div>
-                <p>{{ conversation.lastMessagePreview || '暂无摘要' }}</p>
-                <span>{{ formatTime(conversation.updatedAt || conversation.createdAt) }}</span>
-              </div>
-              <div class="conversation-actions">
-                <button class="text-link" type="button" @click.stop="renameConversation(conversation)">改名</button>
-                <button class="text-link" type="button" @click.stop="toggleConversationActive(conversation)">
-                  {{ conversation.isActive ? '归档' : '恢复' }}
-                </button>
-                <button class="text-danger" type="button" @click.stop="removeConversation(conversation.sessionId)">
-                  删除
-                </button>
-              </div>
-            </article>
-          </div>
-        </template>
-      </aside>
+        <div v-if="message.analysisText" class="analysis-block">
+          {{ message.analysisText }}
+        </div>
 
-      <main class="chat-main">
-        <section v-if="messages.length === 0" class="empty-state">
-          <p class="eyebrow">Quick Start</p>
-          <h2>今天想怎么穿？</h2>
-          <p>你可以直接输入天气、场景、颜色偏好，后端会结合衣橱给出建议。</p>
-
-          <div class="prompt-grid">
-            <button v-for="prompt in quickPrompts" :key="prompt" class="prompt-chip" type="button" @click="sendQuickPrompt(prompt)">
-              {{ prompt }}
-            </button>
-          </div>
-        </section>
-
-        <section ref="messageListRef" class="message-list">
-          <article
-            v-for="message in messages"
-            :key="message.id"
-            :class="['message-card', message.role === 'user' ? 'user' : 'assistant']"
-          >
-            <div class="message-role">{{ message.role === 'user' ? '我' : 'AI 造型师' }}</div>
-            <p class="message-content">{{ message.content }}</p>
-
-            <div v-if="message.recommendations?.length" class="recommendation-grid">
-              <article v-for="(item, index) in message.recommendations" :key="`${message.id}-${index}`" class="recommendation-card">
-                <div class="recommendation-image">
-                  <img :src="resolveRecommendationImage(item)" :alt="resolveRecommendationTitle(item)" />
-                </div>
-                <div class="recommendation-copy">
-                  <h4>{{ resolveRecommendationTitle(item) }}</h4>
-                  <p>{{ resolveRecommendationSubtitle(item) }}</p>
-                </div>
-              </article>
+        <div v-if="message.recommendations?.length" class="look-grid">
+          <article v-for="(item, index) in message.recommendations" :key="`${message.id}-${index}`" class="look-card">
+            <div class="look-image">
+              <img :src="resolveRecommendationImage(item)" :alt="resolveRecommendationTitle(item)" />
             </div>
-
-            <time class="message-time">{{ formatTime(message.createdAt) }}</time>
+            <div class="look-copy">
+              <strong>{{ resolveRecommendationTitle(item) }}</strong>
+              <p>{{ resolveRecommendationSubtitle(item) }}</p>
+            </div>
           </article>
+        </div>
 
-          <div v-if="isSending" class="message-card assistant pending-card">
-            <div class="message-role">AI 造型师</div>
-            <div class="loading-dots">
-              <span></span>
-              <span></span>
-              <span></span>
-            </div>
-          </div>
-        </section>
+        <time>{{ formatTime(message.createdAt) }}</time>
+      </article>
 
-        <form class="composer" @submit.prevent="submitMessage">
+      <article v-if="isSending" class="message-card assistant pending">
+        <div class="loading-dots">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      </article>
+
+      <div ref="messageTailRef" class="message-tail" aria-hidden="true"></div>
+    </section>
+
+    <form ref="composerRef" class="composer" @submit.prevent="submitMessage">
+      <div v-if="imagePreview" class="composer-preview">
+        <img :src="imagePreview" alt="待发送图片" />
+        <div class="composer-preview-copy">
+          <strong>{{ selectedImage?.name || '已选择图片' }}</strong>
+          <span>将按水洗标或材质图进行分析</span>
+        </div>
+        <button class="remove-button" type="button" aria-label="移除图片" @click="clearSelectedImage">×</button>
+      </div>
+
+      <div class="composer-row">
+        <div class="input-shell">
+          <label class="plus-button" aria-label="上传图片">
+            <input type="file" accept="image/*" @change="handleFileSelect" />
+            <span></span>
+            <span></span>
+          </label>
           <textarea
+            ref="textareaRef"
             v-model.trim="userInput"
-            rows="3"
-            placeholder="例如：明天上海 20 度，通勤场景，帮我搭一套不显臃肿的穿搭"
+            rows="1"
             :disabled="isSending"
+            placeholder="问点什么，或上传一张水洗标图片"
+            @input="syncTextareaHeight"
             @keydown.enter.exact.prevent="submitMessage"
           ></textarea>
+        </div>
 
-          <div class="composer-actions">
-            <p>{{ currentConversationLabel }}</p>
-            <button class="primary-button" type="submit" :disabled="isSending || !userInput.trim()">
-              {{ isSending ? '发送中...' : '发送' }}
-            </button>
-          </div>
-        </form>
-      </main>
-    </div>
+        <button class="send-button" type="submit" :disabled="isSending || (!userInput.trim() && !selectedImage)">
+          <span v-if="isSending" class="send-text">中</span>
+          <span v-else-if="selectedImage" class="send-text">析</span>
+          <span v-else class="send-arrow"></span>
+        </button>
+      </div>
+    </form>
   </div>
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { chatApi } from '../api/chat';
+import { knowledgeApi } from '../api/knowledge';
+import { weatherApi } from '../api/weather';
+import { formatMessageHtml } from '../utils/messageFormat';
 
-const router = useRouter();
+const chatPageRef = ref(null);
+const chatHeadRef = ref(null);
+const composerRef = ref(null);
 const messageListRef = ref(null);
+const messageTailRef = ref(null);
+const textareaRef = ref(null);
 const conversations = ref([]);
 const messages = ref([]);
 const currentSessionId = ref(localStorage.getItem('chatSessionId') || '');
-const currentConversationLabel = ref('新会话');
+const currentConversationLabel = ref('新的对话');
 const userInput = ref('');
 const isSending = ref(false);
 const isConversationLoading = ref(false);
-const isSidebarOpen = ref(false);
-const activeFilter = ref('active');
-
-const filterOptions = [
-  { label: '活跃', value: 'active' },
-  { label: '全部', value: 'all' },
-  { label: '已归档', value: 'archived' }
-];
+const historyOpen = ref(false);
+const cachedWeather = ref(weatherApi.getCachedWeather());
+const selectedImage = ref(null);
+const imagePreview = ref('');
 
 const quickPrompts = [
-  '今天下雨，帮我搭一套通勤穿搭',
-  '周末出游，想穿得轻松一点',
-  '面试场景，需要稳重但不要老气',
-  '我想用衣橱里的黑白单品做搭配'
+  '今天 23 度，帮我搭一套轻松一点的出门穿搭。',
+  '这件灰蓝衬衫适合搭什么下装？',
+  '我想要偏极简、干净一点的穿法。',
+  '这个天气适合买针织还是衬衫？'
 ];
 
 const fallbackImage =
-  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="320" height="420"><rect width="100%" height="100%" fill="%23f0e4cf"/><text x="50%" y="50%" text-anchor="middle" fill="%238b7355" font-size="24">LOOK</text></svg>';
+  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="320" height="420"><rect width="100%" height="100%" fill="%23e6dccd"/><text x="50%" y="50%" text-anchor="middle" fill="%238b7a63" font-size="22">LOOK</text></svg>';
 
-const filteredConversations = computed(() => {
-  if (activeFilter.value === 'all') {
-    return conversations.value;
+const currentLocation = computed(() => cachedWeather.value?.location || '');
+let layoutResizeObserver = null;
+const latestFollowThreshold = 72;
+const shouldFollowLatest = ref(true);
+
+const syncLayoutMetrics = () => {
+  const page = chatPageRef.value;
+  if (!page) {
+    return;
   }
 
-  if (activeFilter.value === 'archived') {
-    return conversations.value.filter((item) => !item.isActive);
-  }
+  const headerHeight = Math.ceil(chatHeadRef.value?.offsetHeight || 0);
+  const composerHeight = Math.ceil(composerRef.value?.offsetHeight || 0);
+  page.style.setProperty('--chat-header-height', `${headerHeight}px`);
+  page.style.setProperty('--chat-composer-height', `${composerHeight}px`);
+};
 
-  return conversations.value.filter((item) => item.isActive !== false);
-});
-
-const scrollToBottom = async () => {
+const syncTextareaHeight = async () => {
   await nextTick();
-  if (messageListRef.value) {
-    messageListRef.value.scrollTop = messageListRef.value.scrollHeight;
+  const element = textareaRef.value;
+  if (!element) {
+    return;
   }
+
+  element.style.height = '24px';
+  element.style.height = `${Math.min(element.scrollHeight, 112)}px`;
+  syncLayoutMetrics();
+};
+
+const isNearLatest = () => {
+  const list = messageListRef.value;
+  if (!list) {
+    return true;
+  }
+
+  return list.scrollHeight - list.scrollTop - list.clientHeight <= latestFollowThreshold;
+};
+
+const alignToLatestMessage = async ({ force = false, behavior = 'auto' } = {}) => {
+  await nextTick();
+  syncLayoutMetrics();
+  window.requestAnimationFrame(() => {
+    const list = messageListRef.value;
+    const tail = messageTailRef.value;
+    if (!list || !tail) {
+      return;
+    }
+
+    if (!force && !shouldFollowLatest.value) {
+      return;
+    }
+
+    tail.scrollIntoView({
+      block: 'end',
+      behavior
+    });
+  });
+};
+
+const handleMessageListScroll = () => {
+  shouldFollowLatest.value = isNearLatest();
 };
 
 const syncConversationLabel = () => {
   const currentConversation = conversations.value.find((item) => item.sessionId === currentSessionId.value);
-  currentConversationLabel.value = currentConversation?.title || '新会话';
+  currentConversationLabel.value = currentConversation?.title || '新的对话';
+};
+
+const sortConversations = (items = []) =>
+  [...items].sort((left, right) => {
+    const rightTime = new Date(right.updatedAt || right.createdAt || 0).getTime();
+    const leftTime = new Date(left.updatedAt || left.createdAt || 0).getTime();
+    return rightTime - leftTime;
+  });
+
+const revokePreviewUrl = () => {
+  if (imagePreview.value?.startsWith('blob:')) {
+    URL.revokeObjectURL(imagePreview.value);
+  }
+};
+
+const clearSelectedImage = () => {
+  revokePreviewUrl();
+  selectedImage.value = null;
+  imagePreview.value = '';
+};
+
+const handleFileSelect = (event) => {
+  const [file] = event.target.files || [];
+  event.target.value = '';
+  clearSelectedImage();
+
+  if (!file) {
+    return;
+  }
+
+  selectedImage.value = file;
+  imagePreview.value = URL.createObjectURL(file);
+};
+
+const normalizeServerMessage = (content, result = {}) => ({
+  id: `assistant-${Date.now()}`,
+  role: 'assistant',
+  content,
+  recommendations: Array.isArray(result.recommendedClothes) ? result.recommendedClothes : [],
+  createdAt: new Date().toISOString()
+});
+
+const buildAnalysisMessage = (responseData) => {
+  const analysis = responseData?.analysis || {};
+  const materialTags = Array.isArray(analysis.materials)
+    ? analysis.materials.map((item) => (item.ratio ? `${item.name || item.rawText} ${item.ratio}` : item.name || item.rawText)).filter(Boolean)
+    : [];
+  const careTags = Array.isArray(analysis.careLabels)
+    ? analysis.careLabels.map((item) => item.symbolName || item.instruction || item.rawText).filter(Boolean)
+    : [];
+
+  return {
+    id: `assistant-${Date.now()}`,
+    role: 'assistant',
+    content: responseData?.answer || analysis.summary || '我已经看完这张图片了。',
+    analysisTags: [...materialTags, ...careTags].slice(0, 8),
+    analysisText: analysis.detectedText || '',
+    recommendations: [],
+    createdAt: new Date().toISOString()
+  };
 };
 
 const loadMessages = async (sessionId) => {
   if (!sessionId) {
     messages.value = [];
-    currentConversationLabel.value = '新会话';
+    currentConversationLabel.value = '新的对话';
     return;
   }
 
@@ -209,10 +320,11 @@ const loadMessages = async (sessionId) => {
     const response = await chatApi.getConversationMessages(sessionId);
     messages.value = response.data || [];
     syncConversationLabel();
-    await scrollToBottom();
+    shouldFollowLatest.value = true;
+    await alignToLatestMessage({ force: true, behavior: 'auto' });
   } catch (error) {
     console.error('Load chat messages failed:', error);
-    alert(error.response?.data?.message || '加载聊天记录失败');
+    alert(error.response?.data?.message || '读取消息失败');
   }
 };
 
@@ -220,11 +332,14 @@ const loadConversations = async (preferredSessionId = currentSessionId.value) =>
   isConversationLoading.value = true;
   try {
     const response = await chatApi.getConversations(1, 20);
-    conversations.value = response.data?.items || [];
+    conversations.value = sortConversations(response.data?.items || []);
+    const hasPreferred = preferredSessionId && conversations.value.some((item) => item.sessionId === preferredSessionId);
+    const hasCurrent = currentSessionId.value && conversations.value.some((item) => item.sessionId === currentSessionId.value);
 
-    const targetSessionId =
-      preferredSessionId && conversations.value.some((item) => item.sessionId === preferredSessionId)
-        ? preferredSessionId
+    const targetSessionId = hasPreferred
+      ? preferredSessionId
+      : hasCurrent
+        ? currentSessionId.value
         : conversations.value[0]?.sessionId || '';
 
     currentSessionId.value = targetSessionId;
@@ -238,7 +353,7 @@ const loadConversations = async (preferredSessionId = currentSessionId.value) =>
     syncConversationLabel();
   } catch (error) {
     console.error('Load conversations failed:', error);
-    alert(error.response?.data?.message || '加载会话列表失败');
+    alert(error.response?.data?.message || '读取会话失败');
   } finally {
     isConversationLoading.value = false;
   }
@@ -247,26 +362,28 @@ const loadConversations = async (preferredSessionId = currentSessionId.value) =>
 const selectConversation = async (sessionId) => {
   currentSessionId.value = sessionId;
   localStorage.setItem('chatSessionId', sessionId);
-  isSidebarOpen.value = false;
+  historyOpen.value = false;
   syncConversationLabel();
+  clearSelectedImage();
   await loadMessages(sessionId);
 };
 
-const startNewConversation = () => {
+const startNewConversation = async () => {
   currentSessionId.value = '';
-  currentConversationLabel.value = '新会话';
+  currentConversationLabel.value = '新的对话';
   messages.value = [];
   userInput.value = '';
-  isSidebarOpen.value = false;
+  historyOpen.value = false;
+  localStorage.removeItem('chatSessionId');
+  clearSelectedImage();
   chatApi.clearCurrentSession();
+  await nextTick();
+  await syncTextareaHeight();
+  shouldFollowLatest.value = true;
+  await alignToLatestMessage({ force: true, behavior: 'auto' });
 };
 
-const submitMessage = async () => {
-  const text = userInput.value.trim();
-  if (!text || isSending.value) {
-    return;
-  }
-
+const submitTextMessage = async (text) => {
   const optimisticMessage = {
     id: `local-${Date.now()}`,
     role: 'user',
@@ -278,100 +395,122 @@ const submitMessage = async () => {
   messages.value = [...messages.value, optimisticMessage];
   userInput.value = '';
   isSending.value = true;
-  await scrollToBottom();
+  await syncTextareaHeight();
+  shouldFollowLatest.value = true;
+  await alignToLatestMessage({ force: true, behavior: 'auto' });
 
   try {
     const response = await chatApi.sendMessage({
       message: text,
       sessionId: currentSessionId.value,
-      context: 'general'
+      location: currentLocation.value,
+      context: 'general',
+      metadata: cachedWeather.value
+        ? {
+            weatherSummary: cachedWeather.value.summary || '',
+            weatherCondition: cachedWeather.value.weatherCondition || '',
+            temperature: cachedWeather.value.temperature || ''
+          }
+        : undefined
     });
 
-    const nextSessionId = response.data?.sessionId || currentSessionId.value;
+    const result = response.data || {};
+    const nextSessionId = result.sessionId || currentSessionId.value;
     currentSessionId.value = nextSessionId || '';
 
     if (nextSessionId) {
       localStorage.setItem('chatSessionId', nextSessionId);
       await loadConversations(nextSessionId);
-      await loadMessages(nextSessionId);
     } else {
       await loadConversations('');
     }
+
+    messages.value = [...messages.value, normalizeServerMessage(result.response || '我整理好了。', result)];
   } catch (error) {
     console.error('Send chat message failed:', error);
     messages.value = messages.value.filter((item) => item.id !== optimisticMessage.id);
-    alert(error.response?.data?.message || '发送消息失败，请检查后端 AI 服务');
+    alert(error.response?.data?.message || '发送失败');
   } finally {
     isSending.value = false;
-    await scrollToBottom();
+    await syncTextareaHeight();
+    await alignToLatestMessage({ behavior: 'auto' });
   }
 };
 
-const sendQuickPrompt = async (prompt) => {
-  userInput.value = prompt;
+const submitImageAnalysis = async (text) => {
+  if (!selectedImage.value) {
+    return;
+  }
+
+  const preview = imagePreview.value;
+  const optimisticMessage = {
+    id: `local-image-${Date.now()}`,
+    role: 'user',
+    content: text || '请帮我分析这张水洗标图片。',
+    imagePreview: preview,
+    recommendations: [],
+    createdAt: new Date().toISOString()
+  };
+
+  messages.value = [...messages.value, optimisticMessage];
+  const image = selectedImage.value;
+  const question = text || '请帮我分析这张水洗标图片。';
+  userInput.value = '';
+  selectedImage.value = null;
+  imagePreview.value = '';
+  isSending.value = true;
+  await syncTextareaHeight();
+  shouldFollowLatest.value = true;
+  await alignToLatestMessage({ force: true, behavior: 'auto' });
+
+  try {
+    const response = await knowledgeApi.analyzeMaterialLabel({
+      image,
+      question
+    });
+
+    messages.value = [...messages.value, buildAnalysisMessage(response.data)];
+  } catch (error) {
+    console.error('Analyze material image failed:', error);
+    alert(error.response?.data?.message || '图片分析失败');
+  } finally {
+    isSending.value = false;
+    await syncTextareaHeight();
+    await alignToLatestMessage({ behavior: 'auto' });
+  }
+};
+
+const submitMessage = async () => {
+  const text = userInput.value.trim();
+  if (isSending.value || (!text && !selectedImage.value)) {
+    return;
+  }
+
+  if (selectedImage.value) {
+    await submitImageAnalysis(text);
+    return;
+  }
+
+  await submitTextMessage(text);
+};
+
+const sendQuickPrompt = async (promptText) => {
+  userInput.value = promptText;
+  await syncTextareaHeight();
   await submitMessage();
 };
 
-const renameConversation = async (conversation) => {
-  const nextTitle = window.prompt('请输入新的会话标题', conversation.title || '');
-  if (nextTitle === null) {
-    return;
-  }
-
-  const title = nextTitle.trim();
-  if (!title) {
-    alert('会话标题不能为空');
-    return;
-  }
-
-  try {
-    const result = await chatApi.updateConversationTitle(conversation.sessionId, title);
-    if (result?.code === 200) {
-      conversation.title = title;
-      syncConversationLabel();
-    }
-  } catch (error) {
-    console.error('Rename conversation failed:', error);
-    alert(error.response?.data?.message || '修改会话标题失败');
-  }
-};
-
-const toggleConversationActive = async (conversation) => {
-  const nextActive = !conversation.isActive;
-  const actionLabel = nextActive ? '恢复' : '归档';
-
-  if (!window.confirm(`确认${actionLabel}这个会话吗？`)) {
-    return;
-  }
-
-  try {
-    const result = await chatApi.setConversationActive(conversation.sessionId, nextActive);
-    if (result?.code === 200) {
-      conversation.isActive = nextActive;
-      if (!nextActive && activeFilter.value === 'active' && currentSessionId.value === conversation.sessionId) {
-        activeFilter.value = 'all';
-      }
-    }
-  } catch (error) {
-    console.error('Toggle conversation active failed:', error);
-    alert(error.response?.data?.message || `${actionLabel}会话失败`);
-  }
-};
-
 const removeConversation = async (sessionId) => {
-  if (!window.confirm('确认删除这个会话吗？')) {
+  if (!window.confirm('确认删除这条会话吗？')) {
     return;
   }
 
   try {
     await chatApi.deleteConversation(sessionId);
-
     if (currentSessionId.value === sessionId) {
-      startNewConversation();
+      await startNewConversation();
     }
-
     await loadConversations(currentSessionId.value);
-
     if (currentSessionId.value) {
       await loadMessages(currentSessionId.value);
     }
@@ -381,20 +520,16 @@ const removeConversation = async (sessionId) => {
   }
 };
 
-const resolveRecommendationImage = (item = {}) =>
-  item.imageUrl || item.image || item.coverUrl || fallbackImage;
-
-const resolveRecommendationTitle = (item = {}) =>
-  item.name || item.title || item.category || '推荐单品';
-
+const resolveRecommendationImage = (item = {}) => item.imageUrl || item.image || item.coverUrl || fallbackImage;
+const resolveRecommendationTitle = (item = {}) => item.name || item.title || item.category || '推荐搭配';
 const resolveRecommendationSubtitle = (item = {}) => {
   const values = [item.category, item.primaryColor || item.color, item.brand].filter(Boolean);
-  return values.join(' / ') || '来自你的衣橱推荐';
+  return values.join(' / ') || '由 Ecru 生成的搭配建议';
 };
 
 const formatTime = (value) => {
   if (!value) {
-    return '刚刚';
+    return '--';
   }
 
   return new Date(value).toLocaleString('zh-CN', {
@@ -405,413 +540,627 @@ const formatTime = (value) => {
   });
 };
 
-const goHome = () => {
-  router.push('/');
-};
-
-const goWardrobe = () => {
-  router.push('/wardrobe');
-};
-
-const goProfile = () => {
-  router.push('/profile');
-};
-
-const toggleSidebar = () => {
-  isSidebarOpen.value = !isSidebarOpen.value;
-};
+const formatAssistantMessage = (content) => formatMessageHtml(content);
 
 watch(
   () => messages.value.length,
   async () => {
-    await scrollToBottom();
+    await alignToLatestMessage({ behavior: 'auto' });
   }
 );
 
+watch(historyOpen, (open) => {
+  document.body.classList.toggle('drawer-open', open);
+});
+
 onMounted(async () => {
+  await syncTextareaHeight();
+  syncLayoutMetrics();
+
+  if (typeof ResizeObserver !== 'undefined') {
+    layoutResizeObserver = new ResizeObserver(() => {
+      syncLayoutMetrics();
+    });
+    if (chatHeadRef.value) {
+      layoutResizeObserver.observe(chatHeadRef.value);
+    }
+    if (composerRef.value) {
+      layoutResizeObserver.observe(composerRef.value);
+    }
+  }
+
   await loadConversations(currentSessionId.value);
 
   if (currentSessionId.value) {
     await loadMessages(currentSessionId.value);
   }
+
+  const pendingPrompt = localStorage.getItem('pendingChatPrompt');
+  if (pendingPrompt) {
+    localStorage.removeItem('pendingChatPrompt');
+    await startNewConversation();
+    userInput.value = pendingPrompt;
+    await syncTextareaHeight();
+    await submitMessage();
+  }
+});
+
+onBeforeUnmount(() => {
+  layoutResizeObserver?.disconnect();
+  document.body.classList.remove('drawer-open');
+  clearSelectedImage();
 });
 </script>
 
 <style scoped>
 .chat-page {
-  min-height: 100vh;
-  padding: 20px 16px 28px;
+  position: fixed;
+  inset: 0 0 var(--app-bottom-offset) 0;
+  --chat-top-gap: 10px;
+  --chat-side-gap: 14px;
+  --chat-bottom-gap: 12px;
+  --chat-header-height: 52px;
+  --chat-composer-height: 72px;
+  overflow: hidden;
+  padding: 10px 14px 12px;
   background:
-    radial-gradient(circle at top, rgba(255, 243, 214, 0.85), transparent 34%),
-    linear-gradient(180deg, #f8f1df 0%, #efe2ca 100%);
+    radial-gradient(circle at top, rgba(255, 252, 246, 0.84), transparent 24%),
+    linear-gradient(180deg, var(--bg-base) 0%, var(--bg-soft) 100%);
 }
 
-.chat-header,
-.panel-header,
-.header-actions,
-.composer-actions {
+.history-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 18;
+  background: rgba(25, 20, 14, 0.14);
+  backdrop-filter: blur(4px);
+}
+
+.history-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 19;
+  width: min(82vw, 320px);
+  padding: 16px 14px 18px;
+  border-right: 1px solid var(--line-soft);
+  background: color-mix(in srgb, var(--surface-strong) 96%, transparent);
+  box-shadow: var(--shadow-soft);
+  transform: translateX(-102%);
+  transition: transform 0.22s ease;
+}
+
+.history-panel.open {
+  transform: translateX(0);
+}
+
+.history-head,
+.chat-head,
+.composer-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 
-.chat-header {
+.history-head {
   gap: 12px;
-  margin-bottom: 18px;
+  padding-bottom: 14px;
 }
 
-.eyebrow {
-  margin-bottom: 6px;
-  color: #8f6a37;
+.history-caption,
+.head-copy p,
+.empty-caption {
+  color: var(--text-faint);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+}
+
+.history-head h2 {
+  margin-top: 4px;
+  font-size: 17px;
+}
+
+.history-state {
+  margin-top: 18px;
+  color: var(--text-soft);
   font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
-.chat-header h1,
-.panel-header h2,
-.empty-state h2 {
-  color: #5d4523;
-}
-
-.header-actions {
+.history-list {
+  display: grid;
   gap: 8px;
 }
 
-.chat-layout {
-  display: grid;
-  gap: 16px;
-}
-
-.conversation-panel,
-.chat-main {
-  border-radius: 24px;
-  background: rgba(255, 251, 244, 0.92);
-  border: 1px solid rgba(145, 104, 49, 0.14);
-  box-shadow: 0 18px 44px rgba(109, 78, 38, 0.08);
-}
-
-.conversation-panel {
-  padding: 18px;
-}
-
-.panel-header {
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.panel-state {
-  color: #7d6240;
-  padding: 18px 0 6px;
-}
-
-.conversation-filter,
-.conversation-title-row,
-.conversation-actions {
+.history-item {
   display: flex;
   align-items: center;
-}
-
-.conversation-filter,
-.conversation-actions {
-  gap: 8px;
-}
-
-.conversation-filter {
-  flex-wrap: wrap;
-  margin-bottom: 14px;
-}
-
-.conversation-list {
-  display: grid;
-  gap: 12px;
-}
-
-.conversation-item {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 12px;
-  padding: 14px;
-  border-radius: 18px;
-  background: #fffdf8;
-  border: 1px solid rgba(145, 104, 49, 0.14);
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 11px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  border: 1px solid transparent;
   cursor: pointer;
 }
 
-.conversation-item.active {
-  border-color: #6b4b1f;
-  box-shadow: inset 0 0 0 1px #6b4b1f;
+.history-item.active {
+  background: color-mix(in srgb, var(--accent-soft) 58%, var(--surface-strong));
+  border-color: var(--line-strong);
 }
 
-.conversation-copy {
+.history-copy {
   min-width: 0;
 }
 
-.conversation-copy h3 {
-  color: #5d4523;
-  font-size: 15px;
-}
-
-.conversation-title-row {
-  gap: 8px;
-  justify-content: space-between;
-}
-
-.conversation-copy p,
-.conversation-copy span {
-  margin-top: 6px;
-  color: #8b6f48;
+.history-copy strong {
+  display: block;
+  color: var(--text-main);
   font-size: 12px;
 }
 
-.conversation-copy p {
+.history-copy p,
+.history-copy span {
+  margin-top: 4px;
+  color: var(--text-soft);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.history-copy p {
   display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
   overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
-.conversation-actions {
-  flex-direction: column;
-  align-items: stretch;
-}
-
-.status-badge {
-  flex-shrink: 0;
-  border-radius: 999px;
-  padding: 4px 8px;
-  font-size: 11px;
-}
-
-.status-badge.active {
-  background: rgba(83, 148, 103, 0.16);
-  color: #2f7a47;
-}
-
-.status-badge.archived {
-  background: rgba(139, 115, 85, 0.16);
-  color: #7d6240;
-}
-
-.chat-main {
-  padding: 18px;
-  display: grid;
-  gap: 16px;
-}
-
-.empty-state {
-  padding: 8px 4px;
-  color: #6d573b;
-}
-
-.empty-state p:last-of-type {
-  margin-top: 8px;
-}
-
-.prompt-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 16px;
-}
-
+.delete-button,
+.text-button,
+.remove-button,
 .prompt-chip {
-  padding: 10px 14px;
-  border: 1px solid #d4bc93;
-  border-radius: 999px;
-  background: #fff8eb;
-  color: #6d573b;
+  border: none;
+  background: transparent;
   cursor: pointer;
 }
 
+.delete-button {
+  color: var(--text-faint);
+  font-size: 10px;
+}
+
+.chat-head {
+  gap: 10px;
+  position: absolute;
+  top: var(--chat-top-gap);
+  left: var(--chat-side-gap);
+  right: var(--chat-side-gap);
+  z-index: 8;
+  padding: 4px 0 10px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg-base) 96%, transparent) 0%, rgba(0, 0, 0, 0) 100%);
+  backdrop-filter: blur(10px);
+}
+
+.head-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.chat-head h1 {
+  margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.icon-button {
+  display: inline-grid;
+  gap: 5px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.icon-button span {
+  display: block;
+  height: 1.5px;
+  border-radius: 999px;
+  background: var(--text-main);
+}
+
+.icon-button span:first-child {
+  width: 16px;
+}
+
+.icon-button span:last-child {
+  width: 12px;
+}
+
+.text-button {
+  color: var(--text-soft);
+  font-size: 11px;
+}
+
+.text-button.light {
+  color: var(--text-faint);
+}
+
 .message-list {
+  position: absolute;
+  top: calc(var(--chat-top-gap) + var(--chat-header-height));
+  right: var(--chat-side-gap);
+  bottom: calc(var(--chat-bottom-gap) + var(--chat-composer-height));
+  left: var(--chat-side-gap);
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  min-height: 220px;
-  max-height: 60vh;
+  gap: 10px;
   overflow-y: auto;
-  padding-right: 2px;
+  padding: 4px 0 18px;
+  overscroll-behavior: contain;
+  scroll-padding-top: 16px;
+  scroll-padding-bottom: 24px;
+}
+
+.message-tail {
+  width: 100%;
+  height: 1px;
+  flex: none;
+}
+
+.message-list.empty {
+  justify-content: center;
+}
+
+.empty-state {
+  padding: 0 4px 24px;
+}
+
+.empty-state h2 {
+  margin-top: 8px;
+  font-size: 17px;
+  line-height: 1.5;
+  font-weight: 500;
+}
+
+.prompt-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.prompt-chip {
+  padding: 12px 14px;
+  border: 1px solid var(--line-soft);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--surface-strong) 90%, transparent);
+  color: var(--text-main);
+  text-align: left;
+  font-size: 11px;
+  line-height: 1.55;
 }
 
 .message-card {
-  max-width: 88%;
-  padding: 14px;
-  border-radius: 22px;
+  width: fit-content;
+  max-width: 78%;
+  padding: 10px 12px;
+  border-radius: 18px;
+  font-size: 11px;
 }
 
 .message-card.user {
   align-self: flex-end;
-  background: #6b4b1f;
-  color: #fff8ef;
+  background: var(--accent-strong);
+  color: var(--surface-strong);
+  border-bottom-right-radius: 8px;
 }
 
 .message-card.assistant {
   align-self: flex-start;
-  background: #fffdf8;
-  color: #5d4523;
-  border: 1px solid rgba(145, 104, 49, 0.14);
+  border: 1px solid var(--line-soft);
+  background: color-mix(in srgb, var(--surface-strong) 96%, transparent);
+  color: var(--text-main);
+  border-bottom-left-radius: 8px;
 }
 
-.message-role {
-  font-size: 12px;
-  opacity: 0.75;
-}
-
-.message-content {
-  margin-top: 8px;
-  line-height: 1.7;
-  white-space: pre-wrap;
-}
-
-.message-time {
-  display: block;
-  margin-top: 10px;
-  font-size: 11px;
-  opacity: 0.7;
-}
-
-.recommendation-grid {
-  display: grid;
-  gap: 10px;
-  margin-top: 12px;
-}
-
-.recommendation-card {
-  display: grid;
-  grid-template-columns: 76px 1fr;
-  gap: 10px;
-  padding: 10px;
-  border-radius: 16px;
-  background: #f8f0df;
-}
-
-.recommendation-image {
-  border-radius: 12px;
+.image-preview {
+  margin-bottom: 8px;
+  border-radius: 14px;
   overflow: hidden;
-  background: #ead7b8;
 }
 
-.recommendation-image img {
-  width: 100%;
-  height: 100%;
-  min-height: 88px;
+.image-preview img {
+  display: block;
+  width: 132px;
+  height: 132px;
   object-fit: cover;
 }
 
-.recommendation-copy h4 {
-  color: #5d4523;
-  font-size: 14px;
+.message-content,
+.analysis-block {
+  line-height: 1.75;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
-.recommendation-copy p {
+.rich-content {
+  white-space: normal;
+}
+
+.rich-content :deep(p) {
+  margin: 0;
+}
+
+.rich-content :deep(p + p),
+.rich-content :deep(p + ul),
+.rich-content :deep(p + ol),
+.rich-content :deep(ul + p),
+.rich-content :deep(ol + p),
+.rich-content :deep(ul + ul),
+.rich-content :deep(ol + ol),
+.rich-content :deep(ul + ol),
+.rich-content :deep(ol + ul) {
   margin-top: 8px;
-  color: #8b6f48;
-  font-size: 12px;
+}
+
+.rich-content :deep(ul),
+.rich-content :deep(ol) {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.rich-content :deep(li + li) {
+  margin-top: 4px;
+}
+
+.rich-content :deep(code) {
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: rgba(93, 69, 35, 0.08);
+  font-size: 0.95em;
+}
+
+.rich-content :deep(strong) {
+  font-weight: 700;
+}
+
+.analysis-block {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line-soft);
+  color: var(--text-soft);
+}
+
+.tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.tag-row span {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 10px;
+}
+
+.message-card time {
+  display: block;
+  margin-top: 6px;
+  font-size: 10px;
+  opacity: 0.62;
+}
+
+.look-grid {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.look-card {
+  display: grid;
+  grid-template-columns: 68px 1fr;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 14px;
+  background: var(--surface-quiet);
+}
+
+.look-image {
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.look-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 76px;
+  object-fit: cover;
+}
+
+.look-copy strong {
+  display: block;
+  font-size: 11px;
+}
+
+.look-copy p {
+  margin-top: 5px;
+  color: var(--text-soft);
+  font-size: 10px;
   line-height: 1.5;
 }
 
 .composer {
+  position: absolute;
+  right: var(--chat-side-gap);
+  bottom: var(--chat-bottom-gap);
+  left: var(--chat-side-gap);
+  z-index: 8;
+  padding-top: 8px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, color-mix(in srgb, var(--bg-base) 96%, transparent) 18%);
+  backdrop-filter: blur(10px);
+}
+
+.composer-preview {
   display: grid;
+  grid-template-columns: 52px 1fr auto;
   gap: 10px;
-  padding-top: 4px;
+  align-items: center;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface-strong) 95%, transparent);
+}
+
+.composer-preview img {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+.composer-preview-copy strong {
+  display: block;
+  color: var(--text-main);
+  font-size: 11px;
+}
+
+.composer-preview-copy span {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-faint);
+  font-size: 10px;
+}
+
+.composer-row {
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.input-shell {
+  flex: 1;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: end;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--surface-strong) 95%, transparent);
+}
+
+.plus-button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  margin-bottom: 1px;
+  border-radius: 50%;
+  background: var(--surface-quiet);
+  cursor: pointer;
+}
+
+.plus-button span {
+  position: absolute;
+  width: 12px;
+  height: 1.5px;
+  border-radius: 999px;
+  background: var(--text-faint);
+}
+
+.plus-button span:last-child {
+  transform: rotate(90deg);
+}
+
+.plus-button input {
+  display: none;
 }
 
 .composer textarea {
   width: 100%;
+  height: 24px;
+  min-height: 24px;
+  max-height: 112px;
+  border: none;
+  background: transparent;
   resize: none;
-  border: 1px solid #d9c39b;
-  border-radius: 18px;
-  padding: 14px;
-  background: #fffdf8;
-  color: #5d4523;
+  color: var(--text-main);
+  font-size: 12px;
+  line-height: 1.7;
+  outline: none;
 }
 
-.composer-actions {
-  gap: 12px;
+.remove-button {
+  color: var(--text-faint);
+  font-size: 18px;
 }
 
-.composer-actions p {
-  color: #8b6f48;
-  font-size: 13px;
+.send-button {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent-strong);
+  color: var(--surface-strong);
+  cursor: pointer;
+}
+
+.send-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.send-text {
+  font-size: 12px;
+}
+
+.send-arrow {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-top: 1.6px solid currentColor;
+  border-right: 1.6px solid currentColor;
+  transform: rotate(45deg);
 }
 
 .loading-dots {
   display: flex;
-  gap: 8px;
-  margin-top: 10px;
+  gap: 6px;
+  padding: 4px 2px;
 }
 
 .loading-dots span {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: #8b7355;
-  animation: pulse 1.2s infinite ease-in-out;
+  background: var(--accent);
+  animation: pulse 1.1s infinite ease-in-out;
 }
 
 .loading-dots span:nth-child(2) {
-  animation-delay: 0.15s;
+  animation-delay: 0.16s;
 }
 
 .loading-dots span:nth-child(3) {
-  animation-delay: 0.3s;
-}
-
-.ghost-button,
-.primary-button,
-.text-danger,
-.text-link,
-.filter-chip {
-  border: none;
-  border-radius: 999px;
-  padding: 10px 16px;
-  cursor: pointer;
-}
-
-.ghost-button {
-  background: #ead7b8;
-  color: #5d4523;
-}
-
-.primary-button {
-  background: #6b4b1f;
-  color: #fff8ef;
-}
-
-.filter-chip {
-  padding: 8px 12px;
-  background: #f1e2c7;
-  color: #6b4b1f;
-}
-
-.filter-chip.active {
-  background: #6b4b1f;
-  color: #fff8ef;
-}
-
-.text-link {
-  padding: 6px 10px;
-  background: rgba(107, 75, 31, 0.1);
-  color: #6b4b1f;
-}
-
-.text-danger {
-  padding: 6px 10px;
-  background: rgba(217, 93, 81, 0.12);
-  color: #b04d45;
-}
-
-.mobile-only {
-  display: inline-flex;
+  animation-delay: 0.32s;
 }
 
 @keyframes pulse {
   0%,
   80%,
   100% {
-    transform: scale(0.8);
-    opacity: 0.5;
+    transform: scale(0.84);
+    opacity: 0.4;
   }
   40% {
     transform: scale(1);
@@ -819,32 +1168,21 @@ onMounted(async () => {
   }
 }
 
-@media (max-width: 899px) {
-  .header-actions {
-    display: none;
-  }
-
-  .conversation-panel {
-    display: none;
-  }
-
-  .conversation-panel.open {
-    display: block;
-  }
-}
-
-@media (min-width: 900px) {
+@media (min-width: 768px) {
   .chat-page {
-    padding: 28px 28px 32px;
+    inset: 0;
+    --chat-top-gap: 16px;
+    --chat-side-gap: 22px;
+    --chat-bottom-gap: 18px;
+    padding: 16px 22px 18px;
   }
 
-  .chat-layout {
-    grid-template-columns: 320px minmax(0, 1fr);
-    align-items: start;
+  .chat-head h1 {
+    font-size: 16px;
   }
 
-  .mobile-only {
-    display: none;
+  .message-card {
+    max-width: min(620px, 72%);
   }
 }
 </style>

@@ -26,6 +26,10 @@ public class UpdateClothingRequest {
     private String purchaseDate;
     private String purchaseLink;
     private String brand;
+    private String sourcePlatform;
+    private String sourceOrderId;
+    private String sourceShopName;
+    private String sourceSkuText;
     private Integer frequencyLevel;
 
 }

@@ -186,6 +186,53 @@ export const authApi = {
     }
   },
 
+  getHomePromptSettings: async () => {
+    try {
+      const response = await apiClient.get('/user/settings/home-prompts');
+      return {
+        ...response.data,
+        data: response.data?.data || {}
+      };
+    } catch (error) {
+      console.error('Get home prompt settings failed:', error);
+      throw error;
+    }
+  },
+
+  updateHomePromptSettings: async (payload) => {
+    try {
+      const response = await apiClient.put('/user/settings/home-prompts', payload);
+      return {
+        ...response.data,
+        data: response.data?.data || {}
+      };
+    } catch (error) {
+      console.error('Update home prompt settings failed:', error);
+      throw error;
+    }
+  },
+
+  previewHomePromptsFromPdf: async (file) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await apiClient.post('/user/settings/home-prompts/pdf-preview', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      return {
+        ...response.data,
+        data: response.data?.data || {}
+      };
+    } catch (error) {
+      console.error('Preview home prompts from pdf failed:', error);
+      throw error;
+    }
+  },
+
   updatePassword: async (payload) => {
     try {
       return (await apiClient.put('/user/me/password', payload)).data;

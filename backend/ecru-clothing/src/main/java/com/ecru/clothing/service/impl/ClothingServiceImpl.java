@@ -200,6 +200,18 @@ public class ClothingServiceImpl implements ClothingService {
         if (StringUtils.isNotBlank(request.getBrand())) {
             clothing.setBrand(request.getBrand());
         }
+        if (StringUtils.isNotBlank(request.getSourcePlatform())) {
+            clothing.setSourcePlatform(request.getSourcePlatform());
+        }
+        if (StringUtils.isNotBlank(request.getSourceOrderId())) {
+            clothing.setSourceOrderId(request.getSourceOrderId());
+        }
+        if (StringUtils.isNotBlank(request.getSourceShopName())) {
+            clothing.setSourceShopName(request.getSourceShopName());
+        }
+        if (StringUtils.isNotBlank(request.getSourceSkuText())) {
+            clothing.setSourceSkuText(request.getSourceSkuText());
+        }
         if (request.getFrequencyLevel() != null) {
             clothing.setFrequencyLevel(request.getFrequencyLevel());
         }
@@ -439,6 +451,10 @@ public class ClothingServiceImpl implements ClothingService {
         clothing.setImageUrls(writeJson(request.getImageUrls()));
         clothing.setPurchaseLink(request.getPurchaseLink());
         clothing.setBrand(request.getBrand());
+        clothing.setSourcePlatform(request.getSourcePlatform());
+        clothing.setSourceOrderId(request.getSourceOrderId());
+        clothing.setSourceShopName(request.getSourceShopName());
+        clothing.setSourceSkuText(request.getSourceSkuText());
         if (request.getPurchasePrice() != null) {
             clothing.setPurchasePrice(BigDecimal.valueOf(request.getPurchasePrice()));
         }

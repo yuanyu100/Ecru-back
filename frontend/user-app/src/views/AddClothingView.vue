@@ -1,9 +1,11 @@
 <template>
   <div class="editor-page">
     <header class="editor-header">
-      <button class="ghost-button" type="button" @click="goBack">返回</button>
+      <button class="icon-back" type="button" aria-label="返回" @click="goBack">
+        <span></span>
+      </button>
       <div>
-        <p class="eyebrow">Wardrobe</p>
+        <p class="eyebrow">衣橱</p>
         <h1>添加衣物</h1>
       </div>
     </header>
@@ -171,6 +173,26 @@ const goBack = () => {
   align-items: center;
   gap: 14px;
   margin-bottom: 18px;
+}
+
+.icon-back {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(145, 104, 49, 0.14);
+  border-radius: 50%;
+  background: rgba(255, 251, 244, 0.88);
+  cursor: pointer;
+}
+
+.icon-back span {
+  width: 10px;
+  height: 10px;
+  border-left: 1.5px solid #5d4523;
+  border-bottom: 1.5px solid #5d4523;
+  transform: rotate(45deg);
+  margin-left: 4px;
 }
 
 .eyebrow {

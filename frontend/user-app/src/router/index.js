@@ -25,6 +25,58 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/profile/account',
+    name: 'profile-account',
+    component: () => import('../views/ProfileAccountView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/profile/system',
+    name: 'profile-system',
+    component: () => import('../views/ProfileSystemView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/profile/system/home',
+    name: 'profile-system-home',
+    component: () => import('../views/ProfileHomeSettingsView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/profile/system/home/prompts',
+    name: 'profile-system-home-prompts',
+    component: () => import('../views/ProfileHomePromptListView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/profile/system/home/import',
+    name: 'profile-system-home-import',
+    component: () => import('../views/ProfileHomePromptImportView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/profile/system/home/display',
+    name: 'profile-system-home-display',
+    component: () => import('../views/ProfileHomeDisplayView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/profile/basic',
+    name: 'profile-basic',
+    component: () => import('../views/ProfileBasicView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/profile/preferences',
+    redirect: '/profile/system'
+  },
+  {
+    path: '/profile/security',
+    name: 'profile-security',
+    component: () => import('../views/ProfileSecurityView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/style-learning',
     name: 'style-learning',
     component: () => import('../views/StyleLearningView.vue'),
@@ -43,6 +95,11 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/saved-looks',
+    name: 'saved-looks',
+    component: () => import('../views/SavedLooksView.vue')
+  },
+  {
     path: '/about',
     name: 'about',
     component: () => import('../views/AboutView.vue')
@@ -57,6 +114,12 @@ const routes = [
     path: '/wardrobe/add',
     name: 'add-clothing',
     component: () => import('../views/AddClothingView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/wardrobe/import',
+    name: 'import-clothing',
+    component: () => import('../views/ImportClothingView.vue'),
     meta: { requiresAuth: true }
   },
   {

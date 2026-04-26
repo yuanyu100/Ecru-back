@@ -1,610 +1,726 @@
 <template>
   <div class="home-page">
-    <header class="hero-card">
-      <div class="hero-topbar">
-        <p class="eyebrow">Ecru Mobile</p>
-        <div class="topbar-actions">
-          <button v-if="!isAuthenticated" class="ghost-button" type="button" @click="navigateToLogin">
-            登录
+    <button class="weather-text" type="button" @click="refreshWeather" :disabled="isWeatherLoading">
+      <span>{{ weatherDisplay.location }}</span>
+      <span>{{ isWeatherLoading ? '定位中' : `${weatherDisplay.temperatureText} ${weatherDisplay.weatherCondition}` }}</span>
+    </button>
+
+    <main class="page-main">
+      <section class="prompt-stage">
+        <div class="prompt-copy">
+          <p
+            :class="['typed-line', headlineVisible ? 'visible' : 'hidden']"
+            :style="headlineTransitionStyle"
+          >{{ typedHeadline }}</p>
+        </div>
+
+        <form class="prompt-form" @submit.prevent="submitPrompt">
+          <input
+            v-model.trim="prompt"
+            type="text"
+            placeholder=""
+            autocomplete="off"
+            @keydown.enter.exact.prevent="submitPrompt"
+          />
+          <button class="submit-button" type="submit" aria-label="发送">
+            <span></span>
           </button>
-          <template v-else>
-            <button class="ghost-button" type="button" @click="navigateToProfile">个人中心</button>
-            <button class="ghost-button" type="button" @click="navigateToChat">穿搭助手</button>
-          </template>
-        </div>
-      </div>
+        </form>
 
-      <div class="hero-content">
-        <div>
-          <h1>{{ headline }}</h1>
-          <p class="hero-copy">
-            先把移动端主链路走通：衣橱录入、AI 对话、偏好设置和最近穿搭，都集中在这里。
-          </p>
-        </div>
-
-        <div class="hero-metrics">
-          <article class="metric-pill">
-            <span>最近会话</span>
-            <strong>{{ conversationList.length }}</strong>
-          </article>
-          <article class="metric-pill">
-            <span>穿搭记录</span>
-            <strong>{{ outfitHistory.length }}</strong>
-          </article>
-          <article class="metric-pill">
-            <span>偏好标签</span>
-            <strong>{{ preferredStyleCount }}</strong>
-          </article>
-        </div>
-      </div>
-    </header>
-
-    <section class="action-grid">
-      <article class="action-card primary" @click="navigateToChat">
-        <p class="eyebrow">AI Flow</p>
-        <h2>开始智能穿搭</h2>
-        <p>进入真实对话链路，直接让后端结合衣橱数据推荐单品。</p>
-        <button class="primary-button" type="button" @click.stop="navigateToChat">去聊天</button>
-      </article>
-
-      <article class="action-card" @click="navigateToAddClothing">
-        <p class="eyebrow">Wardrobe</p>
-        <h2>录入新衣物</h2>
-        <p>支持上传图片到 MinIO，并走 AI 识别或手动录入。</p>
-        <button class="ghost-button" type="button" @click.stop="navigateToAddClothing">去上传</button>
-      </article>
-
-      <article class="action-card" @click="navigateToWardrobe">
-        <p class="eyebrow">Collection</p>
-        <h2>管理我的衣橱</h2>
-        <p>查看已录入衣物、编辑主图、补全颜色与使用频率。</p>
-        <button class="ghost-button" type="button" @click.stop="navigateToWardrobe">去衣橱</button>
-      </article>
-
-      <article class="action-card" @click="navigateToMaterials">
-        <p class="eyebrow">Material Lab</p>
-        <h2>识别材质与洗护</h2>
-        <p>上传成分标或面料图，直接问“这种材质好吗”“能不能机洗”“适合什么季节”。</p>
-        <button class="ghost-button" type="button" @click.stop="navigateToMaterials">去识别</button>
-      </article>
-
-      <article class="action-card" @click="navigateToProfile">
-        <p class="eyebrow">Profile</p>
-        <h2>维护个人偏好</h2>
-        <p>同步风格偏好、尺码、地区和头像，便于后续推荐更稳定。</p>
-        <button class="ghost-button" type="button" @click.stop="navigateToProfile">去设置</button>
-      </article>
-      <article class="action-card" @click="navigateToStyleLearning">
-        <p class="eyebrow">Taste Lab</p>
-        <h2>训练风格画像</h2>
-        <p>快速标记喜欢与不喜欢的风格图，让后续 AI 推荐更贴近你的真实审美。</p>
-        <button class="ghost-button" type="button" @click.stop="navigateToStyleLearning">开始学习</button>
-      </article>
-    </section>
-
-    <div v-if="isLoading" class="state-card">正在加载首页数据...</div>
-
-    <div v-else class="content-grid">
-      <section class="panel">
-        <div class="section-header">
-          <div>
-            <p class="eyebrow">Style Profile</p>
-            <h2>风格画像</h2>
-          </div>
-          <button class="ghost-button" type="button" @click="navigateToProfile">完善资料</button>
-        </div>
-
-        <div class="profile-summary">
-          <div class="summary-item">
-            <span>气质类型</span>
-            <strong>{{ styleProfile.temperamentType || '待完善' }}</strong>
-          </div>
-          <div class="summary-item">
-            <span>体型</span>
-            <strong>{{ styleProfile.bodyType || '待完善' }}</strong>
-          </div>
-          <div class="summary-item">
-            <span>职业</span>
-            <strong>{{ styleProfile.occupation || '待完善' }}</strong>
-          </div>
-        </div>
-
-        <div class="tag-section">
-          <p>偏好风格</p>
-          <div class="tag-row">
-            <span v-for="tag in styleProfile.preferredStylesList" :key="tag" class="tag-chip">
-              {{ tag }}
-            </span>
-            <span v-if="styleProfile.preferredStylesList.length === 0" class="muted-text">还没有偏好风格</span>
-          </div>
-        </div>
-
-        <div class="tag-section">
-          <p>偏好颜色</p>
-          <div class="tag-row">
-            <span v-for="tag in styleProfile.preferredColorsList" :key="tag" class="tag-chip soft">
-              {{ tag }}
-            </span>
-            <span v-if="styleProfile.preferredColorsList.length === 0" class="muted-text">还没有偏好颜色</span>
-          </div>
-        </div>
+        <button
+          v-if="visibleCards.length"
+          class="flow-toggle"
+          type="button"
+          :aria-label="isRecommendationVisible ? '收起今日推荐' : '展开今日推荐'"
+          @click="toggleRecommendations"
+        >
+          <span :class="['flow-toggle-icon', isRecommendationVisible ? 'expanded' : 'collapsed']" aria-hidden="true"></span>
+        </button>
       </section>
 
-      <section class="panel">
-        <div class="section-header">
-          <div>
-            <p class="eyebrow">Recent Chat</p>
-            <h2>最近会话</h2>
-          </div>
-          <button class="ghost-button" type="button" @click="navigateToChat">查看全部</button>
+      <section
+        v-if="isRecommendationVisible && visibleCards.length"
+        ref="recommendationSectionRef"
+        class="recommendation-section"
+      >
+        <div class="section-head">
+          <p>今日推荐</p>
+          <button class="text-link" type="button" @click="rebuildInspirations">换一组</button>
         </div>
 
-        <div v-if="conversationList.length === 0" class="empty-block">
-          <p>还没有会话记录。</p>
-          <button class="primary-button" type="button" @click="navigateToChat">开始第一次穿搭咨询</button>
-        </div>
+        <div class="recommendation-grid">
+          <article v-for="card in visibleCards" :key="card.id" class="look-card">
+            <button
+              :class="['save-button', isCardSaved(card.id) ? 'saved' : '']"
+              type="button"
+              :aria-label="isCardSaved(card.id) ? '取消收藏' : '收藏'"
+              @click.stop="toggleSaveCard(card)"
+            >
+              {{ isCardSaved(card.id) ? '★' : '☆' }}
+            </button>
 
-        <div v-else class="list-block">
-          <article
-            v-for="conversation in conversationList"
-            :key="conversation.sessionId"
-            class="list-card"
-            @click="openConversation(conversation.sessionId)"
-          >
-            <div>
-              <h3>{{ conversation.title }}</h3>
-              <p>{{ conversation.lastMessagePreview || '暂无摘要' }}</p>
+            <div class="look-image" :style="cardStyle(card)">
+              <span>{{ card.mood }}</span>
             </div>
-            <span>{{ formatTime(conversation.updatedAt || conversation.createdAt) }}</span>
-          </article>
-        </div>
-      </section>
 
-      <section class="panel wide">
-        <div class="section-header">
-          <div>
-            <p class="eyebrow">Outfit History</p>
-            <h2>最近穿搭记录</h2>
-          </div>
-          <button class="ghost-button" type="button" @click="navigateToChat">继续生成</button>
-        </div>
-
-        <div v-if="outfitHistory.length === 0" class="empty-block">
-          <p>目前还没有落库的穿搭记录。</p>
-          <p class="muted-text">先去生成一次穿搭建议，记录列表和详情页就会有数据。</p>
-        </div>
-
-        <div v-else class="history-grid">
-          <article
-            v-for="item in outfitHistory"
-            :key="item.id"
-            class="history-card"
-            @click="openOutfitDetail(item.id)"
-          >
-            <div class="history-card-top">
-              <div>
-                <h3>{{ item.outfitName }}</h3>
-                <p>{{ item.outfitDescription || '暂无描述' }}</p>
+            <div class="look-copy">
+              <strong>{{ card.title }}</strong>
+              <p>{{ card.note }}</p>
+              <div class="tag-row">
+                <span v-for="tag in card.tags" :key="`${card.id}-${tag}`">#{{ tag }}</span>
               </div>
-              <span :class="['favorite-badge', item.isFavorite ? 'active' : '']">
-                {{ item.isFavorite ? '已收藏' : '未收藏' }}
-              </span>
-            </div>
-
-            <div class="history-meta">
-              <span>{{ item.occasion || '未标注场景' }}</span>
-              <span>{{ item.weatherCondition || '未标注天气' }}</span>
-              <span>{{ formatTime(item.createdAt) }}</span>
             </div>
           </article>
         </div>
       </section>
-    </div>
+    </main>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { authApi } from '../api/auth';
-import { chatApi } from '../api/chat';
 import { outfitApi } from '../api/outfit';
+import { detectBrowserPosition, weatherApi } from '../api/weather';
 
 const router = useRouter();
-const isAuthenticated = ref(false);
-const isLoading = ref(false);
-const currentProfile = ref(null);
-const styleProfile = ref({
-  preferredStylesList: [],
-  preferredColorsList: []
-});
-const conversationList = ref([]);
-const outfitHistory = ref([]);
 
-const headline = computed(() => {
-  if (!isAuthenticated.value) {
-    return '你的智能穿搭工作台';
+const defaultHeadline = '今天想穿成什么样。';
+const homeFlowPreferenceKey = 'ecru-home-flow-default-visible';
+const defaultHeadlineStayMs = 2200;
+const defaultHeadlineFadeMs = 820;
+const headlineRevealDelayMs = 120;
+const fallbackLocation = '所在城市';
+
+const fallbackCards = [
+  {
+    id: 'look-wood-commute',
+    mood: '轻木通勤',
+    title: '米白针织配浅卡其长裤',
+    note: '轻松、干净，适合上班或简单见面。',
+    tags: ['针织', '卡其', '通勤'],
+    palette: ['#d9c3a5', '#f5ecde']
+  },
+  {
+    id: 'look-ink-weekend',
+    mood: '周末散步',
+    title: '灰蓝衬衫配牛仔裤',
+    note: '颜色安静，适合天气舒服的时候随手穿。',
+    tags: ['灰蓝', '牛仔', '周末'],
+    palette: ['#85909a', '#dfe6eb']
+  },
+  {
+    id: 'look-soft-layer',
+    mood: '柔和叠穿',
+    title: '燕麦色马甲叠白衬衫',
+    note: '适合有温差的天气，层次很自然。',
+    tags: ['燕麦色', '叠穿', '层次'],
+    palette: ['#b59f86', '#ece0d1']
+  },
+  {
+    id: 'look-night-simple',
+    mood: '夜色极简',
+    title: '深色上衣配直筒半裙',
+    note: '更收敛，也更显轮廓，适合晚间场景。',
+    tags: ['深色', '半裙', '极简'],
+    palette: ['#5d5752', '#d6cec4']
+  }
+];
+
+const prompt = ref('');
+const typedHeadline = ref('');
+const headlineVisible = ref(true);
+const homeHeadlines = ref([defaultHeadline]);
+const outfitHistory = ref([]);
+const inspirations = ref([]);
+const savedLooks = ref([]);
+const rotateTimer = ref(null);
+const fadeTimer = ref(null);
+const recommendationSectionRef = ref(null);
+const currentWeather = ref(weatherApi.getCachedWeather());
+const isWeatherLoading = ref(false);
+const isRecommendationVisible = ref(localStorage.getItem(homeFlowPreferenceKey) !== 'false');
+const homeHeadlineStayMs = ref(defaultHeadlineStayMs);
+const homeHeadlineFadeMs = ref(defaultHeadlineFadeMs);
+
+const isAuthenticated = computed(() => authApi.isAuthenticated());
+const visibleCards = computed(() => inspirations.value.slice(0, 6));
+const savedLookIds = computed(() => new Set(savedLooks.value.map((item) => item.id)));
+const headlineTransitionStyle = computed(() => ({
+  transitionDuration: `${homeHeadlineFadeMs.value}ms`
+}));
+
+const weatherDisplay = computed(() => {
+  const weather = currentWeather.value || {};
+  const numericTemperature = Number(weather.temperature);
+  const temperatureText = Number.isFinite(numericTemperature) ? `${Math.round(numericTemperature)}°C` : '--';
+
+  return {
+    location: weather.location || fallbackLocation,
+    weatherCondition: weather.weatherCondition || '天气',
+    temperatureText
+  };
+});
+
+const loadSavedLooks = () => {
+  try {
+    savedLooks.value = JSON.parse(localStorage.getItem('savedLooks') || '[]');
+  } catch {
+    savedLooks.value = [];
+  }
+};
+
+const persistSavedLooks = (next) => {
+  savedLooks.value = next;
+  localStorage.setItem('savedLooks', JSON.stringify(next));
+};
+
+const isCardSaved = (cardId) => savedLookIds.value.has(cardId);
+
+const parseHeadlineStayMs = (settings = {}) => {
+  const numericValue = Number(settings.homePromptStayMs);
+  if (!Number.isFinite(numericValue)) {
+    return defaultHeadlineStayMs;
   }
 
-  const nickname = currentProfile.value?.nickname || currentProfile.value?.username || '同学';
-  return `${nickname}，今天想怎么穿？`;
-});
+  return Math.min(Math.max(Math.round(numericValue), 1200), 8000);
+};
 
-const preferredStyleCount = computed(() => styleProfile.value?.preferredStylesList?.length || 0);
+const parseHeadlineFadeMs = (settings = {}) => {
+  const numericValue = Number(settings.homePromptFadeMs);
+  if (!Number.isFinite(numericValue)) {
+    return defaultHeadlineFadeMs;
+  }
 
-const loadDashboard = async () => {
-  isAuthenticated.value = authApi.isAuthenticated();
-  if (!isAuthenticated.value) {
+  return Math.min(Math.max(Math.round(numericValue), 400), 2200);
+};
+
+const parseHomeHeadlines = (settings = {}) => {
+  if (typeof settings.homePrompts === 'string' && settings.homePrompts.trim()) {
+    try {
+      const parsed = JSON.parse(settings.homePrompts);
+      if (Array.isArray(parsed)) {
+        const prompts = parsed.map((item) => String(item || '').trim()).filter(Boolean);
+        if (prompts.length) {
+          return prompts;
+        }
+      }
+    } catch (_error) {
+      // Fall back to the legacy single-string format below.
+    }
+  }
+
+  const prompts = String(settings.homePrompt || defaultHeadline)
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return prompts.length ? prompts : [defaultHeadline];
+};
+
+const clearHeadlineTimers = () => {
+  if (rotateTimer.value) {
+    window.clearTimeout(rotateTimer.value);
+    rotateTimer.value = null;
+  }
+  if (fadeTimer.value) {
+    window.clearTimeout(fadeTimer.value);
+    fadeTimer.value = null;
+  }
+};
+
+const startHeadlineRotation = (sources) => {
+  clearHeadlineTimers();
+
+  const promptList = (Array.isArray(sources) ? sources : [sources]).map((item) => String(item || '').trim()).filter(Boolean);
+  const cycleSources = promptList.length ? promptList : [defaultHeadline];
+  let activeIndex = 0;
+
+  const playCurrent = () => {
+    const source = cycleSources[activeIndex] || defaultHeadline;
+    typedHeadline.value = source;
+    headlineVisible.value = false;
+
+    fadeTimer.value = window.setTimeout(() => {
+      headlineVisible.value = true;
+    }, headlineRevealDelayMs);
+
+    if (cycleSources.length > 1) {
+      rotateTimer.value = window.setTimeout(() => {
+        headlineVisible.value = false;
+        fadeTimer.value = window.setTimeout(() => {
+          activeIndex = (activeIndex + 1) % cycleSources.length;
+          playCurrent();
+        }, homeHeadlineFadeMs.value);
+      }, homeHeadlineStayMs.value + headlineRevealDelayMs);
+    }
+  };
+
+  playCurrent();
+};
+
+const buildHistoryCards = () =>
+  outfitHistory.value.slice(0, 2).map((item, index) => ({
+    id: `history-${item.id}`,
+    mood: item.occasion || '穿搭记录',
+    title: item.outfitName || '最近生成的搭配',
+    note: item.outfitDescription || item.reasoning || '这是你最近保留的一次搭配结果。',
+    tags: [item.weatherCondition || '天气', item.season || '当季', item.isFavorite ? '已收藏' : '搭配'],
+    palette: index % 2 === 0 ? ['#b6c0cf', '#ece4d8'] : ['#b5a28a', '#f4ede1']
+  }));
+
+const rebuildInspirations = () => {
+  const historyCards = buildHistoryCards();
+  const shuffledFallbackCards = [...fallbackCards].sort(() => Math.random() - 0.5);
+  inspirations.value = [...historyCards, ...shuffledFallbackCards].filter(
+    (item, index, list) => list.findIndex((current) => current.id === item.id) === index
+  );
+};
+
+const saveLocalLooks = (payload) => {
+  const next = [payload, ...savedLooks.value.filter((item) => item.id !== payload.id)].slice(0, 20);
+  persistSavedLooks(next);
+};
+
+const removeSavedLook = (cardId) => {
+  persistSavedLooks(savedLooks.value.filter((item) => item.id !== cardId));
+};
+
+const toggleSaveCard = (card) => {
+  if (isCardSaved(card.id)) {
+    removeSavedLook(card.id);
     return;
   }
 
-  isLoading.value = true;
-  try {
-    const [profileResponse, styleResponse, conversationResponse, historyResponse] = await Promise.all([
-      authApi.getCurrentProfile(),
-      outfitApi.getStyleProfile(),
-      chatApi.getConversations(1, 4),
-      outfitApi.getHistory(1, 4)
-    ]);
-
-    currentProfile.value = profileResponse.data;
-    styleProfile.value = styleResponse.data || {
-      preferredStylesList: [],
-      preferredColorsList: []
-    };
-    conversationList.value = conversationResponse.data?.items || [];
-    outfitHistory.value = historyResponse.data || [];
-  } catch (error) {
-    console.error('Load dashboard failed:', error);
-    alert(error.response?.data?.message || '加载首页数据失败');
-  } finally {
-    isLoading.value = false;
-  }
+  saveLocalLooks(card);
 };
 
-const navigateToLogin = () => router.push('/login');
-const navigateToProfile = () => router.push('/profile');
-const navigateToChat = () => router.push('/chat');
-const navigateToWardrobe = () => router.push('/wardrobe');
-const navigateToAddClothing = () => router.push('/wardrobe/add');
-const navigateToMaterials = () => router.push('/materials');
-const navigateToStyleLearning = () => router.push('/style-learning');
-
-const openConversation = (sessionId) => {
-  if (sessionId) {
-    localStorage.setItem('chatSessionId', sessionId);
+const submitPrompt = () => {
+  if (!prompt.value.trim()) {
+    return;
   }
+
+  localStorage.setItem('pendingChatPrompt', prompt.value.trim());
   router.push('/chat');
 };
 
-const openOutfitDetail = (id) => {
-  if (id) {
-    router.push(`/outfit/history/${id}`);
-  }
-};
-
-const formatTime = (value) => {
-  if (!value) {
-    return '刚刚';
-  }
-
-  return new Date(value).toLocaleString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
+const scrollToRecommendations = async () => {
+  await nextTick();
+  recommendationSectionRef.value?.scrollIntoView({
+    behavior: 'smooth',
+    block: 'start'
   });
 };
 
-onMounted(loadDashboard);
+const toggleRecommendations = async () => {
+  isRecommendationVisible.value = !isRecommendationVisible.value;
+  localStorage.setItem(homeFlowPreferenceKey, isRecommendationVisible.value ? 'true' : 'false');
+
+  if (isRecommendationVisible.value) {
+    await scrollToRecommendations();
+    return;
+  }
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+const cardStyle = (card) => ({
+  background: `linear-gradient(135deg, ${card.palette[0]}, ${card.palette[1] || card.palette[0]})`
+});
+
+const parseVisibleSetting = (value) => {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  if (typeof value === 'string') {
+    return value !== 'false';
+  }
+  return localStorage.getItem(homeFlowPreferenceKey) !== 'false';
+};
+
+const loadHomeData = async () => {
+  loadSavedLooks();
+
+  if (!isAuthenticated.value) {
+    rebuildInspirations();
+    startHeadlineRotation(homeHeadlines.value);
+    return;
+  }
+
+  try {
+    const [historyResponse, settingsResponse] = await Promise.all([
+      outfitApi.getHistory(1, 6),
+      authApi.getUserSettings()
+    ]);
+
+    outfitHistory.value = historyResponse.data || [];
+    const settings = settingsResponse.data || {};
+    homeHeadlines.value = parseHomeHeadlines(settings);
+    homeHeadlineStayMs.value = parseHeadlineStayMs(settings);
+    homeHeadlineFadeMs.value = parseHeadlineFadeMs(settings);
+    isRecommendationVisible.value = parseVisibleSetting(settings.homeFlowDefaultVisible);
+    localStorage.setItem(homeFlowPreferenceKey, isRecommendationVisible.value ? 'true' : 'false');
+  } catch (error) {
+    console.error('Load home data failed:', error);
+  } finally {
+    rebuildInspirations();
+    startHeadlineRotation(homeHeadlines.value);
+  }
+};
+
+const fetchWeatherByParams = async (params) => {
+  const response = await weatherApi.getCurrentWeather(params);
+  const weather = response?.data || null;
+  if (weather) {
+    currentWeather.value = weather;
+    weatherApi.setCachedWeather(weather);
+  }
+};
+
+const refreshWeather = async () => {
+  if (weatherApi.hasFreshWeatherCache() && currentWeather.value) {
+    return;
+  }
+
+  isWeatherLoading.value = true;
+  try {
+    const position = await detectBrowserPosition();
+    await fetchWeatherByParams(position);
+  } catch (error) {
+    console.warn('Detect browser position failed:', error);
+    try {
+      const cachedLocation = weatherApi.getCachedWeather()?.location || fallbackLocation;
+      await fetchWeatherByParams({ location: cachedLocation });
+    } catch (fallbackError) {
+      console.warn('Fetch fallback weather failed:', fallbackError);
+    }
+  } finally {
+    isWeatherLoading.value = false;
+  }
+};
+
+onMounted(async () => {
+  if (weatherApi.hasFreshWeatherCache()) {
+    currentWeather.value = weatherApi.getCachedWeather();
+  }
+
+  await Promise.all([loadHomeData(), refreshWeather()]);
+});
+
+onBeforeUnmount(() => {
+  clearHeadlineTimers();
+});
 </script>
 
 <style scoped>
 .home-page {
   min-height: 100vh;
-  padding: 18px 16px 40px;
+  padding: 0 20px 124px;
   background:
-    radial-gradient(circle at top left, rgba(255, 243, 214, 0.88), transparent 30%),
-    radial-gradient(circle at top right, rgba(228, 208, 172, 0.55), transparent 26%),
-    linear-gradient(180deg, #f8f1df 0%, #efe2ca 100%);
+    radial-gradient(circle at top, rgba(255, 252, 246, 0.94), transparent 28%),
+    linear-gradient(180deg, var(--bg-base) 0%, var(--bg-soft) 100%);
 }
 
-.hero-card,
-.action-card,
-.panel,
-.state-card {
-  border-radius: 26px;
-  background: rgba(255, 251, 244, 0.92);
-  border: 1px solid rgba(145, 104, 49, 0.14);
-  box-shadow: 0 18px 44px rgba(109, 78, 38, 0.08);
-}
-
-.hero-card {
-  padding: 18px;
-}
-
-.hero-topbar,
-.topbar-actions,
-.hero-metrics,
-.section-header,
-.history-card-top,
-.history-meta {
-  display: flex;
-  align-items: center;
-}
-
-.hero-topbar,
-.section-header,
-.history-card-top {
-  justify-content: space-between;
-}
-
-.topbar-actions,
-.hero-metrics,
-.action-grid,
-.content-grid,
-.list-block,
-.history-grid,
-.tag-row {
-  gap: 12px;
-}
-
-.eyebrow {
-  margin-bottom: 6px;
-  color: #8f6a37;
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.hero-content {
+.weather-text {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 8;
   display: grid;
-  gap: 18px;
-  margin-top: 18px;
-}
-
-.hero-content h1,
-.action-card h2,
-.panel h2,
-.list-card h3,
-.history-card h3 {
-  color: #5d4523;
-}
-
-.hero-content h1 {
-  font-size: 32px;
-  line-height: 1.2;
-}
-
-.hero-copy,
-.action-card p,
-.list-card p,
-.history-card p,
-.muted-text {
-  color: #7a6140;
-}
-
-.hero-metrics {
-  flex-wrap: wrap;
-}
-
-.metric-pill {
-  min-width: 110px;
-  padding: 12px 14px;
-  border-radius: 18px;
-  background: linear-gradient(180deg, #fffdf8 0%, #f4ead9 100%);
-}
-
-.metric-pill span {
-  display: block;
-  color: #8b6f48;
-  font-size: 12px;
-}
-
-.metric-pill strong {
-  display: block;
-  margin-top: 6px;
-  color: #5d4523;
-  font-size: 24px;
-}
-
-.action-grid,
-.content-grid,
-.profile-summary {
-  display: grid;
-  margin-top: 18px;
-}
-
-.action-card {
-  padding: 18px;
+  gap: 2px;
+  border: none;
+  background: transparent;
+  color: var(--text-faint);
+  text-align: right;
   cursor: pointer;
 }
 
-.action-card.primary {
-  background:
-    linear-gradient(135deg, rgba(107, 75, 31, 0.96), rgba(154, 114, 58, 0.92)),
-    rgba(255, 251, 244, 0.92);
+.weather-text:disabled {
+  cursor: default;
 }
 
-.action-card.primary .eyebrow,
-.action-card.primary h2,
-.action-card.primary p {
-  color: #fff5e8;
+.weather-text span:first-child {
+  font-size: 11px;
+  letter-spacing: 0.08em;
 }
 
-.profile-summary {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+.weather-text span:last-child {
+  font-size: 12px;
+  color: var(--text-soft);
+}
+
+.page-main {
+  width: min(100%, 760px);
+  margin: 0 auto;
+}
+
+.prompt-stage {
+  min-height: 78vh;
+  padding-top: 52vh;
+}
+
+.prompt-copy {
+  display: flex;
+  justify-content: center;
+  text-align: center;
+  transform: translateY(-28px);
+}
+
+.typed-line {
+  min-height: 38px;
+  color: var(--text-soft);
+  font-family: 'Iowan Old Style', 'Noto Serif SC', 'Songti SC', serif;
+  font-size: 29px;
+  letter-spacing: 0.03em;
+  transition: opacity 0.82s ease, transform 0.82s ease, filter 0.82s ease;
+}
+
+.typed-line.visible {
+  opacity: 1;
+  transform: translateY(0);
+  filter: blur(0);
+}
+
+.typed-line.hidden {
+  opacity: 0;
+  transform: translateY(10px);
+  filter: blur(4px);
+}
+
+.prompt-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 10px;
+  width: min(100%, 420px);
+  margin: 34px auto 0;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.prompt-form input {
+  width: 100%;
+  padding: 15px 0 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-main);
+  font-size: 15px;
+  outline: none;
+}
+
+.submit-button {
+  width: 28px;
+  height: 28px;
+  margin-bottom: 8px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.submit-button span {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-top: 1.5px solid var(--accent);
+  border-right: 1.5px solid var(--accent);
+  transform: rotate(45deg);
+}
+
+.flow-toggle {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  margin: 42px 0 0 auto;
+  border: none;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-strong) 94%, transparent);
+  color: var(--text-faint);
+  box-shadow: 0 6px 16px rgba(62, 52, 38, 0.08);
+  cursor: pointer;
+}
+
+.flow-toggle-icon {
+  position: relative;
+  display: block;
+  width: 14px;
+  height: 18px;
+}
+
+.flow-toggle-icon::before,
+.flow-toggle-icon::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  border-right: 1.6px solid currentColor;
+  border-bottom: 1.6px solid currentColor;
+}
+
+.flow-toggle-icon.collapsed::before {
+  top: 0;
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.flow-toggle-icon.collapsed::after {
+  top: 6px;
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.flow-toggle-icon.expanded::before {
+  top: 4px;
+  transform: translateX(-50%) rotate(-135deg);
+}
+
+.flow-toggle-icon.expanded::after {
+  top: 10px;
+  transform: translateX(-50%) rotate(-135deg);
+}
+
+.recommendation-section {
+  padding-top: 36px;
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 16px;
 }
 
-.summary-item {
-  padding: 14px;
-  border-radius: 18px;
-  background: #fffdf8;
+.section-head p {
+  color: var(--text-faint);
+  font-size: 10px;
+  letter-spacing: 0.18em;
 }
 
-.summary-item span {
-  display: block;
-  color: #8b6f48;
-  font-size: 12px;
+.text-link {
+  border: none;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 11px;
+  cursor: pointer;
 }
 
-.summary-item strong {
-  display: block;
-  margin-top: 8px;
-  color: #5d4523;
-  font-size: 16px;
+.recommendation-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
 }
 
-.panel,
-.state-card {
-  padding: 18px;
+.look-card {
+  position: relative;
+  border-radius: 22px;
+  border: 1px solid var(--line-soft);
+  background: color-mix(in srgb, var(--surface-strong) 93%, transparent);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
 }
 
-.state-card,
-.empty-block {
-  text-align: center;
-  color: #6c522f;
+.save-button {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  border: none;
+  background: transparent;
+  color: rgba(255, 250, 242, 0.92);
+  font-size: 18px;
+  cursor: pointer;
 }
 
-.tag-section + .tag-section {
-  margin-top: 16px;
+.save-button.saved {
+  color: #f2d18d;
 }
 
-.tag-section p {
-  margin-bottom: 10px;
-  color: #7c6241;
+.look-image {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  padding: 16px;
+}
+
+.look-image::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.46), transparent 36%),
+    linear-gradient(180deg, transparent 24%, rgba(28, 22, 15, 0.16) 100%);
+}
+
+.look-image span {
+  position: absolute;
+  left: 14px;
+  bottom: 12px;
+  z-index: 1;
+  color: rgba(58, 47, 34, 0.88);
+  font-family: 'Iowan Old Style', 'Noto Serif SC', 'Songti SC', serif;
   font-size: 14px;
+}
+
+.look-copy {
+  padding: 12px 12px 14px;
+}
+
+.look-copy strong {
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.look-copy p {
+  margin-top: 6px;
+  color: var(--text-soft);
+  line-height: 1.6;
+  font-size: 11px;
 }
 
 .tag-row {
   display: flex;
   flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
 }
 
-.tag-chip {
-  border-radius: 999px;
-  padding: 8px 12px;
-  background: #f1debd;
-  color: #6b4b1f;
-  font-size: 12px;
+.tag-row span {
+  color: var(--text-faint);
+  font-size: 10px;
 }
 
-.tag-chip.soft {
-  background: #fff1d8;
-}
-
-.list-card,
-.history-card {
-  padding: 14px;
-  border-radius: 18px;
-  background: #fffdf8;
-  border: 1px solid rgba(145, 104, 49, 0.12);
-}
-
-.list-card {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  cursor: pointer;
-}
-
-.list-card p {
-  margin-top: 8px;
-  line-height: 1.6;
-}
-
-.list-card span,
-.history-meta span {
-  color: #8b6f48;
-  font-size: 12px;
-}
-
-.history-grid {
-  display: grid;
-}
-
-.history-card {
-  cursor: pointer;
-}
-
-.history-card-top {
-  gap: 10px;
-}
-
-.history-card p {
-  margin-top: 8px;
-  line-height: 1.6;
-}
-
-.history-meta {
-  flex-wrap: wrap;
-  margin-top: 12px;
-}
-
-.favorite-badge {
-  flex-shrink: 0;
-  border-radius: 999px;
-  padding: 8px 10px;
-  background: #efe1c8;
-  color: #7c6241;
-  font-size: 12px;
-}
-
-.favorite-badge.active {
-  background: #6b4b1f;
-  color: #fff8ef;
-}
-
-.ghost-button,
-.primary-button {
-  border: none;
-  border-radius: 999px;
-  padding: 10px 16px;
-  cursor: pointer;
-}
-
-.ghost-button {
-  background: #ead7b8;
-  color: #5d4523;
-}
-
-.primary-button {
-  background: #6b4b1f;
-  color: #fff8ef;
-}
-
-@media (max-width: 767px) {
-  .topbar-actions {
-    flex-wrap: wrap;
-    justify-content: flex-end;
-  }
-
-  .profile-summary {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (min-width: 900px) {
+@media (min-width: 768px) {
   .home-page {
-    padding: 28px 28px 48px;
+    padding: 0 28px 40px;
   }
 
-  .action-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .weather-text {
+    top: 24px;
+    right: 30px;
   }
 
-  .content-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .prompt-stage {
+    min-height: 74vh;
+    padding-top: 42vh;
   }
 
-  .panel.wide {
-    grid-column: span 2;
+  .prompt-copy {
+    transform: translateY(-40px);
   }
 
-  .history-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .typed-line {
+    font-size: 37px;
+  }
+
+  .flow-toggle {
+    margin-top: 34px;
+  }
+
+  .recommendation-section {
+    padding-top: 28px;
+  }
+
+  .recommendation-grid {
+    gap: 18px;
   }
 }
 </style>

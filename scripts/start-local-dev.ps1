@@ -119,7 +119,12 @@ if (-not $SkipBackend) {
     $javaCommand = (Get-Command 'java.exe' -ErrorAction Stop).Source
     $backendJar = Join-Path $repoRoot 'backend/ecru-web/target/ecru-web-1.0.0.jar'
     Write-Host 'Preparing backend modules with Maven install (-pl ecru-web -am -DskipTests) ...'
-    & $mavenCommand '-pl' 'ecru-web' '-am' '-DskipTests' 'install'
+    Push-Location (Join-Path $repoRoot 'backend')
+    try {
+        & $mavenCommand '-pl' 'ecru-web' '-am' '-DskipTests' 'install'
+    } finally {
+        Pop-Location
+    }
     Start-ManagedProcess `
         -Name 'backend' `
         -WorkingDirectory (Join-Path $repoRoot 'backend/ecru-web') `
@@ -134,7 +139,7 @@ if (-not $SkipUserApp) {
         -Name 'user-app' `
         -WorkingDirectory (Join-Path $repoRoot 'frontend/user-app') `
         -Executable $npmCommand `
-        -Arguments @('run', 'dev', '--', '--host', '127.0.0.1', '--port', '5173') `
+        -Arguments @('run', 'dev', '--', '--host', '0.0.0.0', '--port', '5173') `
         -Port 5173
 }
 

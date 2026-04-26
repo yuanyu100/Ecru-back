@@ -52,6 +52,12 @@ const routes = [
         meta: { requiresAdmin: true, title: 'AI 会话管理' }
       },
       {
+        path: 'ai-prompts',
+        name: 'admin-ai-prompts',
+        component: () => import('../views/Admin/AiPromptView.vue'),
+        meta: { requiresAdmin: true, title: 'AI Prompt' }
+      },
+      {
         path: 'knowledge',
         name: 'admin-knowledge',
         component: () => import('../views/Admin/KnowledgeView.vue'),

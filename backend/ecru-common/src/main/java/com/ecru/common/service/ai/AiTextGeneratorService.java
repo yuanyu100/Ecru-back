@@ -47,6 +47,9 @@ public class AiTextGeneratorService {
     @Autowired
     private AiApiMonitorService monitorService;
 
+    @Autowired
+    private AiPromptSettingsService promptSettingsService;
+
     private OkHttpClient okHttpClient;
 
     @PostConstruct
@@ -185,6 +188,11 @@ public class AiTextGeneratorService {
      * 分析用户查询意图。
      */
     public Map<String, Object> analyzeQueryIntent(String query, Long userId) {
+        String normalizedQuery = normalizeQuery(query);
+        if (isSimpleGreetingQuery(normalizedQuery) || isIdentityQuestionQuery(normalizedQuery)) {
+            return buildFallbackIntentResult(normalizedQuery);
+        }
+
         AiApiCallContext monitorContext = AiApiCallContext.create(
                 AiApiMonitorWrapper.Scene.INTENT_ANALYZE, modelName, userId);
 
@@ -192,7 +200,7 @@ public class AiTextGeneratorService {
             String endpoint = "/chat/completions";
             String fullUrl = baseUrl + endpoint;
 
-            JSONObject requestBody = buildIntentAnalysisRequestBody(query);
+            JSONObject requestBody = buildIntentAnalysisRequestBody(normalizedQuery);
             monitorContext.setPromptLength(requestBody.toJSONString().length());
 
             RequestBody body = RequestBody.create(
@@ -230,7 +238,7 @@ public class AiTextGeneratorService {
                 monitorContext.markFailed(AiApiMonitorWrapper.ErrorType.BUSINESS_ERROR,
                         e.getMessage(), null);
             }
-            return buildDefaultIntentResult(query);
+            return buildFallbackIntentResult(normalizedQuery);
         } finally {
             monitorService.recordApiCall(monitorContext);
         }
@@ -256,6 +264,7 @@ public class AiTextGeneratorService {
         JSONObject systemMessage = new JSONObject();
         systemMessage.put("role", "system");
         systemMessage.put("content", "你是一位专业的时尚搭配顾问，根据用户提供的信息和衣橱中的衣物，生成个性化的搭配建议。请考虑天气、场合、用户风格偏好等因素，提供详细的搭配方案和专业分析。");
+        systemMessage.put("content", promptSettingsService.getChatSystemPrompt());
         messages.add(systemMessage);
 
         if (chatHistory != null && !chatHistory.isEmpty()) {
@@ -417,5 +426,108 @@ public class AiTextGeneratorService {
         defaultResult.put("clothingType", null);
         defaultResult.put("negativePreferences", new ArrayList<String>());
         return defaultResult;
+    }
+    private Map<String, Object> buildFallbackIntentResult(String query) {
+        String normalizedQuery = normalizeQuery(query);
+        Map<String, Object> defaultResult = new HashMap<>();
+        defaultResult.put("intent", resolveFallbackIntent(normalizedQuery));
+        defaultResult.put("keywords", splitKeywords(normalizedQuery));
+        defaultResult.put("isNegative", containsNegativeSignal(normalizedQuery));
+        defaultResult.put("occasion", null);
+        defaultResult.put("season", null);
+        defaultResult.put("style", null);
+        defaultResult.put("weather", null);
+        defaultResult.put("clothingType", null);
+        defaultResult.put("negativePreferences", new ArrayList<String>());
+        return defaultResult;
+    }
+
+    private String normalizeQuery(String query) {
+        return query == null ? "" : query.trim();
+    }
+
+    private boolean isSimpleGreetingQuery(String query) {
+        String normalized = normalizeQuery(query).toLowerCase();
+        if (normalized.isEmpty()) {
+            return false;
+        }
+
+        normalized = normalized.replaceAll("[\\p{Punct}\\s\\u3000-\\u303F\\uFF00-\\uFF65]+", "");
+
+        Set<String> greetingMessages = new HashSet<>(Arrays.asList(
+                "\u4f60\u597d",
+                "\u60a8\u597d",
+                "\u54c8\u55bd",
+                "\u55e8",
+                "\u65e9\u4e0a\u597d",
+                "\u4e0a\u5348\u597d",
+                "\u4e2d\u5348\u597d",
+                "\u4e0b\u5348\u597d",
+                "\u665a\u4e0a\u597d",
+                "\u5728\u5417",
+                "\u5728\u561b",
+                "\u6709\u4eba\u5417",
+                "hello",
+                "hi",
+                "hey",
+                "goodmorning",
+                "goodafternoon",
+                "goodevening"
+        ));
+
+        return greetingMessages.contains(normalized);
+    }
+
+    private boolean isIdentityQuestionQuery(String query) {
+        String normalized = normalizeQuery(query).toLowerCase();
+        if (normalized.isEmpty()) {
+            return false;
+        }
+
+        normalized = normalized.replaceAll("[\\p{Punct}\\s\\u3000-\\u303F\\uFF00-\\uFF65]+", "");
+
+        Set<String> identityQuestions = new HashSet<>(Arrays.asList(
+                "\u4f60\u662f\u8c01",
+                "\u4f60\u53eb\u4ec0\u4e48",
+                "\u4f60\u662f\u505a\u4ec0\u4e48\u7684",
+                "\u4f60\u662f\u4ec0\u4e48",
+                "\u4ecb\u7ecd\u4e00\u4e0b\u4f60\u81ea\u5df1",
+                "whoareyou",
+                "whatareyou",
+                "introduceyourself"
+        ));
+
+        return identityQuestions.contains(normalized);
+    }
+
+    private String resolveFallbackIntent(String query) {
+        if (isSimpleGreetingQuery(query)) {
+            return "greeting";
+        }
+        if (isIdentityQuestionQuery(query)) {
+            return "identity";
+        }
+        return "\u642d\u914d\u63a8\u8350";
+    }
+
+    private List<String> splitKeywords(String query) {
+        String normalized = normalizeQuery(query);
+        if (normalized.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        String[] parts = normalized.split("\\s+");
+        if (parts.length <= 1) {
+            return new ArrayList<>(Collections.singletonList(normalized));
+        }
+
+        return new ArrayList<>(Arrays.asList(parts));
+    }
+
+    private boolean containsNegativeSignal(String query) {
+        String normalized = normalizeQuery(query);
+        return normalized.contains("\u4e0d\u559c\u6b22")
+                || normalized.contains("\u4e0d\u8981")
+                || normalized.contains("\u8ba8\u538c");
     }
 }

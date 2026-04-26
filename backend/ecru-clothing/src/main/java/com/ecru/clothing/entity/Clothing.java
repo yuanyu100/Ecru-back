@@ -75,6 +75,14 @@ public class Clothing implements Serializable {
 
     private String brand;
 
+    private String sourcePlatform;
+
+    private String sourceOrderId;
+
+    private String sourceShopName;
+
+    private String sourceSkuText;
+
     private Boolean isDeleted;
 
     private String sourceType;

@@ -1,9 +1,11 @@
 <template>
   <div class="style-learning-page">
     <header class="page-header">
-      <button class="ghost-button" type="button" @click="goHome">返回首页</button>
+      <button class="icon-back" type="button" aria-label="返回" @click="goHome">
+        <span></span>
+      </button>
       <div>
-        <p class="eyebrow">Style Learning</p>
+        <p class="eyebrow">偏好学习</p>
         <h1>风格偏好学习</h1>
         <p class="page-copy">通过快速标记喜欢、不喜欢或跳过，让推荐系统更懂你的审美取向。</p>
       </div>
@@ -13,7 +15,7 @@
       <article class="summary-card progress-card">
         <div class="progress-head">
           <div>
-            <p class="eyebrow">Learning Progress</p>
+            <p class="eyebrow">学习进度</p>
             <h2>学习进度</h2>
           </div>
           <strong>{{ progress }}%</strong>
@@ -29,7 +31,7 @@
       <article class="summary-card">
         <div class="section-head">
           <div>
-            <p class="eyebrow">Preference Map</p>
+            <p class="eyebrow">画像</p>
             <h2>当前偏好画像</h2>
           </div>
           <button class="ghost-button small" type="button" :disabled="isResetting" @click="resetProfile">
@@ -58,7 +60,7 @@
     <section class="filter-card">
       <div class="section-head">
         <div>
-          <p class="eyebrow">Category</p>
+          <p class="eyebrow">方向</p>
           <h2>筛选风格方向</h2>
         </div>
         <button class="ghost-button small" type="button" :disabled="isLoadingImages" @click="refreshQueue">
@@ -90,7 +92,7 @@
         <div class="image-panel">
           <div class="image-head">
             <div>
-              <p class="eyebrow">Current Card</p>
+              <p class="eyebrow">当前卡片</p>
               <h2>{{ currentImage.title }}</h2>
             </div>
             <span class="category-badge">{{ currentImage.styleCategory || selectedCategory }}</span>
@@ -353,6 +355,26 @@ onMounted(async () => {
 .page-header {
   gap: 14px;
   margin-bottom: 18px;
+}
+
+.icon-back {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(145, 104, 49, 0.14);
+  border-radius: 50%;
+  background: rgba(255, 251, 244, 0.88);
+  cursor: pointer;
+}
+
+.icon-back span {
+  width: 10px;
+  height: 10px;
+  border-left: 1.5px solid #5d4523;
+  border-bottom: 1.5px solid #5d4523;
+  transform: rotate(45deg);
+  margin-left: 4px;
 }
 
 .page-copy,

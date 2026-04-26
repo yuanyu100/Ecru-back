@@ -10,7 +10,12 @@
         :key="index"
         :class="['message', message.type]"
       >
-        <div class="message-content">
+        <div
+          v-if="message.type === 'ai'"
+          class="message-content rich-content"
+          v-html="formatAssistantMessage(message.content)"
+        ></div>
+        <div v-else class="message-content">
           {{ message.content }}
         </div>
         <div class="message-time">{{ message.timestamp }}</div>
@@ -42,6 +47,7 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue';
 import { chatApi } from '../../api/chat';
+import { formatMessageHtml } from '../../utils/messageFormat';
 
 // 从 localStorage 加载历史聊天记录
 const loadChatHistory = () => {
@@ -67,6 +73,7 @@ const messages = ref(loadChatHistory());
 const inputMessage = ref('');
 const isLoading = ref(false);
 const messagesContainer = ref(null);
+const formatAssistantMessage = (content) => formatMessageHtml(content);
 
 const sendMessage = async () => {
   if (!inputMessage.value.trim() || isLoading.value) return;
@@ -240,6 +247,49 @@ onMounted(() => {
   opacity: 0.7;
   margin-top: 4px;
   text-align: right;
+}
+
+.message-content {
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.75;
+}
+
+.rich-content {
+  white-space: normal;
+}
+
+.rich-content :deep(p) {
+  margin: 0;
+}
+
+.rich-content :deep(p + p),
+.rich-content :deep(p + ul),
+.rich-content :deep(p + ol),
+.rich-content :deep(ul + p),
+.rich-content :deep(ol + p),
+.rich-content :deep(ul + ul),
+.rich-content :deep(ol + ol),
+.rich-content :deep(ul + ol),
+.rich-content :deep(ol + ul) {
+  margin-top: 8px;
+}
+
+.rich-content :deep(ul),
+.rich-content :deep(ol) {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.rich-content :deep(li + li) {
+  margin-top: 4px;
+}
+
+.rich-content :deep(code) {
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: rgba(139, 115, 85, 0.12);
+  font-size: 0.95em;
 }
 
 .message.user .message-time {

@@ -35,6 +35,10 @@ public class ClothingDetailVO {
     private String purchaseDate;
     private String purchaseLink;
     private String brand;
+    private String sourcePlatform;
+    private String sourceOrderId;
+    private String sourceShopName;
+    private String sourceSkuText;
     private String sourceType;
     private Double aiConfidence;
     private LocalDateTime createdAt;

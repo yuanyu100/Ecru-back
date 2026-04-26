@@ -23,13 +23,13 @@ const route = useRoute();
 
 const navItems = computed(() => [
   { path: '/', label: '首页', icon: '首' },
-  { path: '/materials', label: '材质', icon: '料' },
+  { path: '/chat', label: '对话', icon: '聊' },
   { path: '/wardrobe', label: '衣橱', icon: '柜' },
   { path: '/profile', label: '我的', icon: '我' }
 ]);
 
 const navigateTo = (path) => {
-  if ((path === '/profile' || path === '/materials' || path === '/wardrobe') && !authApi.isAuthenticated()) {
+  if ((path === '/profile' || path === '/chat' || path === '/wardrobe') && !authApi.isAuthenticated()) {
     router.push('/login');
     return;
   }
@@ -39,11 +39,18 @@ const navigateTo = (path) => {
 
 const isActive = (item) => {
   if (item.path === '/') {
-    return route.path === '/' || route.path === '/chat';
+    return route.path === '/';
+  }
+
+  if (item.path === '/chat') {
+    return route.path === '/chat';
   }
 
   if (item.path === '/profile') {
-    return ['/profile', '/style-learning', '/login', '/register'].includes(route.path);
+    return (
+      route.path.startsWith('/profile') ||
+      ['/style-learning', '/saved-looks', '/materials', '/about'].includes(route.path)
+    );
   }
 
   return route.path.startsWith(item.path);
@@ -56,12 +63,12 @@ const isActive = (item) => {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 64px;
+  height: var(--bottom-nav-height);
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  background: rgba(247, 236, 213, 0.96);
-  border-top: 1px solid #e8d5a2;
-  box-shadow: 0 -2px 16px rgba(87, 62, 25, 0.08);
+  background: color-mix(in srgb, var(--surface-strong) 92%, transparent);
+  border-top: 1px solid var(--line-soft);
+  box-shadow: 0 -8px 24px rgba(53, 41, 24, 0.06);
   backdrop-filter: blur(10px);
   z-index: 1000;
 }
@@ -72,12 +79,12 @@ const isActive = (item) => {
   gap: 2px;
   border: none;
   background: transparent;
-  color: #8b7355;
+  color: var(--text-faint);
   cursor: pointer;
 }
 
 .nav-item.active {
-  color: #6b4b1f;
+  color: var(--accent-strong);
   font-weight: 600;
 }
 
@@ -88,13 +95,13 @@ const isActive = (item) => {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: rgba(107, 75, 31, 0.08);
+  background: var(--accent-soft);
   font-size: 13px;
 }
 
 .nav-item.active .nav-icon {
-  background: #6b4b1f;
-  color: #fff8ef;
+  background: var(--accent-strong);
+  color: var(--surface-strong);
 }
 
 .nav-text {

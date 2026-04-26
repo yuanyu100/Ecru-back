@@ -1,35 +1,131 @@
+:root {
+  --bottom-nav-height: 64px;
+  --app-bottom-offset: 76px;
+  --bg-base: #f4ecdd;
+  --bg-soft: #efe4d1;
+  --surface: rgba(255, 251, 245, 0.9);
+  --surface-strong: #fffaf2;
+  --surface-quiet: rgba(255, 248, 239, 0.72);
+  --text-main: #3e3426;
+  --text-soft: #7d6d58;
+  --text-faint: #a39074;
+  --line-soft: rgba(126, 101, 66, 0.16);
+  --line-strong: rgba(126, 101, 66, 0.26);
+  --accent: #8c7354;
+  --accent-strong: #5b4831;
+  --accent-soft: rgba(140, 115, 84, 0.1);
+  --danger-soft: rgba(181, 90, 69, 0.12);
+  --danger: #a95744;
+  --shadow-soft: 0 18px 40px rgba(88, 68, 39, 0.08);
+  --shadow-card: 0 12px 28px rgba(88, 68, 39, 0.06);
+}
+
+:root[data-theme='cool'] {
+  --bg-base: #ecebe7;
+  --bg-soft: #e3e1db;
+  --surface: rgba(250, 250, 247, 0.9);
+  --surface-strong: #fcfcfa;
+  --surface-quiet: rgba(246, 245, 241, 0.82);
+  --text-main: #323332;
+  --text-soft: #6d706d;
+  --text-faint: #8d918d;
+  --line-soft: rgba(93, 99, 94, 0.14);
+  --line-strong: rgba(93, 99, 94, 0.22);
+  --accent: #747870;
+  --accent-strong: #4b4f4a;
+  --accent-soft: rgba(116, 120, 112, 0.1);
+  --danger-soft: rgba(154, 96, 84, 0.12);
+  --danger: #986052;
+  --shadow-soft: 0 18px 40px rgba(51, 55, 52, 0.08);
+  --shadow-card: 0 12px 28px rgba(51, 55, 52, 0.06);
+}
+
+:root[data-theme='night'] {
+  --bg-base: #141311;
+  --bg-soft: #1d1a17;
+  --surface: rgba(35, 31, 27, 0.94);
+  --surface-strong: #27231f;
+  --surface-quiet: rgba(42, 37, 32, 0.88);
+  --text-main: #ece3d6;
+  --text-soft: #c4b7a4;
+  --text-faint: #978a79;
+  --line-soft: rgba(222, 201, 173, 0.1);
+  --line-strong: rgba(222, 201, 173, 0.18);
+  --accent: #d5c1a0;
+  --accent-strong: #f0dfc3;
+  --accent-soft: rgba(213, 193, 160, 0.1);
+  --danger-soft: rgba(201, 126, 107, 0.18);
+  --danger: #db9a89;
+  --shadow-soft: 0 18px 40px rgba(0, 0, 0, 0.28);
+  --shadow-card: 0 12px 28px rgba(0, 0, 0, 0.22);
+}
+
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  background-color: #f9f3e6;
-  color: #333;
-  margin: 0;
-  padding: 0;
+  font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  background: var(--bg-base);
+  color: var(--text-main);
   width: 100%;
   overflow-x: hidden;
+  transition:
+    background-color 0.35s ease,
+    color 0.35s ease;
+}
+
+body.drawer-open {
+  overflow: hidden;
 }
 
 #app {
-  min-height: 100vh;
-  box-sizing: border-box;
   width: 100%;
   overflow-x: hidden;
 }
 
-h1, h2, h3, h4, h5, h6 {
-  color: #8b7355;
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: var(--text-main);
+  font-family: 'Iowan Old Style', 'Noto Serif SC', 'Songti SC', serif;
   font-weight: 500;
 }
 
-button {
-  font-family: inherit;
+button,
+input,
+select,
+textarea {
+  font: inherit;
 }
 
-input, select, textarea {
-  font-family: inherit;
+button {
+  color: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+@media (max-width: 767px) {
+  :root {
+    --shadow-soft: 0 10px 24px rgba(88, 68, 39, 0.06);
+    --shadow-card: 0 8px 18px rgba(88, 68, 39, 0.05);
+  }
+
+  body {
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
 }

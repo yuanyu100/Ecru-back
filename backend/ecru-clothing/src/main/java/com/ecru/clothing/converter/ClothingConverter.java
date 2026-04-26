@@ -54,6 +54,10 @@ public class ClothingConverter {
         vo.setPurchaseDate(clothing.getPurchaseDate() != null ? clothing.getPurchaseDate().toString() : null);
         vo.setPurchaseLink(clothing.getPurchaseLink());
         vo.setPurchasePrice(clothing.getPurchasePrice() != null ? clothing.getPurchasePrice().doubleValue() : null);
+        vo.setSourcePlatform(clothing.getSourcePlatform());
+        vo.setSourceOrderId(clothing.getSourceOrderId());
+        vo.setSourceShopName(clothing.getSourceShopName());
+        vo.setSourceSkuText(clothing.getSourceSkuText());
         vo.setUserId(clothing.getUserId());
         vo.setFrequencyLevel(clothing.getFrequencyLevel());
         vo.setWearCount(clothing.getWearCount());
@@ -152,6 +156,10 @@ public class ClothingConverter {
             }
         }
         clothing.setPurchaseLink(request.getPurchaseLink());
+        clothing.setSourcePlatform(request.getSourcePlatform());
+        clothing.setSourceOrderId(request.getSourceOrderId());
+        clothing.setSourceShopName(request.getSourceShopName());
+        clothing.setSourceSkuText(request.getSourceSkuText());
         if (request.getPurchasePrice() != null) {
             clothing.setPurchasePrice(java.math.BigDecimal.valueOf(request.getPurchasePrice()));
         }
@@ -221,6 +229,18 @@ public class ClothingConverter {
         }
         if (request.getPurchaseLink() != null) {
             clothing.setPurchaseLink(request.getPurchaseLink());
+        }
+        if (request.getSourcePlatform() != null) {
+            clothing.setSourcePlatform(request.getSourcePlatform());
+        }
+        if (request.getSourceOrderId() != null) {
+            clothing.setSourceOrderId(request.getSourceOrderId());
+        }
+        if (request.getSourceShopName() != null) {
+            clothing.setSourceShopName(request.getSourceShopName());
+        }
+        if (request.getSourceSkuText() != null) {
+            clothing.setSourceSkuText(request.getSourceSkuText());
         }
         if (request.getPurchasePrice() != null) {
             clothing.setPurchasePrice(java.math.BigDecimal.valueOf(request.getPurchasePrice()));

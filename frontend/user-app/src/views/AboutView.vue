@@ -1,41 +1,41 @@
 <template>
-  <div class="about">
-    <header class="about-header">
-      <h1>关于系统</h1>
-    </header>
-    
-    <main class="about-main">
-      <div class="about-content">
-        <section class="about-section">
-          <h2>系统介绍</h2>
-          <p>本系统是一个基于AI技术的智能助手系统，旨在为用户提供便捷、高效的服务。系统集成了先进的自然语言处理技术，能够理解用户的需求并提供准确的响应。</p>
-        </section>
-        
-        <section class="about-section">
-          <h2>功能特点</h2>
-          <ul class="feature-list">
-            <li>智能聊天：与AI助手进行实时对话</li>
-            <li>知识库：访问系统的知识资源</li>
-            <li>系统设置：个性化配置</li>
-            <li>响应式设计：适配不同设备</li>
-          </ul>
-        </section>
-        
-        <section class="about-section">
-          <h2>技术架构</h2>
-          <p>前端使用Vue 3 + Vite构建，后端基于Java Spring Boot框架，集成了先进的AI模型。</p>
-        </section>
-        
-        <section class="about-section">
-          <h2>联系我们</h2>
-          <p>如果您有任何问题或建议，欢迎联系我们。</p>
-        </section>
+  <div class="about-page">
+    <header class="page-header">
+      <button class="icon-back" type="button" aria-label="返回" @click="goBack">
+        <span></span>
+      </button>
+      <div>
+        <p class="eyebrow">关于</p>
+        <h1>关于 Ecru</h1>
       </div>
-    </main>
-    
-    <footer class="about-footer">
-      <button class="back-btn" @click="goBack">返回首页</button>
-    </footer>
+    </header>
+
+    <section class="hero-card">
+      <p class="hero-caption">原木、留白、轻一点的穿搭助手。</p>
+      <h2>Ecru 想把衣橱、灵感、问答和面料知识，收进同一个干净界面里。</h2>
+    </section>
+
+    <section class="content-card">
+      <article class="about-block">
+        <h3>我们在做什么</h3>
+        <p>帮助用户建立个人衣橱，保存喜欢的灵感，结合 AI 对话、知识库与识别能力，给出更贴近日常的穿搭建议。</p>
+      </article>
+
+      <article class="about-block">
+        <h3>当前支持</h3>
+        <ul>
+          <li>上传个人衣物，形成可检索的专属衣橱。</li>
+          <li>通过首页灵感流收藏喜欢的搭配方向。</li>
+          <li>在对话中获取穿搭建议、单品推荐与面料问答。</li>
+          <li>查看面料百科和洗护标签相关知识。</li>
+        </ul>
+      </article>
+
+      <article class="about-block">
+        <h3>产品方向</h3>
+        <p>我们更在意安静、自然、不打扰的使用感，而不是把页面做成工具台。信息够用，动作够少，风格尽量克制。</p>
+      </article>
+    </section>
   </div>
 </template>
 
@@ -45,121 +45,103 @@ import { useRouter } from 'vue-router';
 const router = useRouter();
 
 const goBack = () => {
-  router.push('/');
+  if (window.history.length > 1) {
+    router.back();
+    return;
+  }
+
+  router.push('/profile');
 };
 </script>
 
 <style scoped>
-.about {
+.about-page {
   min-height: 100vh;
+  padding: 20px 16px 40px;
+  background:
+    radial-gradient(circle at top, rgba(255, 252, 246, 0.9), transparent 28%),
+    linear-gradient(180deg, var(--bg-base) 0%, var(--bg-soft) 100%);
+}
+
+.page-header {
   display: flex;
-  flex-direction: column;
-  background-color: #f0f2f5;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
 }
 
-.about-header {
-  background: linear-gradient(135deg, #4a90e2, #357abd);
-  color: white;
-  text-align: center;
-  padding: 40px 20px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-}
-
-.about-header h1 {
-  font-size: 28px;
-  margin: 0;
-  font-weight: 600;
-}
-
-.about-main {
-  flex: 1;
-  padding: 40px 20px;
-  max-width: 800px;
-  margin: 0 auto;
-  width: 100%;
-}
-
-.about-content {
-  background: white;
-  border-radius: 12px;
-  padding: 30px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
-}
-
-.about-section {
-  margin-bottom: 30px;
-}
-
-.about-section h2 {
-  color: #333;
-  margin-bottom: 15px;
-  font-size: 20px;
-  border-bottom: 2px solid #4a90e2;
-  padding-bottom: 8px;
-}
-
-.about-section p {
-  color: #666;
-  line-height: 1.6;
-  margin-bottom: 15px;
-}
-
-.feature-list {
-  list-style: none;
-  padding: 0;
-}
-
-.feature-list li {
-  color: #666;
-  margin-bottom: 10px;
-  padding-left: 25px;
-  position: relative;
-}
-
-.feature-list li:before {
-  content: '✓';
-  position: absolute;
-  left: 0;
-  color: #4a90e2;
-  font-weight: bold;
-}
-
-.about-footer {
-  padding: 20px;
-  text-align: center;
-  margin-top: 20px;
-}
-
-.back-btn {
-  background-color: #4a90e2;
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 20px;
-  font-size: 14px;
+.icon-back {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line-soft);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--surface-strong) 90%, transparent);
   cursor: pointer;
-  transition: background-color 0.2s ease;
 }
 
-.back-btn:hover {
-  background-color: #357abd;
+.icon-back span {
+  width: 10px;
+  height: 10px;
+  border-left: 1.5px solid var(--text-main);
+  border-bottom: 1.5px solid var(--text-main);
+  transform: rotate(45deg);
+  margin-left: 4px;
 }
 
-@media (max-width: 768px) {
-  .about-header {
-    padding: 30px 20px;
-  }
-  
-  .about-header h1 {
-    font-size: 24px;
-  }
-  
-  .about-main {
-    padding: 20px;
-  }
-  
-  .about-content {
-    padding: 20px;
+.eyebrow,
+.hero-caption {
+  color: var(--text-faint);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+}
+
+.hero-card,
+.content-card {
+  border-radius: 28px;
+  border: 1px solid var(--line-soft);
+  background: color-mix(in srgb, var(--surface-strong) 92%, transparent);
+  box-shadow: var(--shadow-card);
+}
+
+.hero-card {
+  padding: 20px 18px;
+}
+
+.hero-card h2 {
+  margin-top: 10px;
+  font-size: 26px;
+  line-height: 1.45;
+}
+
+.content-card {
+  margin-top: 16px;
+  padding: 18px;
+}
+
+.about-block + .about-block {
+  margin-top: 22px;
+}
+
+.about-block h3 {
+  font-size: 18px;
+}
+
+.about-block p,
+.about-block li {
+  margin-top: 10px;
+  color: var(--text-soft);
+  line-height: 1.8;
+}
+
+.about-block ul {
+  padding-left: 18px;
+}
+
+@media (min-width: 768px) {
+  .about-page {
+    padding: 28px 24px 40px;
   }
 }
 </style>

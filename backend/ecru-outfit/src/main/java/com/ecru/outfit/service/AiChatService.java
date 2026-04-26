@@ -1,6 +1,7 @@
 package com.ecru.outfit.service;
 
 import com.alibaba.fastjson2.JSON;
+import com.ecru.common.service.ai.AiPromptSettingsService;
 import com.ecru.common.service.ai.AiTextGeneratorService;
 import com.ecru.outfit.dto.request.ChatRequestDTO;
 import com.ecru.outfit.dto.request.CreateConversationRequestDTO;
@@ -48,6 +49,9 @@ public class AiChatService {
     @Autowired
     private AiTextGeneratorService textGeneratorService;
 
+    @Autowired
+    private AiPromptSettingsService promptSettingsService;
+
     @Autowired(required = false)
     private StringRedisTemplate redisTemplate;
 
@@ -63,6 +67,7 @@ public class AiChatService {
     @Transactional
     public ChatResponseDTO chat(Long userId, ChatRequestDTO request) {
         try {
+            String userMessage = normalizeUserMessage(request.getMessage());
             // 1. 获取或创建会话
             AiConversation conversation = getOrCreateConversation(userId, request);
             boolean isNewConversation = conversation.getMessageCount() == 0;
@@ -74,14 +79,58 @@ public class AiChatService {
             List<Map<String, String>> chatHistory = getChatHistoryFromDb(conversation.getId());
 
             // 4. 保存用户消息
-            saveUserMessage(conversation.getId(), userId, request.getMessage(), weatherInfo, request.getOccasion());
+            saveUserMessage(conversation.getId(), userId, userMessage, weatherInfo, request.getOccasion());
+
+            if (isSimpleGreetingMessage(userMessage)) {
+                Map<String, Object> greetingIntent = new HashMap<>();
+                greetingIntent.put("intent", "greeting");
+
+                Map<String, Object> context = buildContext(
+                        weatherInfo,
+                        request.getOccasion(),
+                        Collections.emptyList(),
+                        greetingIntent,
+                        Collections.emptyList(),
+                        false
+                );
+                String aiResponse = buildGreetingResponse();
+                Long aiMessageId = saveAiMessage(conversation.getId(), userId, aiResponse, Collections.emptyList(), context);
+
+                updateConversationMessageCount(conversation.getId());
+                updateConversationTitleIfNeeded(conversation, isNewConversation, userMessage);
+                cacheChatContext(conversation.getSessionId(), chatHistory, userMessage, aiResponse);
+
+                return buildChatResponse(conversation, aiResponse, Collections.emptyList(), weatherInfo, aiMessageId, isNewConversation);
+            }
 
             // 5. 分析用户意图
-            Map<String, Object> intentAnalysis = textGeneratorService.analyzeQueryIntent(request.getMessage());
+            if (isIdentityQuestionMessage(userMessage)) {
+                Map<String, Object> identityIntent = new HashMap<>();
+                identityIntent.put("intent", "identity");
+
+                Map<String, Object> context = buildContext(
+                        weatherInfo,
+                        request.getOccasion(),
+                        Collections.emptyList(),
+                        identityIntent,
+                        Collections.emptyList(),
+                        false
+                );
+                String aiResponse = buildIdentityResponse();
+                Long aiMessageId = saveAiMessage(conversation.getId(), userId, aiResponse, Collections.emptyList(), context);
+
+                updateConversationMessageCount(conversation.getId());
+                updateConversationTitleIfNeeded(conversation, isNewConversation, userMessage);
+                cacheChatContext(conversation.getSessionId(), chatHistory, userMessage, aiResponse);
+
+                return buildChatResponse(conversation, aiResponse, Collections.emptyList(), weatherInfo, aiMessageId, isNewConversation);
+            }
+
+            Map<String, Object> intentAnalysis = textGeneratorService.analyzeQueryIntent(userMessage);
             log.info("查询意图分析结果: {}", intentAnalysis);
 
             // 6. 判断是否需要检索衣柜
-            boolean needClothingSearch = isNeedClothingSearch(intentAnalysis, request.getMessage());
+            boolean needClothingSearch = isNeedClothingSearch(intentAnalysis, userMessage);
             log.info("是否需要检索衣柜: {}", needClothingSearch);
 
             // 7. 提取负面偏好
@@ -90,7 +139,7 @@ public class AiChatService {
             // 8. 检索推荐衣物(仅在需要时)
             List<Map<String, Object>> recommendedClothes = new ArrayList<>();
             if (needClothingSearch) {
-                String query = generateClothingQuery(request.getMessage(), weatherInfo, request.getOccasion(), intentAnalysis);
+                String query = generateClothingQuery(userMessage, weatherInfo, request.getOccasion(), intentAnalysis);
                 recommendedClothes = searchClothes(userId, query, negativePreferences);
             }
 
@@ -98,7 +147,7 @@ public class AiChatService {
             Map<String, Object> context = buildContext(weatherInfo, request.getOccasion(), recommendedClothes, intentAnalysis, negativePreferences, needClothingSearch);
 
             // 10. 生成AI回复
-            String aiResponse = textGeneratorService.generateResponse(request.getMessage(), chatHistory, context);
+            String aiResponse = textGeneratorService.generateResponse(userMessage, chatHistory, context);
 
             // 11. 保存AI回复
             Long aiMessageId = saveAiMessage(conversation.getId(), userId, aiResponse, recommendedClothes, context);
@@ -107,26 +156,13 @@ public class AiChatService {
             updateConversationMessageCount(conversation.getId());
 
             // 13. 生成会话标题(如果是新会话)
-            if (isNewConversation && conversation.getTitle() == null) {
-                String title = generateConversationTitle(request.getMessage());
-                conversation.setTitle(title);
-                conversationMapper.updateById(conversation);
-            }
+            updateConversationTitleIfNeeded(conversation, isNewConversation, userMessage);
 
             // 14. 缓存上下文到Redis
-            cacheChatContext(conversation.getSessionId(), chatHistory, request.getMessage(), aiResponse);
+            cacheChatContext(conversation.getSessionId(), chatHistory, userMessage, aiResponse);
 
             // 14. 构建响应
-            ChatResponseDTO response = new ChatResponseDTO();
-            response.setSessionId(conversation.getSessionId());
-            response.setResponse(aiResponse);
-            response.setRecommendedClothes(recommendedClothes);
-            response.setWeatherInfo(weatherInfo);
-            response.setMessageId(aiMessageId);
-            response.setConversationTitle(conversation.getTitle());
-            response.setIsNewConversation(isNewConversation);
-
-            return response;
+            return buildChatResponse(conversation, aiResponse, recommendedClothes, weatherInfo, aiMessageId, isNewConversation);
 
         } catch (Exception e) {
             log.error("AI对话失败: {}", e.getMessage(), e);
@@ -186,7 +222,7 @@ public class AiChatService {
      * 生成会话ID
      */
     private String generateSessionId(Long userId) {
-        return "chat:" + userId + ":" + System.currentTimeMillis();
+        return "chat:" + userId + ":" + System.currentTimeMillis() + ":" + UUID.randomUUID().toString().replace("-", "");
     }
 
     /**
@@ -254,6 +290,67 @@ public class AiChatService {
         chatMessageMapper.insert(message);
     }
 
+    private String normalizeUserMessage(String message) {
+        return message == null ? "" : message.trim();
+    }
+
+    private boolean isSimpleGreetingMessage(String userMessage) {
+        String normalized = normalizeUserMessage(userMessage).toLowerCase(Locale.ROOT);
+        if (normalized.isEmpty()) {
+            return false;
+        }
+
+        normalized = normalized.replaceAll("[\\p{Punct}\\s\\u3000-\\u303F\\uFF00-\\uFF65]+", "");
+
+        Set<String> greetingMessages = new HashSet<>(Arrays.asList(
+                "\u4f60\u597d",
+                "\u60a8\u597d",
+                "\u54c8\u55bd",
+                "\u55e8",
+                "\u5728\u5417",
+                "\u5728\u561b",
+                "\u6709\u4eba\u5417",
+                "hello",
+                "hi",
+                "hey",
+                "goodmorning",
+                "goodafternoon",
+                "goodevening"
+        ));
+
+        return greetingMessages.contains(normalized);
+    }
+
+    private boolean isIdentityQuestionMessage(String userMessage) {
+        String normalized = normalizeUserMessage(userMessage).toLowerCase(Locale.ROOT);
+        if (normalized.isEmpty()) {
+            return false;
+        }
+
+        normalized = normalized.replaceAll("[\\p{Punct}\\s\\u3000-\\u303F\\uFF00-\\uFF65]+", "");
+
+        Set<String> identityQuestions = new HashSet<>(Arrays.asList(
+                "\u4f60\u662f\u8c01",
+                "\u4f60\u53eb\u4ec0\u4e48",
+                "\u4f60\u662f\u505a\u4ec0\u4e48\u7684",
+                "\u4f60\u662f\u4ec0\u4e48",
+                "\u4ecb\u7ecd\u4e00\u4e0b\u4f60\u81ea\u5df1",
+                "whoareyou",
+                "whatareyou",
+                "introduceyourself"
+        ));
+
+        return identityQuestions.contains(normalized);
+    }
+
+    private String buildGreetingResponse() {
+        return promptSettingsService.getGreetingReply();
+    }
+
+    private String buildIdentityResponse() {
+        return promptSettingsService.getIdentityReply();
+    }
+
     /**
      * 保存AI回复
      */
@@ -294,7 +391,7 @@ public class AiChatService {
         // 不需要检索衣柜的意图类型
         Set<String> noSearchIntents = new HashSet<>(Arrays.asList(
             "打招呼", "问候", "寒暄", "闲聊", "感谢", "告别", "再见",
-            "greeting", "chat", "thanks", "goodbye", "farewell",
+            "greeting", "identity", "chat", "thanks", "goodbye", "farewell",
             "系统设置", "帮助", "说明", "介绍"
         ));
 
@@ -509,6 +606,31 @@ public class AiChatService {
     /**
      * 更新会话消息计数
      */
+    private void updateConversationTitleIfNeeded(AiConversation conversation, boolean isNewConversation, String firstMessage) {
+        if (isNewConversation && conversation.getTitle() == null) {
+            String title = generateConversationTitle(firstMessage);
+            conversation.setTitle(title);
+            conversationMapper.updateById(conversation);
+        }
+    }
+
+    private ChatResponseDTO buildChatResponse(AiConversation conversation,
+                                              String aiResponse,
+                                              List<Map<String, Object>> recommendedClothes,
+                                              String weatherInfo,
+                                              Long aiMessageId,
+                                              boolean isNewConversation) {
+        ChatResponseDTO response = new ChatResponseDTO();
+        response.setSessionId(conversation.getSessionId());
+        response.setResponse(aiResponse);
+        response.setRecommendedClothes(recommendedClothes);
+        response.setWeatherInfo(weatherInfo);
+        response.setMessageId(aiMessageId);
+        response.setConversationTitle(conversation.getTitle());
+        response.setIsNewConversation(isNewConversation);
+        return response;
+    }
+
     private void updateConversationMessageCount(Long conversationId) {
         Integer count = chatMessageMapper.countByConversationId(conversationId);
         conversationMapper.updateMessageCount(conversationId, count);

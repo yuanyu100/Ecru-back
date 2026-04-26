@@ -110,6 +110,10 @@ CREATE TABLE IF NOT EXISTS clothings (
     purchase_date DATE COMMENT '购买日期',
     purchase_link VARCHAR(500) COMMENT '购买链接',
     brand VARCHAR(100) COMMENT '品牌',
+    source_platform VARCHAR(30) COMMENT '来源平台，如 pinduoduo',
+    source_order_id VARCHAR(64) COMMENT '来源订单号',
+    source_shop_name VARCHAR(255) COMMENT '来源店铺名',
+    source_sku_text VARCHAR(255) COMMENT '来源规格文案',
     
     -- 状态与元数据
     is_deleted BOOLEAN DEFAULT FALSE COMMENT '是否删除（软删除）',
