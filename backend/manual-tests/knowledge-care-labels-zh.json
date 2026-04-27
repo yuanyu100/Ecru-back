@@ -1,0 +1,74 @@
+[
+  {
+    "symbolCode": "WASH_30",
+    "symbolName": "30度以下常规洗涤",
+    "category": "水洗",
+    "instruction": "建议使用 30 摄氏度及以下水温进行常规洗涤。",
+    "explanation": "较低水温可以减少缩水、褪色和面料损伤风险，适合多数日常服装。",
+    "doText": "使用中性洗涤剂，优先轻柔程序。",
+    "dontText": "不要默认用热水长时间高转速清洗。",
+    "keywords": "30度,水洗,常规洗涤,低温",
+    "source": "manual-tests",
+    "active": true
+  },
+  {
+    "symbolCode": "HAND_WASH",
+    "symbolName": "仅可手洗",
+    "category": "水洗",
+    "instruction": "请用冷水或微温水轻柔手洗。",
+    "explanation": "通常用于较娇贵、容易变形或带有特殊结构的衣物，机洗风险较高。",
+    "doText": "短时浸泡，轻压去水，平整晾晒。",
+    "dontText": "不要大力揉搓、拧干或直接机洗。",
+    "keywords": "手洗,轻柔,娇贵面料,变形风险",
+    "source": "manual-tests",
+    "active": true
+  },
+  {
+    "symbolCode": "DO_NOT_BLEACH",
+    "symbolName": "不可漂白",
+    "category": "漂白",
+    "instruction": "请勿使用含氯或含氧漂白剂。",
+    "explanation": "漂白剂可能破坏染料稳定性，削弱纤维强度，还可能留下不均匀色斑。",
+    "doText": "先用中性洗涤剂做局部去渍处理。",
+    "dontText": "不要把漂白产品直接接触面料表面。",
+    "keywords": "不可漂白,去渍,颜色保护,洗护",
+    "source": "manual-tests",
+    "active": true
+  },
+  {
+    "symbolCode": "LOW_IRON",
+    "symbolName": "低温熨烫",
+    "category": "熨烫",
+    "instruction": "请使用低温熨烫，必要时隔布处理。",
+    "explanation": "适用于混纺、真丝感面料、印花面料或耐热性较弱的衣物。",
+    "doText": "先在不显眼处测试温度，再从反面轻压熨烫。",
+    "dontText": "不要长时间高温直接压在正面面料上。",
+    "keywords": "低温熨烫,隔布,反面熨烫,热敏面料",
+    "source": "manual-tests",
+    "active": true
+  },
+  {
+    "symbolCode": "NO_TUMBLE_DRY",
+    "symbolName": "不可滚筒烘干",
+    "category": "晾干",
+    "instruction": "请勿使用滚筒烘干，建议自然晾干。",
+    "explanation": "高温烘干可能导致针织衫缩水、弹性纤维老化，或让表面手感变粗糙。",
+    "doText": "根据衣物重量选择平铺或悬挂晾干。",
+    "dontText": "不要用高温机器烘干代替自然风干。",
+    "keywords": "不可烘干,自然晾干,针织,缩水",
+    "source": "manual-tests",
+    "active": true
+  },
+  {
+    "symbolCode": "DRY_CLEAN",
+    "symbolName": "建议专业干洗",
+    "category": "专业清洁",
+    "instruction": "日常护理建议送专业门店干洗。",
+    "explanation": "常用于羊毛大衣、西装、带内衬或结构复杂的服装，家庭水洗容易破坏版型。",
+    "doText": "选择可靠干洗门店，并说明面料和污渍情况。",
+    "dontText": "不要在不了解面料风险时自行水洗。",
+    "keywords": "干洗,西装,大衣,版型保护",
+    "source": "manual-tests",
+    "active": true
+  }
+]

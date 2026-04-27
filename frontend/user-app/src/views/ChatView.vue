@@ -8,7 +8,13 @@
           <p class="history-caption">会话</p>
           <h2>最近对话</h2>
         </div>
-        <button class="text-button" type="button" @click="startNewConversation">新建</button>
+        <button class="new-chat-button" type="button" aria-label="新建会话" @click="startNewConversation">
+          <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M3 4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H7l-4 3V4z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+            <line x1="10" y1="7" x2="10" y2="11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+            <line x1="8" y1="9" x2="12" y2="9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+        </button>
       </div>
 
       <div v-if="isConversationLoading" class="history-state">正在读取会话...</div>
@@ -39,7 +45,13 @@
         <p>对话</p>
         <h1>{{ currentConversationLabel }}</h1>
       </div>
-      <button class="text-button light" type="button" @click="startNewConversation">新建</button>
+      <button class="new-chat-button" type="button" aria-label="新建会话" @click="startNewConversation">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M3 4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H7l-4 3V4z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+          <line x1="10" y1="7" x2="10" y2="11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          <line x1="8" y1="9" x2="12" y2="9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+      </button>
     </header>
 
     <section
@@ -178,6 +190,21 @@ const quickPrompts = [
   '这个天气适合买针织还是衬衫？'
 ];
 
+const materialKnowledgeCatalog = [
+  { material: '羊毛', aliases: ['羊毛', 'wool', '毛呢', '羊绒'] },
+  { material: '纯棉', aliases: ['纯棉', '棉', '全棉', 'cotton'] },
+  { material: '亚麻', aliases: ['亚麻', 'linen', '麻料'] },
+  { material: '牛仔布', aliases: ['牛仔布', '牛仔', 'denim'] },
+  { material: '聚酯纤维', aliases: ['聚酯纤维', '聚酯', '涤纶', 'polyester'] },
+  { material: '真丝', aliases: ['真丝', '桑蚕丝', '丝绸', 'silk'] },
+  { material: '粘胶', aliases: ['粘胶', '粘纤', 'viscose', 'rayon'] }
+];
+
+const materialKnowledgeKeywords = [
+  '养护', '保养', '护理', '清洗', '怎么洗', '能洗吗', '洗护', '收纳', '熨烫',
+  '面料', '材质', '特点', '优点', '缺点', '适合什么季节', '适合什么场景'
+];
+
 const fallbackImage =
   'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="320" height="420"><rect width="100%" height="100%" fill="%23e6dccd"/><text x="50%" y="50%" text-anchor="middle" fill="%238b7a63" font-size="22">LOOK</text></svg>';
 
@@ -289,6 +316,42 @@ const normalizeServerMessage = (content, result = {}) => ({
   createdAt: new Date().toISOString()
 });
 
+const normalizeKnowledgeMessage = (payload = {}) => {
+  const matchedFabricTags = Array.isArray(payload.matchedFabrics)
+    ? payload.matchedFabrics.map((item) => item.name).filter(Boolean)
+    : [];
+  const matchedCareTags = Array.isArray(payload.matchedCareLabels)
+    ? payload.matchedCareLabels.map((item) => item.symbolName || item.instruction).filter(Boolean)
+    : [];
+
+  return {
+    id: `assistant-${Date.now()}`,
+    role: 'assistant',
+    content: payload.answer || '我暂时没有从知识库里整理出可用答案。',
+    analysisTags: [...new Set([...matchedFabricTags, ...matchedCareTags])].slice(0, 8),
+    recommendations: [],
+    createdAt: new Date().toISOString()
+  };
+};
+
+const detectMaterialKnowledgeQuestion = (text) => {
+  const normalized = String(text || '').trim().toLowerCase();
+  if (!normalized) {
+    return null;
+  }
+
+  const matchedEntry = materialKnowledgeCatalog.find((entry) =>
+    entry.aliases.some((alias) => normalized.includes(alias.toLowerCase()))
+  );
+  if (!matchedEntry) {
+    return null;
+  }
+
+  return materialKnowledgeKeywords.some((keyword) => normalized.includes(keyword.toLowerCase()))
+    ? matchedEntry.material
+    : null;
+};
+
 const buildAnalysisMessage = (responseData) => {
   const analysis = responseData?.analysis || {};
   const materialTags = Array.isArray(analysis.materials)
@@ -383,7 +446,47 @@ const startNewConversation = async () => {
   await alignToLatestMessage({ force: true, behavior: 'auto' });
 };
 
+const submitMaterialKnowledgeQuestion = async (text, material) => {
+  const optimisticMessage = {
+    id: `local-knowledge-${Date.now()}`,
+    role: 'user',
+    content: text,
+    recommendations: [],
+    createdAt: new Date().toISOString()
+  };
+
+  messages.value = [...messages.value, optimisticMessage];
+  userInput.value = '';
+  isSending.value = true;
+  await syncTextareaHeight();
+  shouldFollowLatest.value = true;
+  await alignToLatestMessage({ force: true, behavior: 'auto' });
+
+  try {
+    const response = await knowledgeApi.askMaterialQuestion({
+      material,
+      question: text
+    });
+
+    messages.value = [...messages.value, normalizeKnowledgeMessage(response.data || {})];
+  } catch (error) {
+    console.error('Ask material knowledge failed:', error);
+    messages.value = messages.value.filter((item) => item.id !== optimisticMessage.id);
+    alert(error.response?.data?.message || '知识库问答失败');
+  } finally {
+    isSending.value = false;
+    await syncTextareaHeight();
+    await alignToLatestMessage({ behavior: 'auto' });
+  }
+};
+
 const submitTextMessage = async (text) => {
+  const material = detectMaterialKnowledgeQuestion(text);
+  if (material) {
+    await submitMaterialKnowledgeQuestion(text, material);
+    return;
+  }
+
   const optimisticMessage = {
     id: `local-${Date.now()}`,
     role: 'user',
@@ -603,9 +706,7 @@ onBeforeUnmount(() => {
   --chat-composer-height: 72px;
   overflow: hidden;
   padding: 10px 14px 12px;
-  background:
-    radial-gradient(circle at top, rgba(255, 252, 246, 0.84), transparent 24%),
-    linear-gradient(180deg, var(--bg-base) 0%, var(--bg-soft) 100%);
+  background: linear-gradient(180deg, var(--bg-base) 0%, var(--bg-soft) 100%);
 }
 
 .history-mask {
@@ -784,8 +885,18 @@ onBeforeUnmount(() => {
   font-size: 11px;
 }
 
-.text-button.light {
-  color: var(--text-faint);
+.new-chat-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-soft);
+  cursor: pointer;
+  flex-shrink: 0;
 }
 
 .message-list {

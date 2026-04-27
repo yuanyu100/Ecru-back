@@ -24,7 +24,7 @@
     </div>
 
     <div class="panel-grid knowledge-grid">
-      <section class="panel-card">
+      <section ref="editorSectionRef" :class="['panel-card', editorHighlight ? 'editor-highlight' : '']">
         <div class="panel-head stacked-head">
           <div>
             <h2>知识库列表</h2>
@@ -56,7 +56,7 @@
               <option value="0">仅停用</option>
             </select>
             <button class="secondary-button" type="button" @click="loadCurrentTab">查询</button>
-            <button class="primary-button" type="button" @click="createNew">新建{{ currentTabLabel }}</button>
+            <button class="primary-button" type="button" @click="createNew">＋ {{ currentTabLabel }}</button>
           </div>
         </div>
 
@@ -264,6 +264,41 @@
           <p v-else class="empty-tip">点击左侧表格任意一行，可以先预览，再决定是否编辑或删除。</p>
         </div>
 
+        <div v-if="activeTab === 'guide'" class="preview-card">
+          <div class="preview-head">
+            <strong>PDF 导入指南</strong>
+            <span>自动解析文本写入知识库</span>
+          </div>
+          <div class="toolbar import-toolbar">
+            <label class="checkbox-row">
+              <input v-model="pdfUpdateExisting" type="checkbox" />
+              <span>同名文档自动覆盖</span>
+            </label>
+            <label class="pdf-file-label">
+              <input
+                ref="pdfFileInputRef"
+                type="file"
+                accept=".pdf"
+                class="pdf-file-input"
+                @change="onPdfFileChange"
+              />
+              <span class="secondary-button" role="button">选择 PDF</span>
+            </label>
+          </div>
+          <p v-if="pdfFile" class="pdf-filename">已选：{{ pdfFile.name }}</p>
+          <div class="import-footer">
+            <p class="panel-subtitle">上传后自动提取全文，以文件名作为指南标题。</p>
+            <button
+              class="primary-button"
+              type="button"
+              :disabled="importingPdf || !pdfFile"
+              @click="submitPdfImport"
+            >
+              {{ importingPdf ? '导入中...' : '开始 PDF 导入' }}
+            </button>
+          </div>
+        </div>
+
         <div class="preview-card">
           <div class="preview-head">
             <strong>批量导入 {{ currentTabLabel }}</strong>
@@ -465,7 +500,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, nextTick, onMounted, reactive, ref } from 'vue';
 import { knowledgeAdminApi } from '../../api/knowledge';
 
 const tabs = [
@@ -548,6 +583,13 @@ const filters = reactive({
 const draft = reactive({ ...defaultDrafts.fabric });
 const importPayload = ref('');
 const importUpdateExisting = ref(true);
+const pdfFile = ref(null);
+const pdfFileInputRef = ref(null);
+const pdfUpdateExisting = ref(true);
+const importingPdf = ref(false);
+const editorSectionRef = ref(null);
+const editorHighlight = ref(false);
+let editorHighlightTimer = null;
 
 const currentTabLabel = computed(() => {
   return tabs.find((item) => item.value === activeTab.value)?.label || '知识';
@@ -644,6 +686,23 @@ const switchTab = async (tab) => {
 const createNew = () => {
   resetDraft();
   resetSelection();
+  focusEditorSection();
+};
+
+const focusEditorSection = async () => {
+  await nextTick();
+  editorSectionRef.value?.scrollIntoView({
+    behavior: 'smooth',
+    block: 'start'
+  });
+  editorHighlight.value = true;
+  if (editorHighlightTimer) {
+    clearTimeout(editorHighlightTimer);
+  }
+  editorHighlightTimer = window.setTimeout(() => {
+    editorHighlight.value = false;
+    editorHighlightTimer = null;
+  }, 1800);
 };
 
 const fillImportTemplate = () => {
@@ -717,6 +776,7 @@ const editItem = (item) => {
     source: item.source || '',
     active: Boolean(item.isActive)
   });
+  focusEditorSection();
 };
 
 const removeItem = async (item) => {
@@ -855,6 +915,30 @@ const submitDraft = async () => {
   }
 };
 
+const onPdfFileChange = (event) => {
+  pdfFile.value = event.target.files?.[0] || null;
+};
+
+const submitPdfImport = async () => {
+  if (!pdfFile.value) return;
+  importingPdf.value = true;
+  try {
+    const result = await knowledgeAdminApi.importGuideFromPdf(pdfFile.value, pdfUpdateExisting.value);
+    if (result?.code === 200) {
+      const d = result.data || {};
+      await Promise.all([loadOverview(), loadCurrentTab()]);
+      pdfFile.value = null;
+      if (pdfFileInputRef.value) pdfFileInputRef.value.value = '';
+      alert(`PDF导入成功\n标题：${d.title || '-'}\n字符数：${d.contentLength || 0}\n新增 ${d.created || 0} 条，更新 ${d.updated || 0} 条`);
+    }
+  } catch (error) {
+    console.error('PDF import failed:', error);
+    alert(error.response?.data?.message || 'PDF导入失败');
+  } finally {
+    importingPdf.value = false;
+  }
+};
+
 onMounted(async () => {
   await Promise.all([loadOverview(), loadCurrentTab()]);
 });
@@ -957,6 +1041,11 @@ onMounted(async () => {
   border: 1px solid #dbe6f7;
 }
 
+.editor-highlight {
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.16);
+  transition: box-shadow 0.25s ease;
+}
+
 .preview-head {
   display: flex;
   align-items: center;
@@ -1023,6 +1112,21 @@ onMounted(async () => {
   justify-content: space-between;
   gap: 12px;
   margin-top: 12px;
+}
+
+.pdf-file-input {
+  display: none;
+}
+
+.pdf-file-label {
+  cursor: pointer;
+}
+
+.pdf-filename {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #4b5563;
+  word-break: break-all;
 }
 
 @media (max-width: 1100px) {
