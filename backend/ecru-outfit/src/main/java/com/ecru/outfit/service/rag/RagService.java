@@ -2,6 +2,7 @@ package com.ecru.outfit.service.rag;
 
 import com.ecru.clothing.mapper.ClothingMapper;
 import com.ecru.common.service.vector.EmbeddingService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -9,9 +10,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * RAG检索服务
- */
+@Slf4j
 @Service
 public class RagService {
 
@@ -36,7 +35,7 @@ public class RagService {
         try {
             return vectorSearchService.searchClothes(userId, query, limit, negativePreferences);
         } catch (Exception e) {
-            System.err.println("语义检索衣物失败: " + e.getMessage());
+            log.error("语义检索衣物失败: {}", e.getMessage(), e);
             return List.of();
         }
     }
@@ -62,7 +61,7 @@ public class RagService {
         try {
             return vectorSearchService.generateAndStoreEmbedding(clothingId, clothingText);
         } catch (Exception e) {
-            System.err.println("为衣物生成嵌入失败: " + e.getMessage());
+            log.error("为衣物生成嵌入失败: {}", e.getMessage(), e);
             return false;
         }
     }
@@ -76,7 +75,7 @@ public class RagService {
         try {
             return embeddingService.generateEmbedding(text);
         } catch (Exception e) {
-            System.err.println("生成文本嵌入失败: " + e.getMessage());
+            log.error("生成文本嵌入失败: {}", e.getMessage(), e);
             return null;
         }
     }
@@ -90,7 +89,7 @@ public class RagService {
         try {
             return embeddingService.generateBatchEmbeddings(texts);
         } catch (Exception e) {
-            System.err.println("批量生成文本嵌入失败: " + e.getMessage());
+            log.error("批量生成文本嵌入失败: {}", e.getMessage(), e);
             return List.of();
         }
     }
@@ -110,7 +109,7 @@ public class RagService {
             statistics.put("wearTrend", clothingMapper.selectWearTrend(userId, null));
             return statistics;
         } catch (Exception e) {
-            System.err.println("鑾峰彇琛ｆ┍缁熻淇℃伅澶辫触: " + e.getMessage());
+            log.error("获取衣橱统计信息失败: {}", e.getMessage(), e);
             return new HashMap<>();
         }
     }

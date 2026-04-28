@@ -124,13 +124,7 @@
             <label>
               <span>分类</span>
               <select v-model="item.category">
-                <option value="上装">上装</option>
-                <option value="下装">下装</option>
-                <option value="裙装">裙装</option>
-                <option value="外套">外套</option>
-                <option value="鞋履">鞋履</option>
-                <option value="包袋">包袋</option>
-                <option value="配饰">配饰</option>
+                <option v-for="option in clothingCategoryOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
               </select>
             </label>
 
@@ -173,6 +167,7 @@
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { wardrobeApi } from '../api/wardrobe';
+import { clothingCategoryOptions } from '../constants/clothingCategories';
 
 const router = useRouter();
 const activeMode = ref('structured_json');
@@ -420,9 +415,7 @@ const goBack = () => {
 .import-page {
   min-height: 100vh;
   padding: 20px 16px 92px;
-  background:
-    radial-gradient(circle at top left, rgba(255, 247, 230, 0.92), transparent 26%),
-    linear-gradient(180deg, #f6eddc 0%, #ead7ba 100%);
+  background: linear-gradient(180deg, var(--bg-base) 0%, var(--bg-soft) 100%);
 }
 
 .import-header {
@@ -437,17 +430,17 @@ const goBack = () => {
   place-items: center;
   width: 34px;
   height: 34px;
-  border: 1px solid rgba(145, 104, 49, 0.14);
+  border: 1px solid var(--line-soft);
   border-radius: 50%;
-  background: rgba(255, 251, 244, 0.88);
+  background: var(--surface-strong);
   cursor: pointer;
 }
 
 .icon-back span {
   width: 10px;
   height: 10px;
-  border-left: 1.5px solid #5d4523;
-  border-bottom: 1.5px solid #5d4523;
+  border-left: 1.5px solid var(--accent-strong);
+  border-bottom: 1.5px solid var(--accent-strong);
   transform: rotate(45deg);
   margin-left: 4px;
 }
@@ -455,7 +448,7 @@ const goBack = () => {
 .eyebrow {
   margin-bottom: 4px;
   font-size: 12px;
-  color: #8f6a37;
+  color: var(--text-soft);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -463,15 +456,15 @@ const goBack = () => {
 .import-header h1,
 .hint-panel strong,
 .preview-header strong {
-  color: #5d4523;
+  color: var(--text-main);
 }
 
 .import-card {
   padding: 18px;
   border-radius: 24px;
-  background: rgba(255, 251, 244, 0.92);
-  border: 1px solid rgba(145, 104, 49, 0.14);
-  box-shadow: 0 18px 44px rgba(109, 78, 38, 0.08);
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  box-shadow: var(--shadow-card);
 }
 
 .import-card + .import-card {
@@ -502,14 +495,14 @@ const goBack = () => {
 .mode-chip,
 .line-button {
   padding: 10px 14px;
-  background: #ead7b8;
-  color: #5d4523;
+  background: var(--bg-soft);
+  color: var(--text-soft);
 }
 
 .mode-chip.active,
 .primary-button {
-  background: #6b4b1f;
-  color: #fff8ef;
+  background: var(--accent-strong);
+  color: var(--surface-strong);
 }
 
 .panel-stack {
@@ -521,8 +514,8 @@ const goBack = () => {
 .hint-panel {
   padding: 14px 16px;
   border-radius: 18px;
-  background: rgba(244, 231, 208, 0.72);
-  color: #6d5531;
+  background: var(--accent-soft);
+  color: var(--text-soft);
 }
 
 .hint-panel p {
@@ -533,7 +526,7 @@ const goBack = () => {
 .field-block {
   display: grid;
   gap: 8px;
-  color: #6c522f;
+  color: var(--text-soft);
   font-size: 14px;
 }
 
@@ -546,11 +539,11 @@ const goBack = () => {
 .field-block input,
 .field-block select {
   width: 100%;
-  border: 1px solid #d9c39b;
+  border: 1px solid var(--line-strong);
   border-radius: 16px;
   padding: 12px 14px;
-  background: #fffdf8;
-  color: #4d3920;
+  background: var(--surface-strong);
+  color: var(--text-main);
 }
 
 .field-block textarea {
@@ -561,7 +554,7 @@ const goBack = () => {
 .switch-row {
   flex-wrap: wrap;
   margin-top: 16px;
-  color: #6c522f;
+  color: var(--text-soft);
 }
 
 .switch-row label,
@@ -578,7 +571,7 @@ const goBack = () => {
 
 .preview-hint {
   margin-top: 12px;
-  color: #7c6541;
+  color: var(--text-soft);
   font-size: 13px;
   line-height: 1.6;
 }
@@ -602,7 +595,7 @@ const goBack = () => {
 
 .preview-header p,
 .plain-list p {
-  color: #7c6541;
+  color: var(--text-soft);
 }
 
 .preview-item {
@@ -611,8 +604,8 @@ const goBack = () => {
   gap: 14px;
   padding: 14px;
   border-radius: 20px;
-  border: 1px solid rgba(145, 104, 49, 0.12);
-  background: #fffdf8;
+  border: 1px solid var(--line-soft);
+  background: var(--surface-strong);
 }
 
 .check-col {
@@ -622,7 +615,7 @@ const goBack = () => {
 .thumb-shell {
   overflow: hidden;
   border-radius: 16px;
-  background: linear-gradient(180deg, #f6ead4 0%, #ede0c7 100%);
+  background: var(--bg-soft);
 }
 
 .thumb-shell img {
@@ -642,7 +635,7 @@ const goBack = () => {
 }
 
 .item-title-row strong {
-  color: #543c1d;
+  color: var(--text-main);
   line-height: 1.5;
 }
 
@@ -672,7 +665,7 @@ const goBack = () => {
 .meta-grid label {
   display: grid;
   gap: 6px;
-  color: #6c522f;
+  color: var(--text-soft);
   font-size: 13px;
 }
 

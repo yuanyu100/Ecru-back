@@ -8,13 +8,19 @@ import com.ecru.web.dto.request.FabricKnowledgeBatchImportRequest;
 import com.ecru.web.dto.request.FabricKnowledgeUpsertRequest;
 import com.ecru.web.dto.request.GuideKnowledgeBatchImportRequest;
 import com.ecru.web.dto.request.GuideKnowledgeUpsertRequest;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import javax.sql.DataSource;
+import java.io.IOException;
 import java.sql.Date;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
@@ -23,6 +29,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @Service
 public class KnowledgeAdminService {
 
@@ -380,6 +387,65 @@ public class KnowledgeAdminService {
     public void deleteCareLabel(Long id) {
         requireExists("knowledge_care_labels", id, "洗护标知识不存在");
         jdbcTemplate.update("DELETE FROM knowledge_care_labels WHERE id = ?", id);
+    }
+
+    @Transactional
+    public Map<String, Object> importGuidesFromPdf(MultipartFile file, boolean updateExisting) {
+        String originalFilename = StringUtils.defaultIfBlank(file.getOriginalFilename(), "未命名文档");
+        String title = originalFilename.replaceAll("(?i)\\.pdf$", "").trim();
+        if (title.isEmpty()) {
+            title = "PDF导入-" + System.currentTimeMillis();
+        }
+
+        String content;
+        try (PDDocument doc = Loader.loadPDF(file.getBytes())) {
+            PDFTextStripper stripper = new PDFTextStripper();
+            content = stripper.getText(doc).trim();
+        } catch (IOException e) {
+            log.error("PDF解析失败: {}", e.getMessage(), e);
+            throw new BusinessException(400, "PDF文件解析失败: " + e.getMessage());
+        }
+
+        if (content.isEmpty()) {
+            throw new BusinessException(400, "PDF文件内容为空，无法导入");
+        }
+
+        String summary = content.length() > 200 ? content.substring(0, 200) + "..." : content;
+        String keywords = title.replaceAll("[\\s_\\-]+", ",");
+
+        Long existingId = findExistingId("knowledge_guides", "title", title);
+        int created = 0;
+        int updated = 0;
+
+        if (existingId != null) {
+            if (updateExisting) {
+                GuideKnowledgeUpsertRequest req = buildPdfGuideRequest(title, summary, content, keywords);
+                updateGuide(existingId, req);
+                updated = 1;
+            }
+        } else {
+            GuideKnowledgeUpsertRequest req = buildPdfGuideRequest(title, summary, content, keywords);
+            createGuide(req);
+            created = 1;
+        }
+
+        Map<String, Object> result = buildImportResult(1, created, updated, existingId != null && !updateExisting ? 1 : 0);
+        result.put("title", title);
+        result.put("contentLength", content.length());
+        return result;
+    }
+
+    private GuideKnowledgeUpsertRequest buildPdfGuideRequest(String title, String summary, String content, String keywords) {
+        GuideKnowledgeUpsertRequest req = new GuideKnowledgeUpsertRequest();
+        req.setTitle(title);
+        req.setSummary(summary);
+        req.setContent(content);
+        req.setGuideType("PDF导入");
+        req.setKeywords(keywords);
+        req.setSource("pdf-import");
+        req.setPublishDate(LocalDate.now().toString());
+        req.setActive(true);
+        return req;
     }
 
     private Map<String, Object> getFabricById(Long id) {

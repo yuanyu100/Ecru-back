@@ -22,7 +22,7 @@
             type="text"
             placeholder="搜索所属用户"
           />
-          <button class="secondary-button" type="button" @click="loadClothings">刷新</button>
+          <button class="secondary-button" type="button" @click="loadClothings">↺</button>
         </div>
       </div>
 

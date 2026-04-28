@@ -11,7 +11,7 @@ spring:
   datasource:
     jdbc-url: jdbc:mysql://localhost:3306/ecru?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     username: root
-    password: 040726fan
+    password: ${DB_PASSWORD:040726fan}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       minimum-idle: 5
@@ -24,7 +24,7 @@ spring:
   datasource-pg:
     jdbc-url: jdbc:postgresql://localhost:5432/ecru-pg
     username: postgres
-    password: 040726fan
+    password: ${DB_PG_PASSWORD:040726fan}
     driver-class-name: org.postgresql.Driver
     hikari:
       minimum-idle: 5
@@ -62,14 +62,13 @@ spring:
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
   global-config:
     db-config:
       id-type: auto
       logic-delete-field: isDeleted
       logic-delete-value: 1
       logic-not-delete-value: 0
-  mapper-locations: classpath*:nonexistent/**/*.xml
 
 # JWT配置
 jwt:
@@ -142,8 +141,8 @@ agent:
 
 # MinIO配置
 minio:
-  endpoint: http://localhost:9000
-  accessKey: minioadmin
-  secretKey: minioadmin
+  endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+  accessKey: ${MINIO_ACCESS_KEY:minioadmin}
+  secretKey: ${MINIO_SECRET_KEY:minioadmin}
   bucketName: ecru
-  domain: http://localhost:9000
+  domain: ${MINIO_DOMAIN:http://localhost:9000}

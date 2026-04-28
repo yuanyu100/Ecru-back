@@ -63,6 +63,11 @@ public class StyleImageServiceImpl implements StyleImageService {
         List<StyleImage> images = styleImageMapper.selectByStyleCategory(category, count, null);
         return images.stream().map(this::convertToVO).collect(Collectors.toList());
     }
+
+    @Override
+    public List<String> getAvailableCategories() {
+        return styleImageMapper.selectActiveCategories();
+    }
     
     @Override
     public boolean existsById(Long id) {

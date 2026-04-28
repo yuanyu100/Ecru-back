@@ -23,7 +23,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
 
@@ -98,6 +100,22 @@ public class AdminKnowledgeController {
     public Result<Map<String, Object>> importGuides(@RequestBody GuideKnowledgeBatchImportRequest request) {
         requireAdmin();
         return Result.success("指南知识批量导入成功", knowledgeAdminService.importGuides(request));
+    }
+
+    @PostMapping(value = "/guides/import-pdf", consumes = "multipart/form-data")
+    @Operation(summary = "从PDF导入指南知识", description = "上传PDF文件，自动解析文本内容并写入指南知识库")
+    public Result<Map<String, Object>> importGuideFromPdf(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "updateExisting", defaultValue = "true") boolean updateExisting) {
+        requireAdmin();
+        if (file == null || file.isEmpty()) {
+            return Result.error(400, "请上传PDF文件");
+        }
+        String filename = file.getOriginalFilename();
+        if (filename == null || !filename.toLowerCase().endsWith(".pdf")) {
+            return Result.error(400, "仅支持PDF格式文件");
+        }
+        return Result.success("PDF导入成功", knowledgeAdminService.importGuidesFromPdf(file, updateExisting));
     }
 
     @PutMapping("/guides/{id}")

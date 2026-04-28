@@ -5,11 +5,11 @@ import com.ecru.outfit.dto.response.OutfitAdviceDetailDTO;
 import com.ecru.outfit.entity.OutfitAdviceRecord;
 import com.ecru.outfit.entity.OutfitItem;
 import com.ecru.outfit.entity.OutfitFeedback;
-import com.ecru.outfit.entity.UserStyleProfile;
+import com.ecru.outfit.entity.UserStyleArchive;
 import com.ecru.outfit.mapper.OutfitAdviceRecordMapper;
 import com.ecru.outfit.mapper.OutfitItemMapper;
 import com.ecru.outfit.mapper.OutfitFeedbackMapper;
-import com.ecru.outfit.mapper.OutfitUserStyleProfileMapper;
+import com.ecru.outfit.mapper.UserStyleArchiveMapper;
 import com.ecru.outfit.service.agent.OutfitAdvisorAgent;
 import com.ecru.outfit.service.mcp.McpWeatherService;
 import com.ecru.outfit.service.rag.RagService;
@@ -50,7 +50,7 @@ public class OutfitAdviceService {
     private OutfitFeedbackMapper outfitFeedbackMapper;
 
     @Autowired
-    private OutfitUserStyleProfileMapper userStyleProfileMapper;
+    private UserStyleArchiveMapper userStyleArchiveMapper;
 
     @Autowired
     private McpWeatherService weatherService;
@@ -212,12 +212,7 @@ public class OutfitAdviceService {
         outfitFeedbackMapper.delete(new LambdaQueryWrapper<OutfitFeedback>()
                 .eq(OutfitFeedback::getOutfitAdviceId, id)
                 .eq(OutfitFeedback::getUserId, userId));
-        if (getOwnedAdviceRecord(id, userId) == null) {
-            return false;
-        }
-        // 删除搭配单品
         outfitItemMapper.deleteByOutfitAdviceId(id);
-        // 删除搭配记录
         return outfitAdviceRecordMapper.deleteById(id) > 0;
     }
 
@@ -286,11 +281,11 @@ public class OutfitAdviceService {
         return record;
     }
 
-    public UserStyleProfile getStyleProfile(Long userId) {
-        UserStyleProfile profile = userStyleProfileMapper.selectByUserId(userId);
+    public UserStyleArchive getStyleProfile(Long userId) {
+        UserStyleArchive profile = userStyleArchiveMapper.selectByUserId(userId);
         if (profile == null) {
             // 如果没有风格档案，返回一个空的对象
-            profile = new UserStyleProfile();
+            profile = new UserStyleArchive();
             profile.setUserId(userId);
         }
         return profile;
@@ -301,21 +296,21 @@ public class OutfitAdviceService {
      * @param profile 风格档案
      * @return 是否成功
      */
-    public boolean updateStyleProfile(UserStyleProfile profile) {
-        UserStyleProfile existing = userStyleProfileMapper.selectByUserId(profile.getUserId());
+    public boolean updateStyleProfile(UserStyleArchive profile) {
+        UserStyleArchive existing = userStyleArchiveMapper.selectByUserId(profile.getUserId());
         LocalDateTime now = LocalDateTime.now();
 
         if (existing == null) {
             profile.setId(null);
             profile.setCreatedAt(now);
             profile.setUpdatedAt(now);
-            return userStyleProfileMapper.insert(profile) > 0;
+            return userStyleArchiveMapper.insert(profile) > 0;
         }
 
         profile.setId(existing.getId());
         profile.setCreatedAt(existing.getCreatedAt());
         profile.setUpdatedAt(now);
-        return userStyleProfileMapper.updateById(profile) > 0;
+        return userStyleArchiveMapper.updateById(profile) > 0;
     }
 
     /**

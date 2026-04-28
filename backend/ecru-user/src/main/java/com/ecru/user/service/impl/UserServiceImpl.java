@@ -10,7 +10,7 @@ import com.ecru.user.dto.UpdatePasswordDTO;
 import com.ecru.user.dto.UpdateUserDTO;
 import com.ecru.user.entity.User;
 import com.ecru.user.mapper.UserMapper;
-
+import com.ecru.user.service.UserLoginLogService;
 import com.ecru.user.service.UserService;
 import com.ecru.user.vo.LoginVO;
 import com.ecru.user.vo.UserVO;
@@ -25,7 +25,6 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.time.LocalDateTime;
 
-
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -34,6 +33,7 @@ public class UserServiceImpl implements UserService {
     private final UserMapper userMapper;
     private final JwtUtil jwtUtil;
     private final PasswordEncoder passwordEncoder;
+    private final UserLoginLogService userLoginLogService;
 
     @Override
     @Transactional
@@ -56,53 +56,41 @@ public class UserServiceImpl implements UserService {
         user.setStatus(1);
 
         userMapper.insert(user);
-        log.info("用户注册成功: {}", request.getUsername());
-
+        log.info("User register success: {}", request.getUsername());
         return user;
     }
 
     @Override
     public LoginVO login(LoginDTO request) {
-        log.info("Login request received: {}", request);
         User user = userMapper.selectByUsername(request.getUsername());
-        log.info("User found: {}", user);
-        
-        // 获取请求IP和设备信息
         String loginIp = getClientIp();
         String loginDevice = getDeviceInfo();
-        log.info("Login IP: {}, Device: {}", loginIp, loginDevice);
-        
+        String loginLocation = null;
+
         if (user == null) {
-            // 记录登录失败日志
-            // userLoginLogService.recordLoginLog(0L, 1, loginIp, loginDevice, 0, "用户名不存在");
+            userLoginLogService.recordLogin(null, 1, loginIp, loginDevice, loginLocation, 0, "用户名不存在");
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
         }
 
         if (user.getStatus() == 0) {
-            // 记录登录失败日志
-            // userLoginLogService.recordLoginLog(user.getId(), 1, loginIp, loginDevice, 0, "用户已被禁用");
+            userLoginLogService.recordLogin(user.getId(), 1, loginIp, loginDevice, loginLocation, 0, "用户已被禁用");
             throw new BusinessException(ErrorCode.USER_DISABLED);
         }
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            // 记录登录失败日志
-            // userLoginLogService.recordLoginLog(user.getId(), 1, loginIp, loginDevice, 0, "密码错误");
+            userLoginLogService.recordLogin(user.getId(), 1, loginIp, loginDevice, loginLocation, 0, "密码错误");
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
         }
 
-        // 更新最后登录时间
         user.setLastLoginAt(LocalDateTime.now());
         user.setLastLoginIp(loginIp);
         userMapper.updateById(user);
 
-        // 生成Token
         String accessToken = jwtUtil.generateAccessToken(user.getId(), user.getUsername(), user.getRole());
         String refreshToken = jwtUtil.generateRefreshToken(user.getId(), user.getUsername(), user.getRole());
 
-        // 记录登录成功日志
-        // userLoginLogService.recordLoginLog(user.getId(), 1, loginIp, loginDevice, 1, null);
-
-        log.info("用户登录成功: {}", request.getUsername());
+        userLoginLogService.recordLogin(user.getId(), 1, loginIp, loginDevice, loginLocation, 1, null);
+        log.info("User login success: {}", request.getUsername());
 
         return LoginVO.builder()
                 .accessToken(accessToken)
@@ -119,9 +107,6 @@ public class UserServiceImpl implements UserService {
                 .build();
     }
 
-    /**
-     * 获取客户端IP
-     */
     private String getClientIp() {
         try {
             ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
@@ -140,14 +125,11 @@ public class UserServiceImpl implements UserService {
                 return ip;
             }
         } catch (Exception e) {
-            log.warn("获取客户端IP失败", e);
+            log.warn("Get client ip failed", e);
         }
         return "unknown";
     }
 
-    /**
-     * 获取设备信息
-     */
     private String getDeviceInfo() {
         try {
             ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
@@ -157,7 +139,7 @@ public class UserServiceImpl implements UserService {
                 return userAgent != null ? userAgent.substring(0, Math.min(userAgent.length(), 200)) : "unknown";
             }
         } catch (Exception e) {
-            log.warn("获取设备信息失败", e);
+            log.warn("Get device info failed", e);
         }
         return "unknown";
     }
@@ -182,7 +164,6 @@ public class UserServiceImpl implements UserService {
     public UserVO updateUser(Long userId, UpdateUserDTO request) {
         User user = getUserById(userId);
 
-        // 检查邮箱是否被其他用户使用
         if (request.getEmail() != null && !request.getEmail().equals(user.getEmail())) {
             if (userMapper.existsByEmail(request.getEmail())) {
                 throw new BusinessException(ErrorCode.EMAIL_EXISTS);
@@ -190,7 +171,6 @@ public class UserServiceImpl implements UserService {
             user.setEmail(request.getEmail());
         }
 
-        // 检查手机号是否被其他用户使用
         if (request.getPhone() != null && !request.getPhone().equals(user.getPhone())) {
             if (userMapper.existsByPhone(request.getPhone())) {
                 throw new BusinessException(ErrorCode.PHONE_EXISTS);
@@ -209,8 +189,7 @@ public class UserServiceImpl implements UserService {
         }
 
         userMapper.updateById(user);
-        log.info("用户更新成功: {}", user.getUsername());
-
+        log.info("User update success: {}", user.getUsername());
         return UserConverter.INSTANCE.toUserVO(user);
     }
 
@@ -218,17 +197,13 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public void updatePassword(Long userId, UpdatePasswordDTO request) {
         User user = getUserById(userId);
-
-        // 验证旧密码
         if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, "旧密码不正确");
         }
 
-        // 更新新密码
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         userMapper.updateById(user);
-
-        log.info("用户修改密码成功: {}", user.getUsername());
+        log.info("User password updated: {}", user.getUsername());
     }
 
     @Override
@@ -238,7 +213,7 @@ public class UserServiceImpl implements UserService {
         user.setAvatarUrl(avatarUrl);
         userMapper.updateById(user);
 
-        log.info("用户更新头像成功: {}", user.getUsername());
+        log.info("User avatar updated: {}", user.getUsername());
         return UserConverter.INSTANCE.toUserVO(user);
     }
 }

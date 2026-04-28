@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python *)",
+      "Bash(grep -E \"\\\\.vue$\")",
+      "Bash(mysql *)",
+      "Bash(xargs cat *)",
+      "Bash(xargs grep *)",
+      "Bash(grep *)",
+      "Bash(git add *)"
+    ]
+  }
+}

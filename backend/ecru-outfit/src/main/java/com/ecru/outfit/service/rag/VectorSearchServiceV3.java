@@ -4,6 +4,7 @@ import com.ecru.clothing.mapper.ClothingMapper;
 import com.ecru.clothing.entity.Clothing;
 import com.ecru.common.service.vector.EmbeddingService;
 import com.ecru.common.service.vector.PgVectorService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -13,9 +14,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * 向量检索服务V3
- */
+@Slf4j
 @Service
 public class VectorSearchServiceV3 {
 
@@ -41,22 +40,15 @@ public class VectorSearchServiceV3 {
      */
     public List<VectorSearchResult> searchClothes(Long userId, String query, Integer limit, List<String> negativePreferences) {
         try {
-            System.err.println("开始语义检索V3，用户ID: " + userId + ", 查询: " + query + ", 限制: " + limit + ", 负面偏好: " + negativePreferences);
-            // 生成查询向量
+            log.debug("开始语义检索V3，用户ID: {}, 查询: {}, 限制: {}", userId, query, limit);
             float[] queryEmbedding = embeddingService.generateEmbedding(query);
-            System.err.println("嵌入生成成功，长度: " + (queryEmbedding != null ? queryEmbedding.length : 0));
+            log.debug("嵌入生成成功，长度: {}", queryEmbedding != null ? queryEmbedding.length : 0);
 
-            // 执行向量搜索
-            System.err.println("执行向量搜索");
             List<VectorSearchResult> results = executeVectorSearch(userId, queryEmbedding, limit, query, negativePreferences);
-
-            System.err.println("返回结果数量: " + results.size());
+            log.debug("返回结果数量: {}", results.size());
             return results;
         } catch (Exception e) {
-            System.err.println("语义检索衣物失败: " + e.getMessage());
-            e.printStackTrace();
-            // 返回模拟数据
-            System.err.println("异常后返回模拟数据");
+            log.warn("语义检索衣物失败，降级为模拟数据: {}", e.getMessage());
             return getMockResults(query, limit, negativePreferences);
         }
     }
@@ -83,59 +75,31 @@ public class VectorSearchServiceV3 {
      */
     private List<VectorSearchResult> executeVectorSearch(Long userId, float[] queryEmbedding, Integer limit, String query, List<String> negativePreferences) {
         try {
-            System.err.println("开始执行向量搜索V3");
-            // 使用pgvector执行向量检索
-            System.err.println("调用pgVectorService.searchVectors");
             List<Map<String, Object>> vectorResults = pgVectorService.searchVectors(userId, queryEmbedding, limit);
-            System.err.println("向量搜索结果数量: " + vectorResults.size());
-            
-            // 构建结果列表
+            log.debug("向量搜索结果数量: {}", vectorResults.size());
+
             List<VectorSearchResult> results = new ArrayList<>();
             for (Map<String, Object> vectorResult : vectorResults) {
                 Long clothingId = ((Number) vectorResult.get("clothing_id")).longValue();
                 Double similarity = (Double) vectorResult.get("similarity");
-                System.err.println("找到衣物ID: " + clothingId + "，相似度: " + similarity);
-                
-                // 尝试从clothings表获取详细信息
+
                 VectorSearchResult result = getClothingDetails(clothingId);
-                if (result != null) {
-                    // 检查是否符合负面偏好
-                    if (!isNegativeMatch(result, negativePreferences)) {
-                        result.setSimilarity(similarity);
-                        results.add(result);
-                        System.err.println("添加结果: " + result.getName());
-                    } else {
-                        System.err.println("过滤掉结果（负面偏好匹配）: " + result.getName());
-                    }
-                } else {
-                    // 如果clothings表不存在，从clothing_embeddings表获取信息
-                    System.err.println("clothings表不存在，尝试从clothing_embeddings表获取信息");
+                if (result == null) {
                     result = getClothingDetailsFromEmbeddings(clothingId);
-                    if (result != null) {
-                        // 检查是否符合负面偏好
-                        if (!isNegativeMatch(result, negativePreferences)) {
-                            result.setSimilarity(similarity);
-                            results.add(result);
-                            System.err.println("添加结果: " + result.getName());
-                        } else {
-                            System.err.println("过滤掉结果（负面偏好匹配）: " + result.getName());
-                        }
-                    }
+                }
+                if (result != null && !isNegativeMatch(result, negativePreferences)) {
+                    result.setSimilarity(similarity);
+                    results.add(result);
                 }
             }
 
-            // 如果没有结果，返回模拟数据
-            System.err.println("构建结果数量: " + results.size());
             if (results.isEmpty()) {
-                System.err.println("返回模拟数据");
+                log.debug("向量搜索无结果，降级为模拟数据");
                 return getMockResults(query, limit, negativePreferences);
             }
-
             return results;
         } catch (Exception e) {
-            System.err.println("执行向量搜索失败: " + e.getMessage());
-            e.printStackTrace();
-            // 返回模拟数据
+            log.warn("执行向量搜索失败，降级为模拟数据: {}", e.getMessage());
             return getMockResults(query, limit, negativePreferences);
         }
     }
@@ -321,22 +285,15 @@ public class VectorSearchServiceV3 {
      */
     private VectorSearchResult getClothingDetails(Long clothingId) {
         try {
-            // 使用ClothingMapper获取衣物信息
-            System.err.println("使用ClothingMapper查询衣物ID: " + clothingId);
-            
             Clothing clothing = clothingMapper.selectById(clothingId);
             if (clothing == null) {
-                System.err.println("衣物不存在: " + clothingId);
                 return null;
             }
-            
-            System.err.println("查询结果: " + clothing);
-            
+
             VectorSearchResult result = new VectorSearchResult();
             result.setClothingId(clothing.getId());
             result.setName(clothing.getName());
             result.setCategory(clothing.getCategory());
-            // 设置详细信息
             result.setPrimaryColor(clothing.getPrimaryColor() != null ? clothing.getPrimaryColor() : "未知");
             result.setSecondaryColor(clothing.getSecondaryColor() != null ? clothing.getSecondaryColor() : "未知");
             result.setMaterial(clothing.getMaterial() != null ? clothing.getMaterial() : "未知");
@@ -345,11 +302,9 @@ public class VectorSearchServiceV3 {
             result.setSeasonTags(clothing.getSeasonTags() != null ? clothing.getSeasonTags() : "");
             result.setImageUrl(clothing.getImageUrl() != null ? clothing.getImageUrl() : "");
             result.setFrequencyLevel(clothing.getFrequencyLevel() != null ? clothing.getFrequencyLevel() : 0);
-            
-            System.err.println("构建结果: " + result.getName());
             return result;
         } catch (Exception e) {
-            System.err.println("获取衣物详情失败: " + e.getMessage());
+            log.warn("获取衣物详情失败，clothingId={}: {}", clothingId, e.getMessage());
             return null;
         }
     }
@@ -361,19 +316,13 @@ public class VectorSearchServiceV3 {
      */
     private VectorSearchResult getClothingDetailsFromEmbeddings(Long clothingId) {
         try {
-            // 从clothing_embeddings表获取信息
             String sql = "SELECT clothing_id, embedding_text, metadata FROM clothing_embeddings WHERE clothing_id = ?";
-            System.err.println("执行SQL: " + sql);
-            System.err.println("参数: " + clothingId);
-            
             Map<String, Object> embeddingMap = jdbcTemplate.queryForMap(sql, clothingId);
-            System.err.println("查询结果: " + embeddingMap);
-            
+
             VectorSearchResult result = new VectorSearchResult();
             result.setClothingId((Long) embeddingMap.get("clothing_id"));
             result.setName((String) embeddingMap.get("embedding_text"));
             result.setCategory("未知");
-            // 设置默认值
             result.setPrimaryColor("未知");
             result.setSecondaryColor("未知");
             result.setMaterial("未知");
@@ -382,11 +331,9 @@ public class VectorSearchServiceV3 {
             result.setSeasonTags("");
             result.setImageUrl("");
             result.setFrequencyLevel(0);
-            
-            System.err.println("构建结果: " + result.getName());
             return result;
         } catch (Exception e) {
-            System.err.println("从clothing_embeddings表获取衣物详情失败: " + e.getMessage());
+            log.warn("从clothing_embeddings获取衣物详情失败，clothingId={}: {}", clothingId, e.getMessage());
             return null;
         }
     }
@@ -399,31 +346,25 @@ public class VectorSearchServiceV3 {
      */
     public boolean generateAndStoreEmbedding(Long clothingId, String clothingText) {
         try {
-            // 生成嵌入
             float[] embedding = embeddingService.generateEmbedding(clothingText);
             if (embedding == null) {
                 return false;
             }
 
-            // 使用ClothingMapper查询衣物信息以获取用户ID和其他元数据
             Clothing clothing = clothingMapper.selectById(clothingId);
             if (clothing == null) {
-                System.err.println("衣物不存在: " + clothingId);
+                log.warn("生成嵌入失败，衣物不存在: {}", clothingId);
                 return false;
             }
-            
-            Long userId = clothing.getUserId();
-            
-            // 构建元数据
+
             Map<String, Object> metadata = new HashMap<>();
             metadata.put("name", clothing.getName());
             metadata.put("category", clothing.getCategory());
             metadata.put("primary_color", clothing.getPrimaryColor());
-            
-            // 存储到pgvector
-            return pgVectorService.storeVector(clothingId, userId, embedding, metadata);
+
+            return pgVectorService.storeVector(clothingId, clothing.getUserId(), embedding, metadata);
         } catch (Exception e) {
-            System.err.println("生成并存储嵌入失败: " + e.getMessage());
+            log.error("生成并存储嵌入失败，clothingId={}: {}", clothingId, e.getMessage(), e);
             return false;
         }
     }

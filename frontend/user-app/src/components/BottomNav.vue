@@ -5,28 +5,50 @@
       :key="item.path"
       type="button"
       :class="['nav-item', isActive(item) ? 'active' : '']"
+      :aria-label="item.label"
+      :title="item.label"
       @click="navigateTo(item.path)"
     >
-      <span class="nav-icon">{{ item.icon }}</span>
-      <span class="nav-text">{{ item.label }}</span>
+      <span class="nav-icon-wrap">
+        <svg v-if="item.id === 'home'" class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path
+            d="M4.75 10.25L12 4.5l7.25 5.75v8a1.5 1.5 0 0 1-1.5 1.5h-3.5v-5h-4.5v5h-3.5a1.5 1.5 0 0 1-1.5-1.5z"
+          />
+        </svg>
+        <svg v-else-if="item.id === 'chat'" class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path
+            d="M6.75 7.75h10.5a2 2 0 0 1 2 2v5.5a2 2 0 0 1-2 2H11l-4.25 3v-3H6.75a2 2 0 0 1-2-2v-5.5a2 2 0 0 1 2-2z"
+          />
+        </svg>
+        <svg v-else-if="item.id === 'wardrobe'" class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path
+            d="M12 6.25a2.25 2.25 0 1 0-2.13-3h4.26A2.25 2.25 0 0 0 12 6.25zm0 0v1.35l6.25 4.58-1.22 1.57-1.78-1.3v7.3h-6.5v-7.3l-1.78 1.3-1.22-1.57L12 7.6"
+          />
+        </svg>
+        <svg v-else class="nav-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path
+            d="M12 12.25a3.25 3.25 0 1 0-3.25-3.25A3.25 3.25 0 0 0 12 12.25zm-5.75 6a5.75 5.75 0 0 1 11.5 0"
+          />
+        </svg>
+        <span v-if="item.id === 'home'" class="home-breath-dot" aria-hidden="true"></span>
+      </span>
     </button>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { authApi } from '../api/auth';
 
 const router = useRouter();
 const route = useRoute();
 
-const navItems = computed(() => [
-  { path: '/', label: '首页', icon: '首' },
-  { path: '/chat', label: '对话', icon: '聊' },
-  { path: '/wardrobe', label: '衣橱', icon: '柜' },
-  { path: '/profile', label: '我的', icon: '我' }
-]);
+const navItems = [
+  { id: 'home', path: '/', label: '\u9996\u9875' },
+  { id: 'chat', path: '/chat', label: '\u804a\u5929' },
+  { id: 'wardrobe', path: '/wardrobe', label: '\u8863\u67dc' },
+  { id: 'profile', path: '/profile', label: '\u6211\u7684' }
+];
 
 const navigateTo = (path) => {
   if ((path === '/profile' || path === '/chat' || path === '/wardrobe') && !authApi.isAuthenticated()) {
@@ -68,44 +90,99 @@ const isActive = (item) => {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   background: color-mix(in srgb, var(--surface-strong) 92%, transparent);
   border-top: 1px solid var(--line-soft);
-  box-shadow: 0 -8px 24px rgba(53, 41, 24, 0.06);
-  backdrop-filter: blur(10px);
+  box-shadow: 0 -10px 30px rgba(53, 41, 24, 0.05);
+  backdrop-filter: blur(14px);
   z-index: 1000;
 }
 
 .nav-item {
-  display: grid;
-  place-items: center;
-  gap: 2px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   background: transparent;
   color: var(--text-faint);
   cursor: pointer;
+  transition: color 180ms ease, transform 180ms ease;
 }
 
 .nav-item.active {
-  color: var(--accent-strong);
-  font-weight: 600;
+  color: var(--text-primary);
 }
 
-.nav-icon {
+.nav-item::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  width: 16px;
+  height: 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-primary) 78%, transparent);
+  transform: translateX(-50%) scaleX(0);
+  opacity: 0;
+  transition: transform 180ms ease, opacity 180ms ease;
+}
+
+.nav-item.active::after {
+  transform: translateX(-50%) scaleX(1);
+  opacity: 1;
+}
+
+.nav-icon-wrap {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--accent-soft);
-  font-size: 13px;
+  width: 26px;
+  height: 26px;
+}
+
+.nav-icon {
+  width: 22px;
+  height: 22px;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 180ms ease;
 }
 
 .nav-item.active .nav-icon {
-  background: var(--accent-strong);
-  color: var(--surface-strong);
+  transform: translateY(-1px);
 }
 
-.nav-text {
-  font-size: 12px;
+.home-breath-dot {
+  position: absolute;
+  top: 1px;
+  right: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent-strong) 64%, white 12%);
+  box-shadow: 0 0 0 0 rgba(126, 92, 56, 0.18);
+  animation: home-breathe 3.6s ease-in-out infinite;
+}
+
+.nav-item.active .home-breath-dot {
+  background: var(--accent-strong);
+  box-shadow: 0 0 0 0 rgba(126, 92, 56, 0.24);
+}
+
+@keyframes home-breathe {
+  0%,
+  100% {
+    transform: scale(0.92);
+    opacity: 0.55;
+    box-shadow: 0 0 0 0 rgba(126, 92, 56, 0.06);
+  }
+
+  50% {
+    transform: scale(1.14);
+    opacity: 0.9;
+    box-shadow: 0 0 0 4px rgba(126, 92, 56, 0.02);
+  }
 }
 
 @media (min-width: 768px) {

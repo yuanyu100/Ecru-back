@@ -5,14 +5,14 @@
     <aside :class="['history-panel', historyOpen ? 'open' : '']">
       <div class="history-head">
         <div>
-          <p class="history-caption">会话</p>
+          <p class="history-caption">CONVERSATIONS</p>
           <h2>最近对话</h2>
         </div>
         <button class="new-chat-button" type="button" aria-label="新建会话" @click="startNewConversation">
-          <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <path d="M3 4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H7l-4 3V4z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
-            <line x1="10" y1="7" x2="10" y2="11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-            <line x1="8" y1="9" x2="12" y2="9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path d="M3 4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H7l-4 3V4z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" />
+            <line x1="10" y1="7" x2="10" y2="11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+            <line x1="8" y1="9" x2="12" y2="9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
           </svg>
         </button>
       </div>
@@ -46,10 +46,10 @@
         <h1>{{ currentConversationLabel }}</h1>
       </div>
       <button class="new-chat-button" type="button" aria-label="新建会话" @click="startNewConversation">
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <path d="M3 4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H7l-4 3V4z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
-          <line x1="10" y1="7" x2="10" y2="11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-          <line x1="8" y1="9" x2="12" y2="9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <path d="M3 4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H7l-4 3V4z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" />
+          <line x1="10" y1="7" x2="10" y2="11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+          <line x1="8" y1="9" x2="12" y2="9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
         </svg>
       </button>
     </header>
@@ -61,7 +61,7 @@
       @scroll="handleMessageListScroll"
     >
       <div v-if="messages.length === 0" class="empty-state">
-        <p class="empty-caption">Ecru</p>
+        <p class="empty-caption">ECRU</p>
         <h2>说一句今天想怎么穿，或者上传一张水洗标图片。</h2>
         <div class="prompt-list">
           <button v-for="item in quickPrompts" :key="item" class="prompt-chip" type="button" @click="sendQuickPrompt(item)">
@@ -85,6 +85,11 @@
           class="message-content rich-content"
           v-html="formatAssistantMessage(message.content)"
         ></div>
+        <div v-else-if="message.role === 'assistant' && message.isStreaming" class="loading-dots inline-loading">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
 
         <div v-if="message.analysisTags?.length" class="tag-row">
           <span v-for="tag in message.analysisTags" :key="`${message.id}-${tag}`">{{ tag }}</span>
@@ -106,26 +111,69 @@
           </article>
         </div>
 
-        <time>{{ formatTime(message.createdAt) }}</time>
-      </article>
-
-      <article v-if="isSending" class="message-card assistant pending">
-        <div class="loading-dots">
-          <span></span>
-          <span></span>
-          <span></span>
+        <div class="message-meta">
+          <div v-if="isAssistantActionVisible(message)" class="message-actions">
+            <button
+              :class="['message-action-button', 'copy-action', { copied: copiedMessageId === message.id }]"
+              type="button"
+              :aria-label="copiedMessageId === message.id ? '已复制' : '复制回答'"
+              :title="copiedMessageId === message.id ? '已复制' : '复制回答'"
+              @click="copyMessageContent(message)"
+            >
+              <svg v-if="copiedMessageId === message.id" width="15" height="15" viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M3.5 8.5 6.5 11.5 12.5 4.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <svg v-else width="15" height="15" viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M5.8 3.2h4.4A1.8 1.8 0 0 1 12 5v5.2A1.8 1.8 0 0 1 10.2 12H5.8A1.8 1.8 0 0 1 4 10.2V5a1.8 1.8 0 0 1 1.8-1.8Z" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round" />
+                <path d="M3.3 9.6A1.7 1.7 0 0 1 2 7.9V4.2a1.8 1.8 0 0 1 1.8-1.8h3.4" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </button>
+            <button
+              :class="['message-action-button', 'feedback-up', { active: message.feedback === 'up' }]"
+              type="button"
+              aria-label="点赞"
+              title="点赞"
+              @click="toggleMessageFeedback(message, 'up')"
+            >
+              <svg v-if="message.feedback === 'up'" width="15" height="15" viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M5.9 7.1V5.2c0-1 .4-1.9 1.1-2.6l1-1 .9.8c.4.4.5 1 .4 1.5L8.8 7h3c.9 0 1.6.8 1.4 1.7l-.6 3A1.6 1.6 0 0 1 11 13H5.9Z" fill="currentColor" />
+                <path d="M2.8 7h3.1v6H2.8z" fill="currentColor" />
+              </svg>
+              <svg v-else width="15" height="15" viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M5.9 7.1V5.2c0-1 .4-1.9 1.1-2.6l1-1 .9.8c.4.4.5 1 .4 1.5L8.8 7h3c.9 0 1.6.8 1.4 1.7l-.6 3A1.6 1.6 0 0 1 11 13H5.9" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M2.8 7h3.1v6H2.8z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" />
+              </svg>
+            </button>
+            <button
+              :class="['message-action-button', 'feedback-down', { active: message.feedback === 'down' }]"
+              type="button"
+              aria-label="点踩"
+              title="点踩"
+              @click="toggleMessageFeedback(message, 'down')"
+            >
+              <svg v-if="message.feedback === 'down'" width="15" height="15" viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M10.1 8.9v1.9c0 1-.4 1.9-1.1 2.6l-1 1-.9-.8c-.4-.4-.5-1-.4-1.5L7.2 9h-3c-.9 0-1.6-.8-1.4-1.7l.6-3A1.6 1.6 0 0 1 5 3h5.1Z" fill="currentColor" />
+                <path d="M10.1 3h3.1v6h-3.1z" fill="currentColor" />
+              </svg>
+              <svg v-else width="15" height="15" viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M10.1 8.9v1.9c0 1-.4 1.9-1.1 2.6l-1 1-.9-.8c-.4-.4-.5-1-.4-1.5L7.2 9h-3c-.9 0-1.6-.8-1.4-1.7l.6-3A1.6 1.6 0 0 1 5 3h5.1" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M10.1 3h3.1v6h-3.1z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" />
+              </svg>
+            </button>
+          </div>
+          <time>{{ formatTime(message.createdAt) }}</time>
         </div>
       </article>
 
       <div ref="messageTailRef" class="message-tail" aria-hidden="true"></div>
     </section>
 
-    <form ref="composerRef" class="composer" @submit.prevent="submitMessage">
+    <form ref="composerRef" class="composer" @submit.prevent="handleComposerAction">
       <div v-if="imagePreview" class="composer-preview">
         <img :src="imagePreview" alt="待发送图片" />
         <div class="composer-preview-copy">
           <strong>{{ selectedImage?.name || '已选择图片' }}</strong>
-          <span>将按水洗标或材质图进行分析</span>
+          <span>将按水洗标或材质图片进行分析</span>
         </div>
         <button class="remove-button" type="button" aria-label="移除图片" @click="clearSelectedImage">×</button>
       </div>
@@ -133,7 +181,7 @@
       <div class="composer-row">
         <div class="input-shell">
           <label class="plus-button" aria-label="上传图片">
-            <input type="file" accept="image/*" @change="handleFileSelect" />
+            <input type="file" accept="image/*" :disabled="isSending" @change="handleFileSelect" />
             <span></span>
             <span></span>
           </label>
@@ -144,13 +192,23 @@
             :disabled="isSending"
             placeholder="问点什么，或上传一张水洗标图片"
             @input="syncTextareaHeight"
-            @keydown.enter.exact.prevent="submitMessage"
+            @keydown.enter.exact.prevent="handleComposerAction"
           ></textarea>
         </div>
 
-        <button class="send-button" type="submit" :disabled="isSending || (!userInput.trim() && !selectedImage)">
-          <span v-if="isSending" class="send-text">中</span>
-          <span v-else-if="selectedImage" class="send-text">析</span>
+        <button
+          class="send-button"
+          :class="{ interrupt: isAbortable }"
+          type="submit"
+          :disabled="isSendButtonDisabled"
+          :aria-label="isAbortable ? '停止生成' : '发送消息'"
+        >
+          <span v-if="isAbortable" class="stop-icon" aria-hidden="true"></span>
+          <span v-else-if="isSending" class="send-loading" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+          </span>
           <span v-else class="send-arrow"></span>
         </button>
       </div>
@@ -171,6 +229,7 @@ const composerRef = ref(null);
 const messageListRef = ref(null);
 const messageTailRef = ref(null);
 const textareaRef = ref(null);
+
 const conversations = ref([]);
 const messages = ref([]);
 const currentSessionId = ref(localStorage.getItem('chatSessionId') || '');
@@ -182,6 +241,17 @@ const historyOpen = ref(false);
 const cachedWeather = ref(weatherApi.getCachedWeather());
 const selectedImage = ref(null);
 const imagePreview = ref('');
+const copiedMessageId = ref('');
+const shouldFollowLatest = ref(true);
+const currentStreamController = ref(null);
+const activeAssistantMessage = ref(null);
+
+let copiedMessageTimer = null;
+let layoutResizeObserver = null;
+
+const latestFollowThreshold = 72;
+const fallbackImage =
+  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="320" height="420"><rect width="100%" height="100%" fill="%23e6dccd"/><text x="50%" y="50%" text-anchor="middle" fill="%238b7a63" font-size="22">LOOK</text></svg>';
 
 const quickPrompts = [
   '今天 23 度，帮我搭一套轻松一点的出门穿搭。',
@@ -192,7 +262,7 @@ const quickPrompts = [
 
 const materialKnowledgeCatalog = [
   { material: '羊毛', aliases: ['羊毛', 'wool', '毛呢', '羊绒'] },
-  { material: '纯棉', aliases: ['纯棉', '棉', '全棉', 'cotton'] },
+  { material: '纯棉', aliases: ['纯棉', '全棉', '棉', 'cotton'] },
   { material: '亚麻', aliases: ['亚麻', 'linen', '麻料'] },
   { material: '牛仔布', aliases: ['牛仔布', '牛仔', 'denim'] },
   { material: '聚酯纤维', aliases: ['聚酯纤维', '聚酯', '涤纶', 'polyester'] },
@@ -202,16 +272,21 @@ const materialKnowledgeCatalog = [
 
 const materialKnowledgeKeywords = [
   '养护', '保养', '护理', '清洗', '怎么洗', '能洗吗', '洗护', '收纳', '熨烫',
-  '面料', '材质', '特点', '优点', '缺点', '适合什么季节', '适合什么场景'
+  '面料', '材质', '特点', '优点', '缺点', '适合什么季节', '适合什么场景',
+  '区别', '差别', '不同', '对比', '哪个好', '怎么买', '值不值得买'
 ];
 
-const fallbackImage =
-  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="320" height="420"><rect width="100%" height="100%" fill="%23e6dccd"/><text x="50%" y="50%" text-anchor="middle" fill="%238b7a63" font-size="22">LOOK</text></svg>';
-
 const currentLocation = computed(() => cachedWeather.value?.location || '');
-let layoutResizeObserver = null;
-const latestFollowThreshold = 72;
-const shouldFollowLatest = ref(true);
+const isAbortable = computed(() => Boolean(currentStreamController.value));
+const isSendButtonDisabled = computed(() => {
+  if (isAbortable.value) {
+    return false;
+  }
+  if (isSending.value) {
+    return true;
+  }
+  return !userInput.value.trim() && !selectedImage.value;
+});
 
 const syncLayoutMetrics = () => {
   const page = chatPageRef.value;
@@ -249,6 +324,7 @@ const isNearLatest = () => {
 const alignToLatestMessage = async ({ force = false, behavior = 'auto' } = {}) => {
   await nextTick();
   syncLayoutMetrics();
+
   window.requestAnimationFrame(() => {
     const list = messageListRef.value;
     const tail = messageTailRef.value;
@@ -271,17 +347,17 @@ const handleMessageListScroll = () => {
   shouldFollowLatest.value = isNearLatest();
 };
 
-const syncConversationLabel = () => {
-  const currentConversation = conversations.value.find((item) => item.sessionId === currentSessionId.value);
-  currentConversationLabel.value = currentConversation?.title || '新的对话';
-};
-
 const sortConversations = (items = []) =>
   [...items].sort((left, right) => {
     const rightTime = new Date(right.updatedAt || right.createdAt || 0).getTime();
     const leftTime = new Date(left.updatedAt || left.createdAt || 0).getTime();
     return rightTime - leftTime;
   });
+
+const syncConversationLabel = () => {
+  const currentConversation = conversations.value.find((item) => item.sessionId === currentSessionId.value);
+  currentConversationLabel.value = currentConversation?.title || '新的对话';
+};
 
 const revokePreviewUrl = () => {
   if (imagePreview.value?.startsWith('blob:')) {
@@ -308,12 +384,10 @@ const handleFileSelect = (event) => {
   imagePreview.value = URL.createObjectURL(file);
 };
 
-const normalizeServerMessage = (content, result = {}) => ({
-  id: `assistant-${Date.now()}`,
-  role: 'assistant',
-  content,
-  recommendations: Array.isArray(result.recommendedClothes) ? result.recommendedClothes : [],
-  createdAt: new Date().toISOString()
+const decorateAssistantMessage = (message = {}) => ({
+  ...message,
+  feedback: message.feedback || '',
+  isStreaming: Boolean(message.isStreaming)
 });
 
 const normalizeKnowledgeMessage = (payload = {}) => {
@@ -324,15 +398,47 @@ const normalizeKnowledgeMessage = (payload = {}) => {
     ? payload.matchedCareLabels.map((item) => item.symbolName || item.instruction).filter(Boolean)
     : [];
 
-  return {
+  return decorateAssistantMessage({
     id: `assistant-${Date.now()}`,
     role: 'assistant',
-    content: payload.answer || '我暂时没有从知识库里整理出可用答案。',
+    content: payload.answer || '我暂时没能从知识库里整理出可用答案。',
     analysisTags: [...new Set([...matchedFabricTags, ...matchedCareTags])].slice(0, 8),
     recommendations: [],
     createdAt: new Date().toISOString()
-  };
+  });
 };
+
+const buildAnalysisMessage = (responseData = {}) => {
+  const analysis = responseData.analysis || {};
+  const materialTags = Array.isArray(analysis.materials)
+    ? analysis.materials
+        .map((item) => (item.ratio ? `${item.name || item.rawText} ${item.ratio}` : item.name || item.rawText))
+        .filter(Boolean)
+    : [];
+  const careTags = Array.isArray(analysis.careLabels)
+    ? analysis.careLabels.map((item) => item.symbolName || item.instruction || item.rawText).filter(Boolean)
+    : [];
+
+  return decorateAssistantMessage({
+    id: `assistant-${Date.now()}`,
+    role: 'assistant',
+    content: responseData.answer || analysis.summary || '我已经看完这张图片了。',
+    analysisTags: [...materialTags, ...careTags].slice(0, 8),
+    analysisText: analysis.detectedText || '',
+    recommendations: [],
+    createdAt: new Date().toISOString()
+  });
+};
+
+const createStreamingAssistantMessage = () =>
+  decorateAssistantMessage({
+    id: `assistant-stream-${Date.now()}`,
+    role: 'assistant',
+    content: '',
+    recommendations: [],
+    createdAt: new Date().toISOString(),
+    isStreaming: true
+  });
 
 const detectMaterialKnowledgeQuestion = (text) => {
   const normalized = String(text || '').trim().toLowerCase();
@@ -343,6 +449,7 @@ const detectMaterialKnowledgeQuestion = (text) => {
   const matchedEntry = materialKnowledgeCatalog.find((entry) =>
     entry.aliases.some((alias) => normalized.includes(alias.toLowerCase()))
   );
+
   if (!matchedEntry) {
     return null;
   }
@@ -352,24 +459,65 @@ const detectMaterialKnowledgeQuestion = (text) => {
     : null;
 };
 
-const buildAnalysisMessage = (responseData) => {
-  const analysis = responseData?.analysis || {};
-  const materialTags = Array.isArray(analysis.materials)
-    ? analysis.materials.map((item) => (item.ratio ? `${item.name || item.rawText} ${item.ratio}` : item.name || item.rawText)).filter(Boolean)
-    : [];
-  const careTags = Array.isArray(analysis.careLabels)
-    ? analysis.careLabels.map((item) => item.symbolName || item.instruction || item.rawText).filter(Boolean)
-    : [];
+const isAssistantActionVisible = (message = {}) =>
+  message.role === 'assistant' &&
+  !message.isStreaming &&
+  Boolean(String(message.content || '').trim());
 
-  return {
-    id: `assistant-${Date.now()}`,
-    role: 'assistant',
-    content: responseData?.answer || analysis.summary || '我已经看完这张图片了。',
-    analysisTags: [...materialTags, ...careTags].slice(0, 8),
-    analysisText: analysis.detectedText || '',
-    recommendations: [],
-    createdAt: new Date().toISOString()
-  };
+const copyMessageContent = async (message = {}) => {
+  if (!isAssistantActionVisible(message) || !navigator.clipboard) {
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(message.content);
+    copiedMessageId.value = message.id;
+    if (copiedMessageTimer) {
+      window.clearTimeout(copiedMessageTimer);
+    }
+    copiedMessageTimer = window.setTimeout(() => {
+      copiedMessageId.value = '';
+      copiedMessageTimer = null;
+    }, 1600);
+  } catch (error) {
+    console.error('Copy message failed:', error);
+    alert('复制失败，请检查浏览器权限。');
+  }
+};
+
+const toggleMessageFeedback = (message = {}, feedback) => {
+  if (!isAssistantActionVisible(message)) {
+    return;
+  }
+
+  message.feedback = message.feedback === feedback ? '' : feedback;
+  messages.value = [...messages.value];
+};
+
+const finishStreamingMessage = (message, fallbackText = '') => {
+  if (!message) {
+    return;
+  }
+
+  message.isStreaming = false;
+  if (!String(message.content || '').trim() && fallbackText) {
+    message.content = fallbackText;
+  }
+  messages.value = [...messages.value];
+};
+
+const abortCurrentStream = async () => {
+  const controller = currentStreamController.value;
+  if (!controller) {
+    return;
+  }
+
+  controller.abort();
+  currentStreamController.value = null;
+  isSending.value = false;
+  finishStreamingMessage(activeAssistantMessage.value, '已停止生成');
+  await syncTextareaHeight();
+  await alignToLatestMessage({ behavior: 'auto' });
 };
 
 const loadMessages = async (sessionId) => {
@@ -381,7 +529,9 @@ const loadMessages = async (sessionId) => {
 
   try {
     const response = await chatApi.getConversationMessages(sessionId);
-    messages.value = response.data || [];
+    messages.value = (response.data || []).map((item) =>
+      item.role === 'assistant' ? decorateAssistantMessage(item) : item
+    );
     syncConversationLabel();
     shouldFollowLatest.value = true;
     await alignToLatestMessage({ force: true, behavior: 'auto' });
@@ -396,8 +546,11 @@ const loadConversations = async (preferredSessionId = currentSessionId.value) =>
   try {
     const response = await chatApi.getConversations(1, 20);
     conversations.value = sortConversations(response.data?.items || []);
-    const hasPreferred = preferredSessionId && conversations.value.some((item) => item.sessionId === preferredSessionId);
-    const hasCurrent = currentSessionId.value && conversations.value.some((item) => item.sessionId === currentSessionId.value);
+
+    const hasPreferred =
+      preferredSessionId && conversations.value.some((item) => item.sessionId === preferredSessionId);
+    const hasCurrent =
+      currentSessionId.value && conversations.value.some((item) => item.sessionId === currentSessionId.value);
 
     const targetSessionId = hasPreferred
       ? preferredSessionId
@@ -406,7 +559,6 @@ const loadConversations = async (preferredSessionId = currentSessionId.value) =>
         : conversations.value[0]?.sessionId || '';
 
     currentSessionId.value = targetSessionId;
-
     if (targetSessionId) {
       localStorage.setItem('chatSessionId', targetSessionId);
     } else {
@@ -422,31 +574,7 @@ const loadConversations = async (preferredSessionId = currentSessionId.value) =>
   }
 };
 
-const selectConversation = async (sessionId) => {
-  currentSessionId.value = sessionId;
-  localStorage.setItem('chatSessionId', sessionId);
-  historyOpen.value = false;
-  syncConversationLabel();
-  clearSelectedImage();
-  await loadMessages(sessionId);
-};
-
-const startNewConversation = async () => {
-  currentSessionId.value = '';
-  currentConversationLabel.value = '新的对话';
-  messages.value = [];
-  userInput.value = '';
-  historyOpen.value = false;
-  localStorage.removeItem('chatSessionId');
-  clearSelectedImage();
-  chatApi.clearCurrentSession();
-  await nextTick();
-  await syncTextareaHeight();
-  shouldFollowLatest.value = true;
-  await alignToLatestMessage({ force: true, behavior: 'auto' });
-};
-
-const submitMaterialKnowledgeQuestion = async (text, material) => {
+const submitMaterialKnowledgeQuestionStream = async (text, material) => {
   const optimisticMessage = {
     id: `local-knowledge-${Date.now()}`,
     role: 'user',
@@ -455,35 +583,73 @@ const submitMaterialKnowledgeQuestion = async (text, material) => {
     createdAt: new Date().toISOString()
   };
 
-  messages.value = [...messages.value, optimisticMessage];
+  const assistantMessage = createStreamingAssistantMessage();
+  const controller = new AbortController();
+
+  messages.value = [...messages.value, optimisticMessage, assistantMessage];
   userInput.value = '';
   isSending.value = true;
-  await syncTextareaHeight();
+  currentStreamController.value = controller;
+  activeAssistantMessage.value = assistantMessage;
   shouldFollowLatest.value = true;
+
+  await syncTextareaHeight();
   await alignToLatestMessage({ force: true, behavior: 'auto' });
 
-  try {
-    const response = await knowledgeApi.askMaterialQuestion({
-      material,
-      question: text
-    });
+  let aborted = false;
 
-    messages.value = [...messages.value, normalizeKnowledgeMessage(response.data || {})];
+  try {
+    await knowledgeApi.askMaterialQuestionStream(
+      {
+        material,
+        question: text
+      },
+      {
+        onChunk: async (chunk) => {
+          assistantMessage.content += chunk;
+          assistantMessage.isStreaming = false;
+          messages.value = [...messages.value];
+          await alignToLatestMessage({ behavior: 'auto' });
+        },
+        onComplete: async () => {
+          finishStreamingMessage(assistantMessage, '我暂时没能从知识库里整理出可用答案。');
+          await alignToLatestMessage({ behavior: 'auto' });
+        }
+      },
+      {
+        signal: controller.signal
+      }
+    );
   } catch (error) {
-    console.error('Ask material knowledge failed:', error);
-    messages.value = messages.value.filter((item) => item.id !== optimisticMessage.id);
-    alert(error.response?.data?.message || '知识库问答失败');
+    if (error?.name === 'AbortError') {
+      aborted = true;
+    } else {
+      console.error('Ask material knowledge stream failed:', error);
+      messages.value = messages.value.filter(
+        (item) => item.id !== optimisticMessage.id && item.id !== assistantMessage.id
+      );
+      alert(error.response?.data?.message || error.message || '知识库问答失败');
+    }
   } finally {
+    if (currentStreamController.value === controller) {
+      currentStreamController.value = null;
+    }
+    if (activeAssistantMessage.value === assistantMessage) {
+      activeAssistantMessage.value = null;
+    }
     isSending.value = false;
+    if (!aborted) {
+      finishStreamingMessage(assistantMessage, '我暂时没能从知识库里整理出可用答案。');
+    }
     await syncTextareaHeight();
     await alignToLatestMessage({ behavior: 'auto' });
   }
 };
 
-const submitTextMessage = async (text) => {
+const submitTextMessageStream = async (text) => {
   const material = detectMaterialKnowledgeQuestion(text);
   if (material) {
-    await submitMaterialKnowledgeQuestion(text, material);
+    await submitMaterialKnowledgeQuestionStream(text, material);
     return;
   }
 
@@ -495,46 +661,87 @@ const submitTextMessage = async (text) => {
     createdAt: new Date().toISOString()
   };
 
-  messages.value = [...messages.value, optimisticMessage];
+  const assistantMessage = createStreamingAssistantMessage();
+  const controller = new AbortController();
+
+  messages.value = [...messages.value, optimisticMessage, assistantMessage];
   userInput.value = '';
   isSending.value = true;
-  await syncTextareaHeight();
+  currentStreamController.value = controller;
+  activeAssistantMessage.value = assistantMessage;
   shouldFollowLatest.value = true;
+
+  await syncTextareaHeight();
   await alignToLatestMessage({ force: true, behavior: 'auto' });
 
-  try {
-    const response = await chatApi.sendMessage({
-      message: text,
-      sessionId: currentSessionId.value,
-      location: currentLocation.value,
-      context: 'general',
-      metadata: cachedWeather.value
-        ? {
-            weatherSummary: cachedWeather.value.summary || '',
-            weatherCondition: cachedWeather.value.weatherCondition || '',
-            temperature: cachedWeather.value.temperature || ''
-          }
-        : undefined
-    });
+  let nextSessionId = currentSessionId.value;
+  let aborted = false;
 
-    const result = response.data || {};
-    const nextSessionId = result.sessionId || currentSessionId.value;
-    currentSessionId.value = nextSessionId || '';
+  try {
+    await chatApi.sendMessageStream(
+      {
+        message: text,
+        sessionId: currentSessionId.value,
+        location: currentLocation.value,
+        context: 'general',
+        metadata: cachedWeather.value
+          ? {
+              weatherSummary: cachedWeather.value.summary || '',
+              weatherCondition: cachedWeather.value.weatherCondition || '',
+              temperature: cachedWeather.value.temperature || ''
+            }
+          : undefined
+      },
+      {
+        onSession: async (session) => {
+          nextSessionId = session?.sessionId || nextSessionId || '';
+          currentSessionId.value = nextSessionId;
+          if (nextSessionId) {
+            localStorage.setItem('chatSessionId', nextSessionId);
+          }
+        },
+        onChunk: async (chunk) => {
+          assistantMessage.content += chunk;
+          assistantMessage.isStreaming = false;
+          messages.value = [...messages.value];
+          await alignToLatestMessage({ behavior: 'auto' });
+        },
+        onComplete: async () => {
+          finishStreamingMessage(assistantMessage, '我整理好了。');
+        }
+      },
+      {
+        signal: controller.signal
+      }
+    );
 
     if (nextSessionId) {
-      localStorage.setItem('chatSessionId', nextSessionId);
       await loadConversations(nextSessionId);
+      await loadMessages(nextSessionId);
     } else {
       await loadConversations('');
     }
-
-    messages.value = [...messages.value, normalizeServerMessage(result.response || '我整理好了。', result)];
   } catch (error) {
-    console.error('Send chat message failed:', error);
-    messages.value = messages.value.filter((item) => item.id !== optimisticMessage.id);
-    alert(error.response?.data?.message || '发送失败');
+    if (error?.name === 'AbortError') {
+      aborted = true;
+    } else {
+      console.error('Send chat stream failed:', error);
+      messages.value = messages.value.filter(
+        (item) => item.id !== optimisticMessage.id && item.id !== assistantMessage.id
+      );
+      alert(error.response?.data?.message || error.message || '发送失败');
+    }
   } finally {
+    if (currentStreamController.value === controller) {
+      currentStreamController.value = null;
+    }
+    if (activeAssistantMessage.value === assistantMessage) {
+      activeAssistantMessage.value = null;
+    }
     isSending.value = false;
+    if (!aborted) {
+      finishStreamingMessage(assistantMessage, '我整理好了。');
+    }
     await syncTextareaHeight();
     await alignToLatestMessage({ behavior: 'auto' });
   }
@@ -555,15 +762,17 @@ const submitImageAnalysis = async (text) => {
     createdAt: new Date().toISOString()
   };
 
-  messages.value = [...messages.value, optimisticMessage];
   const image = selectedImage.value;
   const question = text || '请帮我分析这张水洗标图片。';
+
+  messages.value = [...messages.value, optimisticMessage];
   userInput.value = '';
   selectedImage.value = null;
   imagePreview.value = '';
   isSending.value = true;
-  await syncTextareaHeight();
   shouldFollowLatest.value = true;
+
+  await syncTextareaHeight();
   await alignToLatestMessage({ force: true, behavior: 'auto' });
 
   try {
@@ -571,7 +780,6 @@ const submitImageAnalysis = async (text) => {
       image,
       question
     });
-
     messages.value = [...messages.value, buildAnalysisMessage(response.data)];
   } catch (error) {
     console.error('Analyze material image failed:', error);
@@ -584,8 +792,12 @@ const submitImageAnalysis = async (text) => {
 };
 
 const submitMessage = async () => {
+  if (isSending.value) {
+    return;
+  }
+
   const text = userInput.value.trim();
-  if (isSending.value || (!text && !selectedImage.value)) {
+  if (!text && !selectedImage.value) {
     return;
   }
 
@@ -594,21 +806,74 @@ const submitMessage = async () => {
     return;
   }
 
-  await submitTextMessage(text);
+  await submitTextMessageStream(text);
+};
+
+const handleComposerAction = async () => {
+  if (isAbortable.value) {
+    await abortCurrentStream();
+    return;
+  }
+
+  await submitMessage();
 };
 
 const sendQuickPrompt = async (promptText) => {
+  if (isSending.value) {
+    return;
+  }
+
   userInput.value = promptText;
   await syncTextareaHeight();
   await submitMessage();
 };
 
+const selectConversation = async (sessionId) => {
+  if (isAbortable.value) {
+    await abortCurrentStream();
+  }
+
+  currentSessionId.value = sessionId;
+  localStorage.setItem('chatSessionId', sessionId);
+  historyOpen.value = false;
+  syncConversationLabel();
+  clearSelectedImage();
+  await loadMessages(sessionId);
+};
+
+const startNewConversation = async () => {
+  if (isAbortable.value) {
+    await abortCurrentStream();
+  }
+
+  currentSessionId.value = '';
+  currentConversationLabel.value = '新的对话';
+  messages.value = [];
+  userInput.value = '';
+  historyOpen.value = false;
+  localStorage.removeItem('chatSessionId');
+  clearSelectedImage();
+  chatApi.clearCurrentSession();
+  await nextTick();
+  await syncTextareaHeight();
+  shouldFollowLatest.value = true;
+  await alignToLatestMessage({ force: true, behavior: 'auto' });
+};
+
 const removeConversation = async (sessionId) => {
+  if (!sessionId) {
+    return;
+  }
+
   if (!window.confirm('确认删除这条会话吗？')) {
     return;
   }
 
   try {
+    if (currentSessionId.value === sessionId && isAbortable.value) {
+      await abortCurrentStream();
+    }
+
     await chatApi.deleteConversation(sessionId);
     if (currentSessionId.value === sessionId) {
       await startNewConversation();
@@ -664,6 +929,7 @@ onMounted(async () => {
     layoutResizeObserver = new ResizeObserver(() => {
       syncLayoutMetrics();
     });
+
     if (chatHeadRef.value) {
       layoutResizeObserver.observe(chatHeadRef.value);
     }
@@ -673,7 +939,6 @@ onMounted(async () => {
   }
 
   await loadConversations(currentSessionId.value);
-
   if (currentSessionId.value) {
     await loadMessages(currentSessionId.value);
   }
@@ -691,6 +956,13 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   layoutResizeObserver?.disconnect();
   document.body.classList.remove('drawer-open');
+  currentStreamController.value?.abort();
+
+  if (copiedMessageTimer) {
+    window.clearTimeout(copiedMessageTimer);
+    copiedMessageTimer = null;
+  }
+
   clearSelectedImage();
 });
 </script>
@@ -816,9 +1088,9 @@ onBeforeUnmount(() => {
 }
 
 .delete-button,
-.text-button,
 .remove-button,
-.prompt-chip {
+.prompt-chip,
+.message-action-button {
   border: none;
   background: transparent;
   cursor: pointer;
@@ -878,11 +1150,6 @@ onBeforeUnmount(() => {
 
 .icon-button span:last-child {
   width: 12px;
-}
-
-.text-button {
-  color: var(--text-soft);
-  font-size: 11px;
 }
 
 .new-chat-button {
@@ -1060,11 +1327,66 @@ onBeforeUnmount(() => {
   font-size: 10px;
 }
 
+.message-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.message-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.message-action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  height: auto;
+  padding: 0;
+  color: color-mix(in srgb, var(--text-soft) 88%, var(--text-faint));
+  opacity: 0.82;
+  transition: color 0.18s ease, opacity 0.18s ease, transform 0.18s ease;
+}
+
+.message-action-button:hover {
+  color: var(--text-main);
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+.message-action-button svg {
+  display: block;
+}
+
+.copy-action.copied {
+  color: #2f6b57;
+  opacity: 1;
+}
+
+.feedback-up.active {
+  color: #2f6b57;
+  opacity: 1;
+}
+
+.feedback-down.active {
+  color: #8a4f3f;
+  opacity: 1;
+}
+
 .message-card time {
   display: block;
-  margin-top: 6px;
   font-size: 10px;
   opacity: 0.62;
+  margin-left: auto;
+}
+
+.inline-loading {
+  margin-top: 2px;
 }
 
 .look-grid {
@@ -1224,15 +1546,18 @@ onBeforeUnmount(() => {
   background: var(--accent-strong);
   color: var(--surface-strong);
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.send-button.interrupt {
+  background: #9a4d3a;
 }
 
 .send-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-
-.send-text {
-  font-size: 12px;
 }
 
 .send-arrow {
@@ -1244,12 +1569,19 @@ onBeforeUnmount(() => {
   transform: rotate(45deg);
 }
 
-.loading-dots {
-  display: flex;
-  gap: 6px;
-  padding: 4px 2px;
+.stop-icon {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: currentColor;
 }
 
+.send-loading {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.send-loading span,
 .loading-dots span {
   width: 7px;
   height: 7px;
@@ -1258,10 +1590,24 @@ onBeforeUnmount(() => {
   animation: pulse 1.1s infinite ease-in-out;
 }
 
+.send-loading span {
+  width: 5px;
+  height: 5px;
+  background: currentColor;
+}
+
+.loading-dots {
+  display: flex;
+  gap: 6px;
+  padding: 4px 2px;
+}
+
+.send-loading span:nth-child(2),
 .loading-dots span:nth-child(2) {
   animation-delay: 0.16s;
 }
 
+.send-loading span:nth-child(3),
 .loading-dots span:nth-child(3) {
   animation-delay: 0.32s;
 }

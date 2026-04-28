@@ -60,6 +60,16 @@ export const knowledgeAdminApi = {
     return response.data;
   },
 
+  async importGuideFromPdf(file, updateExisting = true) {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('updateExisting', String(updateExisting));
+    const response = await apiClient.post('/admin/knowledge/guides/import-pdf', form, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data;
+  },
+
   async updateGuide(id, payload) {
     const response = await apiClient.put(`/admin/knowledge/guides/${id}`, payload);
     return response.data;

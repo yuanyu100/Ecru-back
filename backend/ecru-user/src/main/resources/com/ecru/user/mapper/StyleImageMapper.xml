@@ -23,4 +23,13 @@
         WHERE si.id = #{id}
     </select>
 
+    <select id="selectActiveCategories" resultType="java.lang.String">
+        SELECT DISTINCT style_category
+        FROM style_images
+        WHERE is_active = true
+          AND style_category IS NOT NULL
+          AND style_category != ''
+        ORDER BY style_category ASC
+    </select>
+
 </mapper>

@@ -3,6 +3,7 @@ package com.ecru.common.service.ai;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
+import lombok.extern.slf4j.Slf4j;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -25,9 +26,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
-/**
- * 图片分析服务。
- */
+@Slf4j
 @Service("aiImageAnalyzerService")
 public class AiImageAnalyzerService {
 
@@ -63,7 +62,7 @@ public class AiImageAnalyzerService {
                         return ImageAnalysisResult.fromJson(cachedData);
                     }
                 } catch (Exception e) {
-                    System.err.println("Redis缓存读取失败: " + e.getMessage());
+                    log.warn("Redis缓存读取失败: {}", e.getMessage());
                 }
             }
 
@@ -73,13 +72,13 @@ public class AiImageAnalyzerService {
                 try {
                     redisTemplate.opsForValue().set(cacheKey, result.toJson(), 86400, TimeUnit.SECONDS);
                 } catch (Exception e) {
-                    System.err.println("Redis缓存写入失败: " + e.getMessage());
+                    log.warn("Redis缓存写入失败: {}", e.getMessage());
                 }
             }
 
             return result;
         } catch (Exception e) {
-            System.err.println("分析穿搭图片失败: " + e.getMessage());
+            log.error("分析穿搭图片失败: {}", e.getMessage(), e);
             return null;
         }
     }
@@ -101,7 +100,7 @@ public class AiImageAnalyzerService {
                     return ClothingAnalysisResult.fromJson(cachedData);
                 }
             } catch (Exception e) {
-                System.err.println("Redis缓存读取失败: " + e.getMessage());
+                log.warn("Redis缓存读取失败: {}", e.getMessage());
             }
         }
 
@@ -111,7 +110,7 @@ public class AiImageAnalyzerService {
             try {
                 redisTemplate.opsForValue().set(cacheKey, result.toJson(), 86400, TimeUnit.SECONDS);
             } catch (Exception e) {
-                System.err.println("Redis缓存写入失败: " + e.getMessage());
+                log.warn("Redis缓存写入失败: {}", e.getMessage());
             }
         }
 
@@ -139,7 +138,7 @@ public class AiImageAnalyzerService {
                     return MaterialLabelAnalysisResult.fromJson(cachedData);
                 }
             } catch (Exception e) {
-                System.err.println("Redis缓存读取失败: " + e.getMessage());
+                log.warn("Redis缓存读取失败: {}", e.getMessage());
             }
         }
 
@@ -168,7 +167,7 @@ public class AiImageAnalyzerService {
             try {
                 redisTemplate.opsForValue().set(cacheKey, result.toJson(), 86400, TimeUnit.SECONDS);
             } catch (Exception e) {
-                System.err.println("Redis缓存写入失败: " + e.getMessage());
+                log.warn("Redis缓存写入失败: {}", e.getMessage());
             }
         }
 
@@ -258,7 +257,7 @@ public class AiImageAnalyzerService {
             result.setSuggestions(analysisJson.getString("suggestions"));
             return result;
         } catch (Exception e) {
-            System.err.println("解析穿搭图片响应失败: " + e.getMessage());
+            log.error("解析穿搭图片响应失败: {}", e.getMessage(), e);
             return null;
         }
     }
@@ -292,7 +291,7 @@ public class AiImageAnalyzerService {
             }
             return result;
         } catch (Exception e) {
-            System.err.println("解析衣物图片响应失败: " + e.getMessage());
+            log.error("解析衣物图片响应失败: {}", e.getMessage(), e);
             return null;
         }
     }
@@ -313,7 +312,7 @@ public class AiImageAnalyzerService {
             result.setCareLabels(parseCareLabelSignals(analysisJson.getJSONArray("careLabels")));
             return result;
         } catch (Exception e) {
-            System.err.println("解析材质标签响应失败: " + e.getMessage());
+            log.error("解析材质标签响应失败: {}", e.getMessage(), e);
             return null;
         }
     }

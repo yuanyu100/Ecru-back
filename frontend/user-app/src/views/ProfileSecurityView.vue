@@ -123,10 +123,20 @@ const logout = () => {
   }
 
   authApi.logout();
-  router.push('/login');
+  if (window.history.length > 1) {
+    router.back();
+    return;
+  }
+
+  router.replace('/login');
 };
 
 const goBack = () => {
+  if (window.history.length > 1) {
+    router.back();
+    return;
+  }
+
   router.push('/profile/account');
 };
 

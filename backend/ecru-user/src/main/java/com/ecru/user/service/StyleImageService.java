@@ -29,6 +29,11 @@ public interface StyleImageService {
      * 根据风格大类获取图片
      */
     List<StyleImageVO> getStyleImagesByCategory(String category, Integer count);
+
+    /**
+     * 获取当前可用的风格图分类。
+     */
+    List<String> getAvailableCategories();
     
     /**
      * 检查图片是否存在

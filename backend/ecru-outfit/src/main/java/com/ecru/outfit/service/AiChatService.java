@@ -57,6 +57,16 @@ public class AiChatService {
 
     private static final String CHAT_CONTEXT_PREFIX = "chat:context:";
     private static final long CONTEXT_EXPIRE_HOURS = 24;
+    private static final Set<String> MATERIAL_KNOWLEDGE_TERMS = new HashSet<>(Arrays.asList(
+            "羊毛", "羊绒", "羊毛衫", "羊绒衫", "棉", "纯棉", "亚麻", "真丝", "桑蚕丝", "丝绸",
+            "牛仔", "牛仔布", "涤纶", "聚酯", "聚酯纤维", "粘胶", "粘纤", "viscose", "rayon",
+            "linen", "silk", "wool", "cashmere", "cotton", "polyester", "denim"
+    ));
+    private static final Set<String> MATERIAL_KNOWLEDGE_QUESTIONS = new HashSet<>(Arrays.asList(
+            "区别", "差别", "不同", "对比", "哪个好", "哪个更好", "怎么选", "是什么", "什么意思",
+            "怎么养护", "怎么护理", "怎么保养", "怎么洗", "能洗吗", "洗护", "清洗", "护理",
+            "特点", "优点", "缺点", "优缺点", "适合什么", "适不适合", "值不值得买", "能买吗"
+    ));
 
     /**
      * 发送消息并获取AI回复
@@ -384,6 +394,10 @@ public class AiChatService {
         if (intentAnalysis == null) {
             return false;
         }
+        if (isMaterialKnowledgeQuestion(userMessage, intentAnalysis)) {
+            log.info("消息 [{}] 识别为材质知识问答，不检索衣柜", userMessage);
+            return false;
+        }
 
         // 获取意图类型
         String intent = readIntentText(intentAnalysis.get("intent"));
@@ -452,6 +466,29 @@ public class AiChatService {
     /**
      * 提取负面偏好
      */
+    private boolean isMaterialKnowledgeQuestion(String userMessage, Map<String, Object> intentAnalysis) {
+        String lowerMessage = userMessage == null ? "" : userMessage.toLowerCase();
+        boolean hasMaterialTerm = MATERIAL_KNOWLEDGE_TERMS.stream().anyMatch(lowerMessage::contains);
+        boolean hasKnowledgeQuestion = MATERIAL_KNOWLEDGE_QUESTIONS.stream().anyMatch(lowerMessage::contains);
+
+        if (!hasMaterialTerm && intentAnalysis != null) {
+            String clothingType = readIntentText(intentAnalysis.get("clothingType"));
+            if (clothingType != null) {
+                String normalizedType = clothingType.toLowerCase();
+                hasMaterialTerm = MATERIAL_KNOWLEDGE_TERMS.stream().anyMatch(normalizedType::contains);
+            }
+        }
+
+        String intent = intentAnalysis == null ? null : readIntentText(intentAnalysis.get("intent"));
+        boolean knowledgeIntent = intent != null
+                && (intent.toLowerCase().contains("knowledge")
+                || intent.contains("知识")
+                || intent.contains("材质")
+                || intent.contains("面料"));
+
+        return hasMaterialTerm && (hasKnowledgeQuestion || knowledgeIntent);
+    }
+
     private List<String> extractNegativePreferences(Map<String, Object> intentAnalysis) {
         List<String> negativePreferences = new ArrayList<>();
         if (intentAnalysis != null && intentAnalysis.containsKey("negativePreferences")) {

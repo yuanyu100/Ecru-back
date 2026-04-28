@@ -15,6 +15,7 @@ import com.ecru.clothing.entity.ClothingWearLog;
 import com.ecru.clothing.mapper.ClothingMapper;
 import com.ecru.clothing.mapper.ClothingWearLogMapper;
 import com.ecru.clothing.service.ClothingService;
+import com.ecru.common.config.MinioConfig;
 import com.ecru.common.exception.BusinessException;
 import com.ecru.common.service.ai.AiImageAnalyzerService;
 import com.ecru.common.service.storage.ImageStorageService;
@@ -31,6 +32,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -54,6 +56,7 @@ public class ClothingServiceImpl implements ClothingService {
     private final ClothingWearLogMapper clothingWearLogMapper;
     private final ClothingConverter clothingConverter;
     private final ImageStorageService imageStorageService;
+    private final MinioConfig minioConfig;
 
     @Qualifier("aiImageAnalyzerService")
     private final AiImageAnalyzerService imageAnalyzerService;
@@ -312,6 +315,7 @@ public class ClothingServiceImpl implements ClothingService {
     }
 
     @Override
+    @Transactional
     public void recordWear(Long userId, Long clothingId, RecordWearRequest request) {
         Clothing clothing = requireOwnedClothing(userId, clothingId);
 
@@ -502,7 +506,7 @@ public class ClothingServiceImpl implements ClothingService {
             String bucketName;
             String objectName;
             if (bucketEndIndex == -1) {
-                bucketName = "ecru";
+                bucketName = minioConfig.getBucketName();
                 objectName = path;
             } else {
                 bucketName = path.substring(0, bucketEndIndex);
@@ -510,8 +514,8 @@ public class ClothingServiceImpl implements ClothingService {
             }
 
             MinioClient minioClient = MinioClient.builder()
-                    .endpoint("http://localhost:9000")
-                    .credentials("minioadmin", "minioadmin")
+                    .endpoint(minioConfig.getEndpoint())
+                    .credentials(minioConfig.getAccessKey(), minioConfig.getSecretKey())
                     .build();
 
             return minioClient.getObject(

@@ -28,4 +28,6 @@ public interface StyleImageMapper extends BaseMapper<StyleImage> {
      * 根据ID获取图片及其标签
      */
     StyleImage selectByIdWithTags(@Param("id") Long id);
+
+    List<String> selectActiveCategories();
 }

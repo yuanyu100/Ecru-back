@@ -42,6 +42,115 @@ export const chatApi = {
     localStorage.removeItem('chatSessionId');
   },
 
+  sendMessageStream: async (input, handlers = {}, options = {}) => {
+    const payload =
+      typeof input === 'string'
+        ? { message: input }
+        : input || {};
+
+    const sessionId = payload.sessionId || localStorage.getItem('chatSessionId');
+    const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+    const baseURL = apiClient.defaults.baseURL || '/api/v1';
+
+    const response = await fetch(`${baseURL}/ai-chat-stream/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      signal: options.signal,
+      body: JSON.stringify({
+        message: payload.message,
+        sessionId,
+        location: payload.location,
+        occasion: payload.occasion,
+        context: payload.context || 'general',
+        metadata: payload.metadata
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || `Stream request failed: ${response.status}`);
+    }
+
+    if (!response.body) {
+      throw new Error('Stream response body is empty');
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+
+    const emitData = async (rawEvent) => {
+      const eventText = String(rawEvent || '').trim();
+      if (!eventText) {
+        return false;
+      }
+
+      const dataLines = eventText
+        .split(/\r?\n/)
+        .filter((line) => line.startsWith('data:'))
+        .map((line) => line.slice(5).trimStart());
+
+      const data = (dataLines.length ? dataLines.join('\n') : eventText).trim();
+      if (!data) {
+        return false;
+      }
+
+      if (data.startsWith('[SESSION]')) {
+        const [nextSessionId = '', title = '', isNewConversation = 'false'] = data.slice(9).split('|');
+        if (nextSessionId) {
+          localStorage.setItem('chatSessionId', nextSessionId);
+        }
+        await handlers.onSession?.({
+          sessionId: nextSessionId,
+          title,
+          isNewConversation: isNewConversation === 'true'
+        });
+        return false;
+      }
+
+      if (data === '[DONE]') {
+        await handlers.onComplete?.();
+        return true;
+      }
+
+      if (data.startsWith('[ERROR]')) {
+        const error = new Error(data.slice(7) || 'Stream response failed');
+        await handlers.onError?.(error);
+        throw error;
+      }
+
+      await handlers.onChunk?.(data);
+      return false;
+    };
+
+    while (true) {
+      const { value, done } = await reader.read();
+      buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+
+      let separatorIndex = buffer.search(/\r?\n\r?\n/);
+      while (separatorIndex !== -1) {
+        const eventChunk = buffer.slice(0, separatorIndex);
+        buffer = buffer.slice(separatorIndex + (buffer[separatorIndex] === '\r' ? 4 : 2));
+        const shouldStop = await emitData(eventChunk);
+        if (shouldStop) {
+          return;
+        }
+        separatorIndex = buffer.search(/\r?\n\r?\n/);
+      }
+
+      if (done) {
+        const finalChunk = buffer.trim();
+        if (finalChunk) {
+          await emitData(finalChunk);
+        }
+        return;
+      }
+    }
+  },
+
   sendMessage: async (input) => {
     try {
       const payload =

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ecru.common.mapper.ai.AiApiStatsHourlyMapper">
+
+    <select id="selectByDateRange" resultType="com.ecru.common.entity.ai.AiApiStatsHourly">
+        SELECT *
+        FROM ai_api_stats_hourly
+        WHERE stats_date &gt;= #{startDate}
+          AND stats_date &lt;= #{endDate}
+        ORDER BY stats_date, stats_hour
+    </select>
+
+    <select id="selectTodayHourly" resultType="com.ecru.common.entity.ai.AiApiStatsHourly">
+        SELECT *
+        FROM ai_api_stats_hourly
+        WHERE stats_date = #{today}
+        ORDER BY stats_hour
+    </select>
+
+    <select id="selectSceneStats" resultType="com.ecru.common.entity.ai.AiApiStatsHourly">
+        SELECT
+            scene,
+            SUM(total_calls) AS total_calls,
+            SUM(success_calls) AS success_calls,
+            SUM(failed_calls) AS failed_calls,
+            AVG(success_rate) AS avg_success_rate,
+            AVG(avg_response_time) AS avg_response_time
+        FROM ai_api_stats_hourly
+        WHERE stats_date = #{today}
+        GROUP BY scene
+    </select>
+
+    <select id="selectModelStats" resultType="com.ecru.common.entity.ai.AiApiStatsHourly">
+        SELECT
+            model,
+            SUM(total_calls) AS total_calls,
+            SUM(success_calls) AS success_calls,
+            SUM(failed_calls) AS failed_calls,
+            AVG(success_rate) AS avg_success_rate,
+            AVG(avg_response_time) AS avg_response_time
+        FROM ai_api_stats_hourly
+        WHERE stats_date = #{today}
+        GROUP BY model
+    </select>
+
+</mapper>

@@ -1,13 +1,15 @@
 <template>
   <div class="style-learning-page">
     <header class="page-header">
-      <button class="icon-back" type="button" aria-label="返回" @click="goHome">
+      <button class="icon-back" type="button" aria-label="返回上一级" @click="goBack">
         <span></span>
       </button>
       <div>
-        <p class="eyebrow">偏好学习</p>
-        <h1>风格偏好学习</h1>
-        <p class="page-copy">通过快速标记喜欢、不喜欢或跳过，让推荐系统更懂你的审美取向。</p>
+        <p class="eyebrow">风格偏好学习</p>
+        <h1>用喜欢和跳过，训练你的穿搭偏好</h1>
+        <p class="page-copy">
+          每次选择都会帮助系统更快理解你偏爱的风格方向、场景气质和搭配倾向。
+        </p>
       </div>
     </header>
 
@@ -16,7 +18,7 @@
         <div class="progress-head">
           <div>
             <p class="eyebrow">学习进度</p>
-            <h2>学习进度</h2>
+            <h2>当前偏好建模</h2>
           </div>
           <strong>{{ progress }}%</strong>
         </div>
@@ -24,23 +26,27 @@
           <span :style="{ width: `${progress}%` }"></span>
         </div>
         <p class="summary-copy">
-          当前画像会基于你的标记持续更新。进度达到 100% 后，推荐会更稳定。
+          当进度接近 100% 时，推荐流和搭配建议会更贴近你的真实审美。
         </p>
       </article>
 
       <article class="summary-card">
         <div class="section-head">
           <div>
-            <p class="eyebrow">画像</p>
-            <h2>当前偏好画像</h2>
+            <p class="eyebrow">当前画像</p>
+            <h2>已学习到的偏好</h2>
           </div>
           <button class="ghost-button small" type="button" :disabled="isResetting" @click="resetProfile">
-            {{ isResetting ? '重置中...' : '重置画像' }}
+            {{ isResetting ? '重置中...' : '重置偏好' }}
           </button>
         </div>
 
         <div v-if="topPreferences.length" class="preference-list">
-          <article v-for="item in topPreferences" :key="item.styleTag.id || item.styleTag.name" class="preference-item">
+          <article
+            v-for="item in topPreferences"
+            :key="item.styleTag.id || item.styleTag.name"
+            class="preference-item"
+          >
             <div class="preference-meta">
               <div>
                 <strong>{{ item.styleTag.name || '未命名标签' }}</strong>
@@ -53,18 +59,18 @@
             </div>
           </article>
         </div>
-        <p v-else class="empty-tip">还没有形成明显的偏好画像，先完成几次标记。</p>
+        <p v-else class="empty-tip">还没有形成明确偏好，先看几组风格图试试。</p>
       </article>
     </section>
 
     <section class="filter-card">
       <div class="section-head">
         <div>
-          <p class="eyebrow">方向</p>
-          <h2>筛选风格方向</h2>
+          <p class="eyebrow">风格筛选</p>
+          <h2>按方向浏览灵感图</h2>
         </div>
         <button class="ghost-button small" type="button" :disabled="isLoadingImages" @click="refreshQueue">
-          {{ isLoadingImages ? '加载中...' : '换一组图片' }}
+          {{ isLoadingImages ? '刷新中...' : '换一组图片' }}
         </button>
       </div>
 
@@ -82,7 +88,7 @@
     </section>
 
     <section class="learning-card">
-      <div v-if="isLoadingImages" class="state-card">正在加载风格图...</div>
+      <div v-if="isLoadingImages" class="state-card">正在加载风格图片...</div>
 
       <div v-else-if="currentImage" class="learning-shell">
         <div class="image-shell">
@@ -92,7 +98,7 @@
         <div class="image-panel">
           <div class="image-head">
             <div>
-              <p class="eyebrow">当前卡片</p>
+              <p class="eyebrow">当前图片</p>
               <h2>{{ currentImage.title }}</h2>
             </div>
             <span class="category-badge">{{ currentImage.styleCategory || selectedCategory }}</span>
@@ -101,21 +107,21 @@
           <div class="meta-grid">
             <div>
               <span>来源</span>
-              <strong>{{ currentImage.source || '未知来源' }}</strong>
+              <strong>{{ currentImage.source || '未标注来源' }}</strong>
             </div>
             <div>
-              <span>价格</span>
+              <span>参考价格</span>
               <strong>{{ formatPrice(currentImage.price) }}</strong>
             </div>
           </div>
 
           <div class="tag-block">
-            <p>关联标签</p>
+            <p>相关标签</p>
             <div class="tag-row">
               <span v-for="tag in currentImage.tags" :key="tag.id || tag.name" class="tag-chip">
                 {{ tag.name }}
               </span>
-              <span v-if="currentImage.tags.length === 0" class="muted-text">当前图片还没有标签信息</span>
+              <span v-if="currentImage.tags.length === 0" class="muted-text">这张图暂时还没有标签。</span>
             </div>
           </div>
 
@@ -147,7 +153,7 @@
           </div>
 
           <p class="summary-copy">
-            每次标记都会更新你的风格画像，后续 AI 穿搭建议会更贴近这些偏好。
+            多点几轮后，系统会更稳定地识别你偏爱的风格路线，并反映到首页推荐和搭配建议里。
           </p>
 
           <a
@@ -163,9 +169,9 @@
       </div>
 
       <div v-else class="state-card">
-        <p>当前没有可用的风格图。</p>
-        <p class="muted-text">可能是样本数据还没准备好，也可能这组图片已经全部标记完了。</p>
-        <button class="primary-button" type="button" @click="refreshQueue">重新尝试</button>
+        <p>当前没有可展示的风格图。</p>
+        <p class="muted-text">你可以刷新图片，或者切换一个风格分类再试。</p>
+        <button class="primary-button" type="button" @click="refreshQueue">重新加载</button>
       </div>
     </section>
   </div>
@@ -176,18 +182,20 @@ import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { stylePreferenceApi } from '../api/stylePreference';
 
+const ALL_CATEGORY = '全部';
+
 const router = useRouter();
 const progress = ref(0);
 const topPreferences = ref([]);
 const categories = ref([]);
-const selectedCategory = ref('全部');
+const selectedCategory = ref(ALL_CATEGORY);
 const imageQueue = ref([]);
 const isLoadingImages = ref(false);
 const isSubmitting = ref(false);
 const isResetting = ref(false);
 const seenImageIds = new Set();
 
-const categoryOptions = computed(() => ['全部', ...categories.value.filter(Boolean)]);
+const categoryOptions = computed(() => [ALL_CATEGORY, ...categories.value.filter(Boolean)]);
 const currentImage = computed(() => imageQueue.value[0] || null);
 
 const toScoreWidth = (score) => {
@@ -202,7 +210,7 @@ const formatScore = (score) => {
 
 const formatPrice = (price) => {
   if (price === null || price === undefined || price === '') {
-    return '未提供';
+    return '暂无';
   }
 
   const numeric = Number(price);
@@ -211,6 +219,15 @@ const formatPrice = (price) => {
   }
 
   return `¥${numeric.toFixed(2)}`;
+};
+
+const goBack = () => {
+  if (window.history.length > 1) {
+    router.back();
+    return;
+  }
+
+  router.push('/profile/system');
 };
 
 const syncSummary = async () => {
@@ -238,7 +255,7 @@ const fetchImages = async ({ append = false, allowReuse = false } = {}) => {
     }
 
     const result =
-      selectedCategory.value === '全部'
+      selectedCategory.value === ALL_CATEGORY
         ? await stylePreferenceApi.getRandomImages(12)
         : await stylePreferenceApi.getImagesByCategory(selectedCategory.value, 12);
 
@@ -294,7 +311,7 @@ const submitFeedback = async (preferenceType) => {
 };
 
 const resetProfile = async () => {
-  if (!window.confirm('确认清空当前风格画像和已标记记录吗？')) {
+  if (!window.confirm('确认重置当前风格偏好吗？已学习到的偏好分数会清空。')) {
     return;
   }
 
@@ -306,14 +323,10 @@ const resetProfile = async () => {
     await refreshQueue();
   } catch (error) {
     console.error('Reset style profile failed:', error);
-    alert(error.response?.data?.message || '重置风格画像失败');
+    alert(error.response?.data?.message || '重置风格偏好失败');
   } finally {
     isResetting.value = false;
   }
-};
-
-const goHome = () => {
-  router.push('/');
 };
 
 onMounted(async () => {
@@ -327,9 +340,9 @@ onMounted(async () => {
   min-height: 100vh;
   padding: 20px 16px 40px;
   background:
-    radial-gradient(circle at top left, rgba(255, 243, 214, 0.86), transparent 32%),
-    radial-gradient(circle at bottom right, rgba(198, 138, 74, 0.18), transparent 28%),
-    linear-gradient(180deg, #f7efdc 0%, #ead9b8 100%);
+    radial-gradient(circle at top left, color-mix(in srgb, var(--accent-soft) 70%, transparent), transparent 32%),
+    radial-gradient(circle at bottom right, color-mix(in srgb, var(--surface-quiet) 92%, transparent), transparent 28%),
+    linear-gradient(180deg, var(--bg-base) 0%, var(--bg-soft) 100%);
 }
 
 .page-header,
@@ -362,17 +375,17 @@ onMounted(async () => {
   place-items: center;
   width: 34px;
   height: 34px;
-  border: 1px solid rgba(145, 104, 49, 0.14);
+  border: 1px solid var(--line-soft);
   border-radius: 50%;
-  background: rgba(255, 251, 244, 0.88);
+  background: color-mix(in srgb, var(--surface-strong) 90%, transparent);
   cursor: pointer;
 }
 
 .icon-back span {
   width: 10px;
   height: 10px;
-  border-left: 1.5px solid #5d4523;
-  border-bottom: 1.5px solid #5d4523;
+  border-left: 1.5px solid var(--text-main);
+  border-bottom: 1.5px solid var(--text-main);
   transform: rotate(45deg);
   margin-left: 4px;
 }
@@ -380,21 +393,15 @@ onMounted(async () => {
 .page-copy,
 .summary-copy,
 .muted-text {
-  color: #7a6040;
+  color: var(--text-soft);
 }
 
 .eyebrow {
   margin-bottom: 6px;
-  color: #8f6a37;
+  color: var(--text-faint);
   font-size: 12px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-}
-
-.page-header h1,
-.summary-card h2,
-.image-panel h2 {
-  color: #5d4523;
 }
 
 .summary-grid,
@@ -408,9 +415,9 @@ onMounted(async () => {
 .learning-card,
 .state-card {
   border-radius: 28px;
-  background: rgba(255, 251, 244, 0.94);
-  border: 1px solid rgba(145, 104, 49, 0.14);
-  box-shadow: 0 18px 44px rgba(109, 78, 38, 0.08);
+  background: color-mix(in srgb, var(--surface-strong) 94%, transparent);
+  border: 1px solid var(--line-soft);
+  box-shadow: var(--shadow-soft);
 }
 
 .summary-card,
@@ -421,7 +428,7 @@ onMounted(async () => {
 }
 
 .progress-card strong {
-  color: #6b4b1f;
+  color: var(--accent-strong);
   font-size: 32px;
 }
 
@@ -429,7 +436,7 @@ onMounted(async () => {
 .score-track {
   overflow: hidden;
   border-radius: 999px;
-  background: #f0e1c5;
+  background: color-mix(in srgb, var(--accent-soft) 70%, var(--surface-quiet));
 }
 
 .progress-track {
@@ -442,7 +449,7 @@ onMounted(async () => {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #b77b30 0%, #6b4b1f 100%);
+  background: linear-gradient(90deg, var(--accent) 0%, var(--accent-strong) 100%);
 }
 
 .preference-list {
@@ -453,19 +460,20 @@ onMounted(async () => {
 .preference-item {
   padding: 12px 14px;
   border-radius: 18px;
-  background: #fffdf8;
+  background: var(--surface-strong);
 }
 
-.preference-meta strong {
-  display: block;
-  color: #5d4523;
+.preference-meta strong,
+.meta-grid strong,
+.image-panel h2 {
+  color: var(--text-main);
 }
 
 .preference-meta span,
 .preference-meta em,
 .meta-grid span,
 .category-badge {
-  color: #8b6f48;
+  color: var(--text-faint);
   font-size: 12px;
 }
 
@@ -504,13 +512,13 @@ onMounted(async () => {
 
 .filter-chip {
   padding: 10px 14px;
-  background: #f3e4c9;
-  color: #6b4b1f;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
 }
 
 .filter-chip.active {
-  background: #6b4b1f;
-  color: #fff8ef;
+  background: var(--accent-strong);
+  color: var(--surface-strong);
 }
 
 .learning-shell {
@@ -520,15 +528,18 @@ onMounted(async () => {
 .image-shell {
   overflow: hidden;
   border-radius: 24px;
-  background: #f0e1c5;
+  background: #fff;
+  border: 1px solid var(--line-soft);
   min-height: 320px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
 }
 
 .image-shell img {
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  background: #fff;
 }
 
 .image-panel {
@@ -539,7 +550,7 @@ onMounted(async () => {
 .category-badge,
 .tag-chip {
   padding: 8px 12px;
-  background: #f1debd;
+  background: var(--accent-soft);
 }
 
 .meta-grid {
@@ -550,18 +561,12 @@ onMounted(async () => {
   flex: 1;
   padding: 14px;
   border-radius: 18px;
-  background: #fffdf8;
-}
-
-.meta-grid strong {
-  display: block;
-  margin-top: 8px;
-  color: #5d4523;
+  background: var(--surface-strong);
 }
 
 .tag-block p {
   margin-bottom: 10px;
-  color: #6e5433;
+  color: var(--text-soft);
 }
 
 .action-row {
@@ -571,31 +576,30 @@ onMounted(async () => {
 .feedback-button {
   flex: 1;
   padding: 14px 16px;
-  color: #fffaf4;
+  color: #fff;
   font-weight: 600;
 }
 
 .feedback-button.dislike {
-  background: #d65f53;
+  background: var(--danger);
 }
 
 .feedback-button.skip {
-  background: #b49568;
+  background: var(--accent);
 }
 
 .feedback-button.like {
-  background: #6b4b1f;
+  background: var(--accent-strong);
 }
 
 .source-link {
-  color: #7d5930;
-  text-decoration: none;
+  color: var(--accent-strong);
   font-weight: 600;
 }
 
 .empty-tip,
 .state-card {
-  color: #6d573b;
+  color: var(--text-soft);
 }
 
 .state-card {
@@ -608,8 +612,8 @@ onMounted(async () => {
 }
 
 .ghost-button {
-  background: #ead7b8;
-  color: #5d4523;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
 }
 
 .ghost-button.small {
@@ -618,8 +622,8 @@ onMounted(async () => {
 
 .primary-button {
   margin-top: 12px;
-  background: #6b4b1f;
-  color: #fff8ef;
+  background: var(--accent-strong);
+  color: var(--surface-strong);
 }
 
 .ghost-button:disabled,

@@ -1,7 +1,7 @@
 USE ecru;
 
 -- Demo accounts:
---   admin:    zhangsan / 123456
+--   admin:    admin / 123456
 --   ordinary: testuser / 123456
 -- The password hash below is BCrypt("123456").
 
@@ -50,7 +50,7 @@ INSERT INTO users (
     username, password, email, phone, avatar_url, nickname, role, status, created_at, updated_at
 ) VALUES
     (
-        'zhangsan',
+        'admin',
         @demo_password,
         'demo-admin-ecru@example.com',
         '19988880002',
@@ -83,7 +83,7 @@ ON DUPLICATE KEY UPDATE
     status = VALUES(status),
     updated_at = NOW();
 
-SET @admin_id = (SELECT id FROM users WHERE username = 'zhangsan' LIMIT 1);
+SET @admin_id = (SELECT id FROM users WHERE username = 'admin' LIMIT 1);
 SET @user_id = (SELECT id FROM users WHERE username = 'testuser' LIMIT 1);
 
 CREATE TABLE IF NOT EXISTS style_tags (
@@ -281,13 +281,13 @@ WHERE title IN (
 );
 
 INSERT INTO style_tags (name, category, is_preset, description, usage_count, created_at, updated_at) VALUES
-    ('commute', 'style', 1, 'Looks suited for weekday commute and office scenes', 12, NOW(), NOW()),
-    ('minimal', 'style', 1, 'Low saturation and clean silhouette direction', 9, NOW(), NOW()),
-    ('soft', 'mood', 1, 'Gentle and light visual impression', 7, NOW(), NOW()),
-    ('academia', 'style', 1, 'Bookish and clean campus-inspired styling', 6, NOW(), NOW()),
-    ('casual', 'style', 1, 'Relaxed and everyday weekend direction', 10, NOW(), NOW()),
-    ('vintage', 'style', 1, 'Layered styling with a retro tone', 5, NOW(), NOW()),
-    ('sharp', 'mood', 1, 'Crisp lines and tailored visual impression', 8, NOW(), NOW())
+    ('通勤', '风格', 1, '适合上班、通勤和办公室场景的穿搭方向', 12, NOW(), NOW()),
+    ('极简', '风格', 1, '低饱和、干净利落的轮廓与配色方向', 9, NOW(), NOW()),
+    ('柔和', '氛围', 1, '视觉感受轻盈温和、亲和度高', 7, NOW(), NOW()),
+    ('学院', '风格', 1, '带有书卷感和校园气质的清爽搭配', 6, NOW(), NOW()),
+    ('休闲', '风格', 1, '适合日常出行与周末放松的轻松穿搭', 10, NOW(), NOW()),
+    ('复古', '风格', 1, '带有层次感和旧时氛围的复古搭配', 5, NOW(), NOW()),
+    ('利落', '氛围', 1, '线条清晰、剪裁明确的干练视觉', 8, NOW(), NOW())
 ON DUPLICATE KEY UPDATE
     is_preset = VALUES(is_preset),
     description = VALUES(description),
@@ -302,27 +302,27 @@ SET @style_img_vintage_layering = 'https://dummyimage.com/900x1200/d7cbbf/573e2a
 SET @style_img_sharp_tailoring = 'https://dummyimage.com/900x1200/d8dde5/384557.png&text=SHARP';
 
 INSERT INTO style_images (image_url, title, source, source_url, price, style_category, is_active, created_at, updated_at) VALUES
-    (@style_img_commute_minimal, 'Demo Commute Minimal', 'demo-seed', 'https://example.com/style/commute-minimal', 299.00, 'commute', 1, NOW(), NOW()),
-    (@style_img_soft_office, 'Demo Soft Office', 'demo-seed', 'https://example.com/style/soft-office', 269.00, 'commute', 1, NOW(), NOW()),
-    (@style_img_clean_academia, 'Demo Clean Academia', 'demo-seed', 'https://example.com/style/clean-academia', 329.00, 'academia', 1, NOW(), NOW()),
-    (@style_img_weekend_casual, 'Demo Weekend Casual', 'demo-seed', 'https://example.com/style/weekend-casual', 219.00, 'casual', 1, NOW(), NOW()),
-    (@style_img_vintage_layering, 'Demo Vintage Layering', 'demo-seed', 'https://example.com/style/vintage-layering', 359.00, 'vintage', 1, NOW(), NOW()),
-    (@style_img_sharp_tailoring, 'Demo Sharp Tailoring', 'demo-seed', 'https://example.com/style/sharp-tailoring', 399.00, 'commute', 1, NOW(), NOW());
+    (@style_img_commute_minimal, '通勤极简示例', '演示数据', 'https://example.com/style/commute-minimal', 299.00, '通勤', 1, NOW(), NOW()),
+    (@style_img_soft_office, '柔和通勤示例', '演示数据', 'https://example.com/style/soft-office', 269.00, '通勤', 1, NOW(), NOW()),
+    (@style_img_clean_academia, '清爽学院示例', '演示数据', 'https://example.com/style/clean-academia', 329.00, '学院', 1, NOW(), NOW()),
+    (@style_img_weekend_casual, '周末休闲示例', '演示数据', 'https://example.com/style/weekend-casual', 219.00, '休闲', 1, NOW(), NOW()),
+    (@style_img_vintage_layering, '复古叠穿示例', '演示数据', 'https://example.com/style/vintage-layering', 359.00, '复古', 1, NOW(), NOW()),
+    (@style_img_sharp_tailoring, '利落剪裁示例', '演示数据', 'https://example.com/style/sharp-tailoring', 399.00, '通勤', 1, NOW(), NOW());
 
-SET @style_image_1 = (SELECT id FROM style_images WHERE title = 'Demo Commute Minimal' ORDER BY id DESC LIMIT 1);
-SET @style_image_2 = (SELECT id FROM style_images WHERE title = 'Demo Soft Office' ORDER BY id DESC LIMIT 1);
-SET @style_image_3 = (SELECT id FROM style_images WHERE title = 'Demo Clean Academia' ORDER BY id DESC LIMIT 1);
-SET @style_image_4 = (SELECT id FROM style_images WHERE title = 'Demo Weekend Casual' ORDER BY id DESC LIMIT 1);
-SET @style_image_5 = (SELECT id FROM style_images WHERE title = 'Demo Vintage Layering' ORDER BY id DESC LIMIT 1);
-SET @style_image_6 = (SELECT id FROM style_images WHERE title = 'Demo Sharp Tailoring' ORDER BY id DESC LIMIT 1);
+SET @style_image_1 = (SELECT id FROM style_images WHERE title = '通勤极简示例' ORDER BY id DESC LIMIT 1);
+SET @style_image_2 = (SELECT id FROM style_images WHERE title = '柔和通勤示例' ORDER BY id DESC LIMIT 1);
+SET @style_image_3 = (SELECT id FROM style_images WHERE title = '清爽学院示例' ORDER BY id DESC LIMIT 1);
+SET @style_image_4 = (SELECT id FROM style_images WHERE title = '周末休闲示例' ORDER BY id DESC LIMIT 1);
+SET @style_image_5 = (SELECT id FROM style_images WHERE title = '复古叠穿示例' ORDER BY id DESC LIMIT 1);
+SET @style_image_6 = (SELECT id FROM style_images WHERE title = '利落剪裁示例' ORDER BY id DESC LIMIT 1);
 
-SET @style_tag_commute = (SELECT id FROM style_tags WHERE name = 'commute' AND category = 'style' LIMIT 1);
-SET @style_tag_minimal = (SELECT id FROM style_tags WHERE name = 'minimal' AND category = 'style' LIMIT 1);
-SET @style_tag_soft = (SELECT id FROM style_tags WHERE name = 'soft' AND category = 'mood' LIMIT 1);
-SET @style_tag_academia = (SELECT id FROM style_tags WHERE name = 'academia' AND category = 'style' LIMIT 1);
-SET @style_tag_casual = (SELECT id FROM style_tags WHERE name = 'casual' AND category = 'style' LIMIT 1);
-SET @style_tag_vintage = (SELECT id FROM style_tags WHERE name = 'vintage' AND category = 'style' LIMIT 1);
-SET @style_tag_sharp = (SELECT id FROM style_tags WHERE name = 'sharp' AND category = 'mood' LIMIT 1);
+SET @style_tag_commute = (SELECT id FROM style_tags WHERE name = '通勤' AND category = '风格' LIMIT 1);
+SET @style_tag_minimal = (SELECT id FROM style_tags WHERE name = '极简' AND category = '风格' LIMIT 1);
+SET @style_tag_soft = (SELECT id FROM style_tags WHERE name = '柔和' AND category = '氛围' LIMIT 1);
+SET @style_tag_academia = (SELECT id FROM style_tags WHERE name = '学院' AND category = '风格' LIMIT 1);
+SET @style_tag_casual = (SELECT id FROM style_tags WHERE name = '休闲' AND category = '风格' LIMIT 1);
+SET @style_tag_vintage = (SELECT id FROM style_tags WHERE name = '复古' AND category = '风格' LIMIT 1);
+SET @style_tag_sharp = (SELECT id FROM style_tags WHERE name = '利落' AND category = '氛围' LIMIT 1);
 
 INSERT INTO style_image_tags (image_id, style_tag_id, confidence, created_at) VALUES
     (@style_image_1, @style_tag_commute, 0.98, NOW()),
@@ -966,5 +966,5 @@ INSERT INTO ai_api_call_record (
     );
 
 SELECT 'Demo data seeded successfully.' AS message,
-       'zhangsan / 123456 (ADMIN)' AS admin_account,
+       'admin / 123456 (ADMIN)' AS admin_account,
        'testuser / 123456 (USER)' AS user_account;

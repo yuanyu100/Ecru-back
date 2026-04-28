@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ecru.common.mapper.ai.AiApiCallRecordMapper">
+
+    <select id="selectRecentCalls" resultType="com.ecru.common.entity.ai.AiApiCallRecord">
+        SELECT *
+        FROM ai_api_call_record
+        ORDER BY created_at DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectErrorDistribution" resultType="map">
+        SELECT
+            error_type,
+            COUNT(*) AS count
+        FROM ai_api_call_record
+        WHERE status = 0
+          AND created_at &gt;= #{startTime}
+        GROUP BY error_type
+    </select>
+
+    <select id="selectTodayStats" resultType="map">
+        SELECT
+            COUNT(*) AS total_calls,
+            SUM(CASE WHEN status = 1 THEN 1 ELSE 0 END) AS success_calls,
+            SUM(CASE WHEN status = 0 THEN 1 ELSE 0 END) AS failed_calls,
+            AVG(response_time) AS avg_response_time,
+            SUM(total_tokens) AS total_tokens
+        FROM ai_api_call_record
+        WHERE create_date = #{today}
+    </select>
+
+</mapper>

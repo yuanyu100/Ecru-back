@@ -1,6 +1,7 @@
 package com.ecru.common.service.vector;
 
 import okhttp3.*;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -8,9 +9,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * 嵌入服务
- */
+@Slf4j
 @Service
 public class EmbeddingService {
 
@@ -72,8 +71,7 @@ public class EmbeddingService {
                 return parseEmbeddingResponse(responseBody);
             }
         } catch (Exception e) {
-            System.err.println("生成文本嵌入失败: " + e.getMessage());
-            // 失败时返回模拟向量作为兜底
+            log.error("生成文本嵌入失败: {}", e.getMessage(), e);
             float[] embedding = new float[1024];
             for (int i = 0; i < embedding.length; i++) {
                 embedding[i] = (float) (text.length() % (i + 1)) / (i + 1);
@@ -111,16 +109,11 @@ public class EmbeddingService {
             }
             return embedding;
         } catch (Exception e) {
-            System.err.println("解析嵌入响应失败: " + e.getMessage());
+            log.error("解析嵌入响应失败: {}", e.getMessage(), e);
             return new float[1024];
         }
     }
 
-    /**
-     * 批量生成文本嵌入
-     * @param texts 文本列表
-     * @return 嵌入向量列表
-     */
     public List<float[]> generateBatchEmbeddings(List<String> texts) {
         try {
             // 调用硅基流动API批量生成真实嵌入
@@ -155,8 +148,7 @@ public class EmbeddingService {
                 return parseBatchEmbeddingResponse(responseBody);
             }
         } catch (Exception e) {
-            System.err.println("批量生成文本嵌入失败: " + e.getMessage());
-            // 失败时返回模拟向量作为兜底
+            log.error("批量生成文本嵌入失败: {}", e.getMessage(), e);
             List<float[]> embeddings = new ArrayList<>();
             for (String text : texts) {
                 float[] embedding = new float[1024];
@@ -191,7 +183,7 @@ public class EmbeddingService {
             }
             return embeddings;
         } catch (Exception e) {
-            System.err.println("解析批量嵌入响应失败: " + e.getMessage());
+            log.error("解析批量嵌入响应失败: {}", e.getMessage(), e);
             return new ArrayList<>();
         }
     }

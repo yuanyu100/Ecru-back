@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Screenshot Auth Helper</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: #f5f4ef;
+        color: #222;
+        font: 16px/1.5 "Microsoft YaHei", "Noto Sans SC", sans-serif;
+      }
+      .card {
+        padding: 24px 28px;
+        border: 1px solid #222;
+        background: #fff;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">正在注入登录态并跳转截图页面…</div>
+    <script>
+      const params = new URLSearchParams(location.search);
+      const target = params.get('target') || '/';
+      const accessToken = params.get('accessToken') || '';
+      const refreshToken = params.get('refreshToken') || '';
+      const user = params.get('user') || '';
+
+      if (accessToken) {
+        localStorage.setItem('accessToken', accessToken);
+        localStorage.setItem('token', accessToken);
+      }
+      if (refreshToken) {
+        localStorage.setItem('refreshToken', refreshToken);
+      }
+      if (user) {
+        localStorage.setItem('user', decodeURIComponent(user));
+      }
+
+      setTimeout(() => {
+        location.replace(target);
+      }, 120);
+    </script>
+  </body>
+</html>

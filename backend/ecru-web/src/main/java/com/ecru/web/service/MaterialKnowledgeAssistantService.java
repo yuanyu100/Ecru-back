@@ -3,8 +3,10 @@ package com.ecru.web.service;
 import com.ecru.common.exception.BusinessException;
 import com.ecru.common.service.ai.AiImageAnalyzerService;
 import com.ecru.common.service.ai.AiTextGeneratorService;
+import com.ecru.common.service.ai.AiTextGeneratorStreamService;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -18,14 +20,20 @@ import java.util.Objects;
 public class MaterialKnowledgeAssistantService {
 
     private static final int MATCH_LIMIT = 5;
+    private static final String MATERIAL_SYSTEM_PROMPT = "你是服装材质、面料和洗护知识助手。请严格基于给定的知识库匹配结果回答，"
+            + "不要把用户衣柜、穿搭推荐、图片推荐混入回答；如信息不足，请明确说明。"
+            + "回答使用简洁、自然的中文，优先说明材质特点、区别、优缺点、适用场景和护理建议。";
 
     private final KnowledgeBaseService knowledgeBaseService;
     private final AiTextGeneratorService aiTextGeneratorService;
+    private final AiTextGeneratorStreamService aiTextGeneratorStreamService;
 
     public MaterialKnowledgeAssistantService(KnowledgeBaseService knowledgeBaseService,
-                                             AiTextGeneratorService aiTextGeneratorService) {
+                                             AiTextGeneratorService aiTextGeneratorService,
+                                             AiTextGeneratorStreamService aiTextGeneratorStreamService) {
         this.knowledgeBaseService = knowledgeBaseService;
         this.aiTextGeneratorService = aiTextGeneratorService;
+        this.aiTextGeneratorStreamService = aiTextGeneratorStreamService;
     }
 
     public Map<String, Object> askMaterialQuestion(String material, String question, Long userId) {
@@ -56,6 +64,35 @@ public class MaterialKnowledgeAssistantService {
         result.put("answer", answer);
         result.put("answerSource", answerSource);
         return result;
+    }
+
+    public Flux<String> askMaterialQuestionStream(String material, String question, Long userId) {
+        String safeMaterial = StringUtils.trimToEmpty(material);
+        String safeQuestion = StringUtils.trimToEmpty(question);
+        if (StringUtils.isBlank(safeMaterial)) {
+            throw new BusinessException(400, "材质不能为空");
+        }
+        if (StringUtils.isBlank(safeQuestion)) {
+            throw new BusinessException(400, "问题不能为空");
+        }
+
+        List<String> keywords = collectKeywords(safeMaterial, safeQuestion, null);
+        List<Map<String, Object>> matchedFabrics = knowledgeBaseService.matchFabrics(keywords, MATCH_LIMIT);
+        List<Map<String, Object>> matchedCareLabels = knowledgeBaseService.matchCareLabels(keywords, MATCH_LIMIT);
+
+        Map<String, Object> context = new LinkedHashMap<>();
+        context.put("material", safeMaterial);
+        context.put("matchedFabrics", matchedFabrics);
+        context.put("matchedCareLabels", matchedCareLabels);
+        context.put("needClothingSearch", false);
+
+        String userPrompt = "用户识别到的主要材质是：" + safeMaterial + "\n"
+                + "用户问题：" + safeQuestion + "\n"
+                + "请只结合知识库信息作答；如果问题涉及区别、优缺点、是否值得购买、适合场景、养护方法，请一并说明。";
+
+        return aiTextGeneratorStreamService
+                .generateStreamResponseWithCustomPrompt(MATERIAL_SYSTEM_PROMPT, userPrompt, List.of(), context)
+                .switchIfEmpty(Flux.just(buildFallbackAnswer(safeMaterial, safeQuestion, matchedFabrics, matchedCareLabels, null), "[DONE]"));
     }
 
     public Map<String, Object> buildMaterialAnalysisResponse(

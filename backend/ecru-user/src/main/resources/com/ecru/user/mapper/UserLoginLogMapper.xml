@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ecru.user.mapper.UserLoginLogMapper">
+
+    <select id="selectAdminLogs" resultType="com.ecru.user.vo.UserLoginLogVO">
+        SELECT
+            l.id,
+            l.user_id AS userId,
+            u.username,
+            u.nickname,
+            l.login_type AS loginType,
+            l.login_ip AS loginIp,
+            l.login_device AS loginDevice,
+            l.login_location AS loginLocation,
+            l.login_status AS loginStatus,
+            l.fail_reason AS failReason,
+            l.created_at AS createdAt
+        FROM user_login_logs l
+        LEFT JOIN users u ON u.id = l.user_id
+        WHERE 1 = 1
+        <if test="userId != null">
+            AND l.user_id = #{userId}
+        </if>
+        <if test="loginStatus != null">
+            AND l.login_status = #{loginStatus}
+        </if>
+        ORDER BY l.created_at DESC
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="countAdminLogs" resultType="long">
+        SELECT COUNT(*)
+        FROM user_login_logs l
+        WHERE 1 = 1
+        <if test="userId != null">
+            AND l.user_id = #{userId}
+        </if>
+        <if test="loginStatus != null">
+            AND l.login_status = #{loginStatus}
+        </if>
+    </select>
+
+</mapper>

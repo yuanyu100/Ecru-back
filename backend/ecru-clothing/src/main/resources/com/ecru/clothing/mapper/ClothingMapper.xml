@@ -1,0 +1,294 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ecru.clothing.mapper.ClothingMapper">
+
+    <sql id="wearPeriodCondition">
+        <if test="period != null and period != '' and period != 'all'">
+            <choose>
+                <when test="period == 'today'">
+                    AND worn_at = CURRENT_DATE
+                </when>
+                <when test="period == 'week'">
+                    AND worn_at &gt;= DATE_SUB(CURRENT_DATE, INTERVAL 6 DAY)
+                </when>
+                <when test="period == 'month'">
+                    AND worn_at &gt;= DATE_SUB(CURRENT_DATE, INTERVAL 29 DAY)
+                </when>
+                <when test="period == 'year'">
+                    AND worn_at &gt;= DATE_SUB(CURRENT_DATE, INTERVAL 364 DAY)
+                </when>
+            </choose>
+        </if>
+    </sql>
+
+    <select id="selectClothingList" resultType="com.ecru.clothing.entity.Clothing">
+        SELECT *
+        FROM clothings
+        WHERE user_id = #{userId}
+          AND is_deleted = 0
+        <if test="request.category != null and request.category != ''">
+            AND category = #{request.category}
+        </if>
+        <if test="request.primaryColor != null and request.primaryColor != ''">
+            AND primary_color = #{request.primaryColor}
+        </if>
+        <if test="request.material != null and request.material != ''">
+            AND material = #{request.material}
+        </if>
+        <if test="request.styleTag != null and request.styleTag != ''">
+            AND style_tags LIKE CONCAT('%', #{request.styleTag}, '%')
+        </if>
+        <if test="request.occasionTag != null and request.occasionTag != ''">
+            AND occasion_tags LIKE CONCAT('%', #{request.occasionTag}, '%')
+        </if>
+        <if test="request.seasonTag != null and request.seasonTag != ''">
+            AND season_tags LIKE CONCAT('%', #{request.seasonTag}, '%')
+        </if>
+        <if test="request.keyword != null and request.keyword != ''">
+            AND (
+                name LIKE CONCAT('%', #{request.keyword}, '%')
+                OR category LIKE CONCAT('%', #{request.keyword}, '%')
+                OR primary_color LIKE CONCAT('%', #{request.keyword}, '%')
+                OR brand LIKE CONCAT('%', #{request.keyword}, '%')
+            )
+        </if>
+        <if test="request.minFrequency != null">
+            AND frequency_level &gt;= #{request.minFrequency}
+        </if>
+        <if test="request.maxFrequency != null">
+            AND frequency_level &lt;= #{request.maxFrequency}
+        </if>
+        <choose>
+            <when test="request.sortBy == 'wearCount'">ORDER BY wear_count</when>
+            <when test="request.sortBy == 'frequencyLevel'">ORDER BY frequency_level</when>
+            <otherwise>ORDER BY created_at</otherwise>
+        </choose>
+        <choose>
+            <when test="request.sortOrder == 'asc'">ASC</when>
+            <otherwise>DESC</otherwise>
+        </choose>
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="countClothingList" resultType="long">
+        SELECT COUNT(*)
+        FROM clothings
+        WHERE user_id = #{userId}
+          AND is_deleted = 0
+        <if test="request.category != null and request.category != ''">
+            AND category = #{request.category}
+        </if>
+        <if test="request.primaryColor != null and request.primaryColor != ''">
+            AND primary_color = #{request.primaryColor}
+        </if>
+        <if test="request.material != null and request.material != ''">
+            AND material = #{request.material}
+        </if>
+        <if test="request.styleTag != null and request.styleTag != ''">
+            AND style_tags LIKE CONCAT('%', #{request.styleTag}, '%')
+        </if>
+        <if test="request.occasionTag != null and request.occasionTag != ''">
+            AND occasion_tags LIKE CONCAT('%', #{request.occasionTag}, '%')
+        </if>
+        <if test="request.seasonTag != null and request.seasonTag != ''">
+            AND season_tags LIKE CONCAT('%', #{request.seasonTag}, '%')
+        </if>
+        <if test="request.keyword != null and request.keyword != ''">
+            AND (
+                name LIKE CONCAT('%', #{request.keyword}, '%')
+                OR category LIKE CONCAT('%', #{request.keyword}, '%')
+                OR primary_color LIKE CONCAT('%', #{request.keyword}, '%')
+                OR brand LIKE CONCAT('%', #{request.keyword}, '%')
+            )
+        </if>
+        <if test="request.minFrequency != null">
+            AND frequency_level &gt;= #{request.minFrequency}
+        </if>
+        <if test="request.maxFrequency != null">
+            AND frequency_level &lt;= #{request.maxFrequency}
+        </if>
+    </select>
+
+    <select id="selectAdminClothingList" resultType="com.ecru.clothing.dto.response.AdminClothingListVO">
+        SELECT
+            c.id,
+            c.user_id AS userId,
+            c.name,
+            c.category,
+            c.sub_category AS subCategory,
+            c.primary_color AS primaryColor,
+            c.material,
+            c.style_tags AS styleTags,
+            c.image_url AS imageUrl,
+            c.source_type AS sourceType,
+            c.wear_count AS wearCount,
+            c.frequency_level AS frequencyLevel,
+            c.created_at AS createdAt,
+            u.username AS ownerUsername,
+            u.nickname AS ownerNickname,
+            u.email AS ownerEmail
+        FROM clothings c
+        LEFT JOIN users u ON u.id = c.user_id
+        WHERE c.is_deleted = 0
+        <if test="request.userId != null">
+            AND c.user_id = #{request.userId}
+        </if>
+        <if test="request.category != null and request.category != ''">
+            AND c.category = #{request.category}
+        </if>
+        <if test="request.primaryColor != null and request.primaryColor != ''">
+            AND c.primary_color = #{request.primaryColor}
+        </if>
+        <if test="request.sourceType != null and request.sourceType != ''">
+            AND c.source_type = #{request.sourceType}
+        </if>
+        <if test="request.keyword != null and request.keyword != ''">
+            AND (
+                c.name LIKE CONCAT('%', #{request.keyword}, '%')
+                OR c.category LIKE CONCAT('%', #{request.keyword}, '%')
+                OR c.primary_color LIKE CONCAT('%', #{request.keyword}, '%')
+                OR c.brand LIKE CONCAT('%', #{request.keyword}, '%')
+            )
+        </if>
+        <if test="request.ownerKeyword != null and request.ownerKeyword != ''">
+            AND (
+                u.username LIKE CONCAT('%', #{request.ownerKeyword}, '%')
+                OR u.nickname LIKE CONCAT('%', #{request.ownerKeyword}, '%')
+                OR u.email LIKE CONCAT('%', #{request.ownerKeyword}, '%')
+            )
+        </if>
+        ORDER BY c.created_at DESC
+        LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="countAdminClothingList" resultType="long">
+        SELECT COUNT(*)
+        FROM clothings c
+        LEFT JOIN users u ON u.id = c.user_id
+        WHERE c.is_deleted = 0
+        <if test="request.userId != null">
+            AND c.user_id = #{request.userId}
+        </if>
+        <if test="request.category != null and request.category != ''">
+            AND c.category = #{request.category}
+        </if>
+        <if test="request.primaryColor != null and request.primaryColor != ''">
+            AND c.primary_color = #{request.primaryColor}
+        </if>
+        <if test="request.sourceType != null and request.sourceType != ''">
+            AND c.source_type = #{request.sourceType}
+        </if>
+        <if test="request.keyword != null and request.keyword != ''">
+            AND (
+                c.name LIKE CONCAT('%', #{request.keyword}, '%')
+                OR c.category LIKE CONCAT('%', #{request.keyword}, '%')
+                OR c.primary_color LIKE CONCAT('%', #{request.keyword}, '%')
+                OR c.brand LIKE CONCAT('%', #{request.keyword}, '%')
+            )
+        </if>
+        <if test="request.ownerKeyword != null and request.ownerKeyword != ''">
+            AND (
+                u.username LIKE CONCAT('%', #{request.ownerKeyword}, '%')
+                OR u.nickname LIKE CONCAT('%', #{request.ownerKeyword}, '%')
+                OR u.email LIKE CONCAT('%', #{request.ownerKeyword}, '%')
+            )
+        </if>
+    </select>
+
+    <select id="selectPossibleDuplicate" resultType="com.ecru.clothing.entity.Clothing">
+        SELECT *
+        FROM clothings
+        WHERE user_id = #{userId}
+          AND is_deleted = 0
+        <if test="purchaseLink != null and purchaseLink != ''">
+            AND purchase_link = #{purchaseLink}
+        </if>
+        <if test="sourceOrderId != null and sourceOrderId != ''">
+            AND source_order_id = #{sourceOrderId}
+        </if>
+        <if test="imageUrl != null and imageUrl != '' and (purchaseLink == null or purchaseLink == '') and (sourceOrderId == null or sourceOrderId == '')">
+            AND image_url = #{imageUrl}
+        </if>
+        LIMIT 1
+    </select>
+
+    <select id="selectClothingStatistics" resultType="map">
+        SELECT
+            COUNT(*) AS totalClothings,
+            COUNT(DISTINCT wear_log.clothing_id) AS totalWorn,
+            SUBSTRING_INDEX(
+                GROUP_CONCAT(wear_log.clothing_id ORDER BY wear_log.wear_count DESC, wear_log.clothing_id ASC),
+                ',',
+                1
+            ) AS mostWornClothingId,
+            MAX(wear_log.wear_count) AS mostWornCount
+        FROM clothings c
+        LEFT JOIN (
+            SELECT clothing_id, COUNT(*) AS wear_count
+            FROM clothing_wear_logs
+            WHERE user_id = #{userId}
+            <include refid="wearPeriodCondition"/>
+            GROUP BY clothing_id
+        ) wear_log ON c.id = wear_log.clothing_id
+        WHERE c.user_id = #{userId}
+          AND c.is_deleted = 0
+    </select>
+
+    <select id="selectClothingCountByCategory" resultType="map">
+        SELECT
+            category,
+            COUNT(*) AS count,
+            ROUND(
+                (COUNT(*) * 100.0) / NULLIF((SELECT COUNT(*) FROM clothings WHERE user_id = #{userId} AND is_deleted = 0), 0),
+                2
+            ) AS percentage
+        FROM clothings
+        WHERE user_id = #{userId}
+          AND is_deleted = 0
+        GROUP BY category
+    </select>
+
+    <select id="selectClothingCountByColor" resultType="map">
+        SELECT
+            primary_color AS color,
+            COUNT(*) AS count,
+            ROUND(
+                (COUNT(*) * 100.0) / NULLIF((SELECT COUNT(*) FROM clothings WHERE user_id = #{userId} AND is_deleted = 0), 0),
+                2
+            ) AS percentage
+        FROM clothings
+        WHERE user_id = #{userId}
+          AND is_deleted = 0
+        GROUP BY primary_color
+    </select>
+
+    <select id="selectClothingCountByFrequency" resultType="map">
+        SELECT
+            frequency_level AS level,
+            CASE frequency_level
+                WHEN 1 THEN '很少'
+                WHEN 2 THEN '较少'
+                WHEN 3 THEN '一般'
+                WHEN 4 THEN '较多'
+                WHEN 5 THEN '经常'
+                ELSE '未知'
+            END AS label,
+            COUNT(*) AS count
+        FROM clothings
+        WHERE user_id = #{userId}
+          AND is_deleted = 0
+        GROUP BY frequency_level
+    </select>
+
+    <select id="selectWearTrend" resultType="map">
+        SELECT
+            DATE_FORMAT(worn_at, '%Y-%m-%d') AS date,
+            COUNT(*) AS count
+        FROM clothing_wear_logs
+        WHERE user_id = #{userId}
+        <include refid="wearPeriodCondition"/>
+        GROUP BY DATE_FORMAT(worn_at, '%Y-%m-%d')
+        ORDER BY date
+    </select>
+
+</mapper>

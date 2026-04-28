@@ -9,15 +9,14 @@ import com.ecru.clothing.entity.Clothing;
 import com.ecru.clothing.entity.ClothingWearLog;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * 服装转换工具类
- */
+@Slf4j
 @Component
 public class ClothingConverter {
 
@@ -152,7 +151,7 @@ public class ClothingConverter {
             try {
                 clothing.setPurchaseDate(java.time.LocalDate.parse(request.getPurchaseDate()));
             } catch (Exception e) {
-                e.printStackTrace();
+                log.warn("Parse date failed: {}", e.getMessage());
             }
         }
         clothing.setPurchaseLink(request.getPurchaseLink());
@@ -224,7 +223,7 @@ public class ClothingConverter {
             try {
                 clothing.setPurchaseDate(java.time.LocalDate.parse(request.getPurchaseDate()));
             } catch (Exception e) {
-                e.printStackTrace();
+                log.warn("Parse date failed: {}", e.getMessage());
             }
         }
         if (request.getPurchaseLink() != null) {

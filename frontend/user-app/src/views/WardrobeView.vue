@@ -6,15 +6,19 @@
         <span class="count-copy">{{ totalItems }} 件</span>
       </div>
 
-      <input
-        v-model.trim="filters.keyword"
-        type="text"
-        placeholder="搜索衣物、颜色或材质"
-        @keyup.enter="reloadList"
-      />
-
-      <div class="action-strip">
-        <button class="line-button import-button" type="button" @click="navigateToImport">订单导入</button>
+      <div class="search-row">
+        <input
+          v-model.trim="filters.keyword"
+          type="text"
+          placeholder="搜索衣物、颜色或材质"
+          @keyup.enter="reloadList"
+        />
+        <button class="search-button" type="button" aria-label="搜索" @click="reloadList">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/>
+            <line x1="10" y1="10" x2="14" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </button>
       </div>
 
       <div class="chip-row">
@@ -59,11 +63,11 @@
       </section>
 
       <footer v-if="totalPages > 1" class="pagination">
-        <button type="button" class="line-button" :disabled="currentPage === 1" @click="changePage(currentPage - 1)">上一页</button>
-        <span>{{ currentPage }} / {{ totalPages }}</span>
-        <button type="button" class="line-button" :disabled="currentPage === totalPages" @click="changePage(currentPage + 1)">
-          下一页
-        </button>
+        <div class="page-nav">
+          <button type="button" class="page-arrow" :disabled="currentPage === 1" @click="changePage(currentPage - 1)">‹</button>
+          <span>{{ currentPage }} / {{ totalPages }}</span>
+          <button type="button" class="page-arrow" :disabled="currentPage === totalPages" @click="changePage(currentPage + 1)">›</button>
+        </div>
       </footer>
     </div>
 
@@ -78,6 +82,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { wardrobeApi } from '../api/wardrobe';
+import { clothingCategoryFilterOptions } from '../constants/clothingCategories';
 
 const router = useRouter();
 const wardrobePageRef = ref(null);
@@ -92,13 +97,7 @@ let layoutResizeObserver = null;
 const fallbackImage =
   'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="320" height="420"><rect width="100%" height="100%" fill="%23f0e7d8"/><text x="50%" y="50%" text-anchor="middle" fill="%23847a68" font-size="24">LOOK</text></svg>';
 
-const categoryOptions = [
-  { label: '全部', value: '' },
-  { label: '上装', value: '上装' },
-  { label: '下装', value: '下装' },
-  { label: '裙装', value: '裙装' },
-  { label: '外套', value: '外套' }
-];
+const categoryOptions = clothingCategoryFilterOptions;
 
 const filters = reactive({
   category: '',
@@ -231,9 +230,16 @@ onBeforeUnmount(() => {
   font-size: 11px;
 }
 
-.filter-strip input {
-  width: 100%;
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-top: 12px;
+}
+
+.filter-strip input {
+  flex: 1;
+  min-width: 0;
   border: 1px solid var(--line-soft);
   border-radius: 18px;
   padding: 11px 14px;
@@ -243,10 +249,18 @@ onBeforeUnmount(() => {
   outline: none;
 }
 
-.action-strip {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 12px;
+.search-button {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  cursor: pointer;
 }
 
 .chip-row {
@@ -403,9 +417,35 @@ onBeforeUnmount(() => {
 .pagination {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  justify-content: flex-start;
   margin-top: 20px;
+}
+
+.page-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.page-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.page-arrow:disabled {
+  opacity: 0.28;
+  cursor: default;
 }
 
 .fab-button {

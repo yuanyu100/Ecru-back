@@ -22,6 +22,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.Locale;
 
 /**
  * AI对话流式服务
@@ -45,11 +46,24 @@ public class AiChatStreamService {
     @Autowired
     private AiTextGeneratorStreamService streamService;
 
+    @Autowired
+    private com.ecru.common.service.ai.AiPromptSettingsService promptSettingsService;
+
     @Autowired(required = false)
     private StringRedisTemplate redisTemplate;
 
     private static final String CHAT_CONTEXT_PREFIX = "chat:context:";
     private static final long CONTEXT_EXPIRE_HOURS = 24;
+    private static final Set<String> MATERIAL_KNOWLEDGE_TERMS = new HashSet<>(Arrays.asList(
+            "羊毛", "羊绒", "羊毛衫", "羊绒衫", "棉", "纯棉", "亚麻", "真丝", "桑蚕丝", "丝绸",
+            "牛仔", "牛仔布", "涤纶", "聚酯", "聚酯纤维", "粘胶", "粘纤", "viscose", "rayon",
+            "linen", "silk", "wool", "cashmere", "cotton", "polyester", "denim"
+    ));
+    private static final Set<String> MATERIAL_KNOWLEDGE_QUESTIONS = new HashSet<>(Arrays.asList(
+            "区别", "差别", "不同", "对比", "哪个好", "哪个更好", "怎么选", "是什么", "什么意思",
+            "怎么养护", "怎么护理", "怎么保养", "怎么洗", "能洗吗", "洗护", "清洗", "护理",
+            "特点", "优点", "缺点", "优缺点", "适合什么", "适不适合", "值不值得买", "能买吗"
+    ));
 
     /**
      * 流式发送消息并获取AI回复
@@ -74,6 +88,43 @@ public class AiChatStreamService {
 
             // 4. 保存用户消息
             saveUserMessage(conversation.getId(), userId, request.getMessage(), weatherInfo, request.getOccasion());
+
+            String normalizedMessage = normalizeUserMessage(request.getMessage());
+            if (isSimpleGreetingMessage(normalizedMessage)) {
+                Map<String, Object> context = buildContext(weatherInfo, request.getOccasion(), Collections.emptyList(), false);
+                ChatContext chatContext = new ChatContext();
+                chatContext.setConversation(conversation);
+                chatContext.setUserId(userId);
+                chatContext.setChatHistory(chatHistory);
+                chatContext.setContext(context);
+                chatContext.setRecommendedClothes(Collections.emptyList());
+                chatContext.setNeedClothingSearch(false);
+                chatContext.setIsNewConversation(isNewConversation);
+                chatContext.setDirectResponse(buildGreetingResponse());
+                contextRef.set(chatContext);
+                return String.format("[SESSION]%s|%s|%s",
+                        conversation.getSessionId(),
+                        conversation.getTitle() != null ? conversation.getTitle() : "",
+                        isNewConversation);
+            }
+
+            if (isIdentityQuestionMessage(normalizedMessage)) {
+                Map<String, Object> context = buildContext(weatherInfo, request.getOccasion(), Collections.emptyList(), false);
+                ChatContext chatContext = new ChatContext();
+                chatContext.setConversation(conversation);
+                chatContext.setUserId(userId);
+                chatContext.setChatHistory(chatHistory);
+                chatContext.setContext(context);
+                chatContext.setRecommendedClothes(Collections.emptyList());
+                chatContext.setNeedClothingSearch(false);
+                chatContext.setIsNewConversation(isNewConversation);
+                chatContext.setDirectResponse(buildIdentityResponse());
+                contextRef.set(chatContext);
+                return String.format("[SESSION]%s|%s|%s",
+                        conversation.getSessionId(),
+                        conversation.getTitle() != null ? conversation.getTitle() : "",
+                        isNewConversation);
+            }
 
             // 5. 分析用户意图
             // 简化意图分析，直接根据关键词判断
@@ -122,6 +173,12 @@ public class AiChatStreamService {
         ChatContext chatContext = contextRef.get();
         if (chatContext == null) {
             return Flux.error(new RuntimeException("上下文未初始化"));
+        }
+
+        if (chatContext.getDirectResponse() != null) {
+            return Flux.just(chatContext.getDirectResponse())
+                    .concatWith(Flux.just("[DONE]"))
+                    .doOnComplete(() -> saveAiMessageAsync(chatContext, chatContext.getDirectResponse()));
         }
 
         StringBuilder fullResponse = new StringBuilder();
@@ -209,6 +266,12 @@ public class AiChatStreamService {
         }
 
         String lowerMessage = userMessage.toLowerCase();
+        boolean hasMaterialTerm = MATERIAL_KNOWLEDGE_TERMS.stream().anyMatch(lowerMessage::contains);
+        boolean hasKnowledgeQuestion = MATERIAL_KNOWLEDGE_QUESTIONS.stream().anyMatch(lowerMessage::contains);
+        if (hasMaterialTerm && hasKnowledgeQuestion) {
+            log.info("消息 [{}] 识别为材质知识问答，不检索衣柜", userMessage);
+            return false;
+        }
 
         // 打招呼关键词
         Set<String> greetingKeywords = new HashSet<>(Arrays.asList(
@@ -418,6 +481,46 @@ public class AiChatStreamService {
     /**
      * 构建上下文信息
      */
+    private String normalizeUserMessage(String userMessage) {
+        return userMessage == null ? "" : userMessage.trim();
+    }
+
+    private boolean isSimpleGreetingMessage(String userMessage) {
+        String normalized = normalizeUserMessage(userMessage).toLowerCase(Locale.ROOT);
+        if (normalized.isEmpty()) {
+            return false;
+        }
+
+        normalized = normalized.replaceAll("[\\p{Punct}\\s\\u3000-\\u303F\\uFF00-\\uFF65]+", "");
+        Set<String> greetingMessages = new HashSet<>(Arrays.asList(
+                "你好", "您好", "哈喽", "嗨", "在吗", "在嘛", "有人吗",
+                "hello", "hi", "hey", "goodmorning", "goodafternoon", "goodevening"
+        ));
+        return greetingMessages.contains(normalized);
+    }
+
+    private boolean isIdentityQuestionMessage(String userMessage) {
+        String normalized = normalizeUserMessage(userMessage).toLowerCase(Locale.ROOT);
+        if (normalized.isEmpty()) {
+            return false;
+        }
+
+        normalized = normalized.replaceAll("[\\p{Punct}\\s\\u3000-\\u303F\\uFF00-\\uFF65]+", "");
+        Set<String> identityQuestions = new HashSet<>(Arrays.asList(
+                "你是谁", "你叫什么", "你是做什么的", "你是什么", "介绍一下你自己",
+                "whoareyou", "whatareyou", "introduceyourself"
+        ));
+        return identityQuestions.contains(normalized);
+    }
+
+    private String buildGreetingResponse() {
+        return promptSettingsService.getGreetingReply();
+    }
+
+    private String buildIdentityResponse() {
+        return promptSettingsService.getIdentityReply();
+    }
+
     private Map<String, Object> buildContext(String weatherInfo, String occasion,
                                              List<Map<String, Object>> recommendedClothes,
                                              boolean needClothingSearch) {
@@ -456,6 +559,7 @@ public class AiChatStreamService {
         private List<Map<String, Object>> recommendedClothes;
         private boolean needClothingSearch;
         private boolean isNewConversation;
+        private String directResponse;
 
         // Getters and Setters
         public AiConversation getConversation() { return conversation; }
@@ -472,5 +576,7 @@ public class AiChatStreamService {
         public void setNeedClothingSearch(boolean needClothingSearch) { this.needClothingSearch = needClothingSearch; }
         public boolean isNewConversation() { return isNewConversation; }
         public void setIsNewConversation(boolean isNewConversation) { this.isNewConversation = isNewConversation; }
+        public String getDirectResponse() { return directResponse; }
+        public void setDirectResponse(String directResponse) { this.directResponse = directResponse; }
     }
 }

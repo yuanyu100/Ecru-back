@@ -90,9 +90,10 @@ import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 
 const router = useRouter();
-const currentTheme = ref(localStorage.getItem('ecru-theme') || 'sand');
+const currentTheme = ref(localStorage.getItem('ecru-theme') || 'system');
 
 const themes = [
+  { label: '跟随系统', value: 'system' },
   { label: '米黄', value: 'sand' },
   { label: '冷灰', value: 'cool' },
   { label: '暗夜', value: 'night' }
@@ -101,7 +102,6 @@ const themes = [
 const switchTheme = (theme) => {
   currentTheme.value = theme;
   localStorage.setItem('ecru-theme', theme);
-  document.documentElement.dataset.theme = theme;
   window.dispatchEvent(new Event('ecru-theme-change'));
 };
 

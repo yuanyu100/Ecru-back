@@ -3,7 +3,10 @@
 <mapper namespace="com.ecru.outfit.mapper.OutfitAdviceRecordMapper">
 
     <select id="selectByUserId" resultType="com.ecru.outfit.entity.OutfitAdviceRecord">
-        SELECT * FROM outfit_advice_records WHERE user_id = #{userId} ORDER BY created_at DESC
+        SELECT * FROM outfit_advice_records
+        WHERE user_id = #{userId}
+          AND NOT (input_type = 3 AND occasion = 'HOME_DAILY')
+        ORDER BY created_at DESC
     </select>
 
     <select id="selectByUserIdAndOccasion" resultType="com.ecru.outfit.entity.OutfitAdviceRecord">
@@ -11,11 +14,17 @@
     </select>
 
     <select id="selectFavoritesByUserId" resultType="com.ecru.outfit.entity.OutfitAdviceRecord">
-        SELECT * FROM outfit_advice_records WHERE user_id = #{userId} AND is_favorite = true ORDER BY created_at DESC
+        SELECT * FROM outfit_advice_records
+        WHERE user_id = #{userId}
+          AND is_favorite = true
+          AND NOT (input_type = 3 AND occasion = 'HOME_DAILY')
+        ORDER BY created_at DESC
     </select>
 
     <select id="countByUserId" resultType="java.lang.Integer">
-        SELECT COUNT(*) FROM outfit_advice_records WHERE user_id = #{userId}
+        SELECT COUNT(*) FROM outfit_advice_records
+        WHERE user_id = #{userId}
+          AND NOT (input_type = 3 AND occasion = 'HOME_DAILY')
     </select>
 
     <update id="updateIsFavorite" parameterType="map">
@@ -23,6 +32,24 @@
             is_favorite = #{isFavorite}, updated_at = #{updatedAt}
         WHERE id = #{id}
     </update>
+
+    <select id="selectHomeRecommendations" resultType="com.ecru.outfit.entity.OutfitAdviceRecord">
+        SELECT *
+        FROM outfit_advice_records
+        WHERE user_id = #{userId}
+          AND input_type = 3
+          AND occasion = 'HOME_DAILY'
+          AND is_deleted = 0
+        ORDER BY created_at DESC
+        LIMIT #{limit}
+    </select>
+
+    <delete id="deleteHomeRecommendations" parameterType="java.lang.Long">
+        DELETE FROM outfit_advice_records
+        WHERE user_id = #{userId}
+          AND input_type = 3
+          AND occasion = 'HOME_DAILY'
+    </delete>
 
 
 

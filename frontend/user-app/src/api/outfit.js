@@ -64,6 +64,32 @@ const normalizeAdviceDetail = (payload = {}) => ({
   feedback: normalizeFeedback(payload.feedback)
 });
 
+const normalizeHomeRecommendationLook = (item = {}) => ({
+  ...item,
+  id: item.id,
+  mood: item.mood || '今日搭配',
+  title: item.title || '未命名搭配',
+  note: item.note || '',
+  tags: Array.isArray(item.tags) ? item.tags.filter(Boolean) : [],
+  palette: Array.isArray(item.palette) && item.palette.length ? item.palette : ['#D7C1A1', '#F4EEE3'],
+  items: Array.isArray(item.items)
+    ? item.items.map((lookItem) => ({
+        clothingId: lookItem.clothingId,
+        name: lookItem.name || '',
+        category: lookItem.category || '',
+        color: lookItem.color || '',
+        imageUrl: lookItem.imageUrl || '',
+        reason: lookItem.reason || '',
+        frequencyLevel: Number(lookItem.frequencyLevel || 0),
+        wearCount: Number(lookItem.wearCount || 0),
+        sourceType: lookItem.sourceType || '',
+        sourcePlatform: lookItem.sourcePlatform || '',
+        fromWardrobe: lookItem.fromWardrobe !== false
+      }))
+    : [],
+  createdAt: item.createdAt || ''
+});
+
 export const outfitApi = {
   async getHistory(page = 1, size = 5) {
     const response = await apiClient.get('/outfit/history', {
@@ -116,5 +142,27 @@ export const outfitApi = {
 
   async updateStyleProfile(payload) {
     return (await apiClient.put('/outfit/style-profile', payload)).data;
+  },
+
+  async getHomeRecommendations(params = {}) {
+    const response = await apiClient.get('/outfit/home-recommendations', { params });
+    return {
+      ...response.data,
+      data: {
+        ...(response.data?.data || {}),
+        emptyReason: response.data?.data?.emptyReason || '',
+        looks: Array.isArray(response.data?.data?.looks)
+          ? response.data.data.looks.map(normalizeHomeRecommendationLook)
+          : []
+      }
+    };
+  },
+
+  async getHomeRecommendationDetail(id) {
+    const response = await apiClient.get(`/outfit/home-recommendations/${id}`);
+    return {
+      ...response.data,
+      data: normalizeHomeRecommendationLook(response.data?.data || {})
+    };
   }
 };

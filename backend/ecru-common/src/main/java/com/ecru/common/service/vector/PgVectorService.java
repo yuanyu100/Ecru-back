@@ -53,8 +53,7 @@ public class PgVectorService {
             }
             return true;
         } catch (Exception e) {
-            System.err.println("存储向量失败: " + e.getMessage());
-            e.printStackTrace();
+            log.error("存储向量失败，clothingId={}: {}", clothingId, e.getMessage(), e);
             return false;
         }
     }
@@ -71,8 +70,7 @@ public class PgVectorService {
             int rows = jdbcTemplate.update(sql, clothingId);
             return rows > 0;
         } catch (Exception e) {
-            System.err.println("删除向量失败: " + e.getMessage());
-            e.printStackTrace();
+            log.error("删除向量失败，clothingId={}: {}", clothingId, e.getMessage(), e);
             return false;
         }
     }
@@ -89,7 +87,7 @@ public class PgVectorService {
             Integer count = jdbcTemplate.queryForObject(sql, Integer.class, clothingId);
             return count != null && count > 0;
         } catch (Exception e) {
-            System.err.println("检查向量存在失败: " + e.getMessage());
+            log.warn("检查向量存在失败，clothingId={}: {}", clothingId, e.getMessage());
             return false;
         }
     }
@@ -125,10 +123,9 @@ public class PgVectorService {
                     """;
             jdbcTemplate.execute(createIndexSql);
 
-            System.out.println("表结构初始化成功");
+            log.info("表结构初始化成功");
         } catch (Exception e) {
-            System.err.println("初始化表结构失败: " + e.getMessage());
-            e.printStackTrace();
+            log.error("初始化表结构失败: {}", e.getMessage(), e);
         }
     }
 
@@ -161,7 +158,7 @@ public class PgVectorService {
         try {
             // 转换查询向量为字符串格式
             String queryVectorString = arrayToVectorString(queryEmbedding);
-            log.info("查询向量: " + queryVectorString);
+            log.debug("执行向量搜索，userId={}, limit={}", userId, limit);
             
             // 执行向量搜索
             String sql = """
@@ -182,8 +179,7 @@ public class PgVectorService {
                 return result;
             }, queryVectorString, userId, limit);
         } catch (Exception e) {
-            System.err.println("搜索向量失败: " + e.getMessage());
-            e.printStackTrace();
+            log.error("搜索向量失败，userId={}: {}", userId, e.getMessage(), e);
             return new java.util.ArrayList<>();
         }
     }

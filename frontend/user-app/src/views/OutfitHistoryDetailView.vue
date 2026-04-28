@@ -1,7 +1,7 @@
 <template>
   <div class="detail-page">
     <header class="detail-header">
-      <button class="ghost-button" type="button" @click="goBack">返回</button>
+      <button class="ghost-button" type="button" @click="goBack">‹</button>
       <div>
         <p class="eyebrow">Outfit Record</p>
         <h1>穿搭记录详情</h1>
@@ -513,6 +513,9 @@ onMounted(loadDetail);
 .ghost-button {
   background: #ead7b8;
   color: #5d4523;
+  font-size: 22px;
+  line-height: 1;
+  padding: 8px 14px;
 }
 
 .ghost-button.danger {

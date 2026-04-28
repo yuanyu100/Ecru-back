@@ -8,9 +8,9 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/**
- * 衣物向量服务
- */
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Service
 public class ClothingVectorService {
 
@@ -34,20 +34,11 @@ public class ClothingVectorService {
      * @param seasonTags 季节标签
      */
     public void generateAndStoreVector(Long clothingId, Long userId, String name, String category, String primaryColor, String styleTags, String occasionTags, String seasonTags) {
-        System.out.println("开始为衣物ID: " + clothingId + " 生成向量");
         executorService.submit(() -> {
             try {
-                System.out.println("线程开始执行向量化处理，衣物ID: " + clothingId);
-                // 构建衣物描述文本
                 String clothingDescription = buildClothingDescription(name, category, primaryColor, styleTags, occasionTags, seasonTags);
-                System.out.println("衣物描述: " + clothingDescription);
-                
-                // 生成向量
-                System.out.println("开始生成向量");
                 float[] embedding = embeddingService.generateEmbedding(clothingDescription);
-                System.out.println("向量生成成功，长度: " + embedding.length);
-                
-                // 构建元数据
+
                 Map<String, Object> metadata = new HashMap<>();
                 metadata.put("name", name);
                 metadata.put("category", category);
@@ -55,24 +46,13 @@ public class ClothingVectorService {
                 metadata.put("styleTags", styleTags);
                 metadata.put("occasionTags", occasionTags);
                 metadata.put("seasonTags", seasonTags);
-                
-                // 存储向量
-                System.out.println("开始存储向量");
-                boolean success = pgVectorService.storeVector(
-                        clothingId,
-                        userId,
-                        embedding,
-                        metadata
-                );
-                
-                if (success) {
-                    System.out.println("成功为衣物ID: " + clothingId + " 生成并存储向量");
-                } else {
-                    System.err.println("存储向量失败，衣物ID: " + clothingId);
+
+                boolean success = pgVectorService.storeVector(clothingId, userId, embedding, metadata);
+                if (!success) {
+                    log.warn("存储向量失败，clothingId={}", clothingId);
                 }
             } catch (Exception e) {
-                System.err.println("为衣物生成向量失败，衣物ID: " + clothingId + ", 错误: " + e.getMessage());
-                e.printStackTrace();
+                log.error("为衣物生成向量失败，clothingId={}: {}", clothingId, e.getMessage(), e);
             }
         });
     }
@@ -91,13 +71,10 @@ public class ClothingVectorService {
     public void updateClothingVector(Long clothingId, Long userId, String name, String category, String primaryColor, String styleTags, String occasionTags, String seasonTags) {
         executorService.submit(() -> {
             try {
-                // 先删除旧向量
                 pgVectorService.deleteVector(clothingId, userId);
-                // 生成并存储新向量
                 generateAndStoreVector(clothingId, userId, name, category, primaryColor, styleTags, occasionTags, seasonTags);
             } catch (Exception e) {
-                System.err.println("更新衣物向量失败，衣物ID: " + clothingId + ", 错误: " + e.getMessage());
-                e.printStackTrace();
+                log.error("更新衣物向量失败，clothingId={}: {}", clothingId, e.getMessage(), e);
             }
         });
     }
@@ -112,8 +89,7 @@ public class ClothingVectorService {
             try {
                 pgVectorService.deleteVector(clothingId, userId);
             } catch (Exception e) {
-                System.err.println("删除衣物向量失败，衣物ID: " + clothingId + ", 错误: " + e.getMessage());
-                e.printStackTrace();
+                log.error("删除衣物向量失败，clothingId={}: {}", clothingId, e.getMessage(), e);
             }
         });
     }
@@ -163,19 +139,12 @@ public class ClothingVectorService {
      * 批量为衣物生成并存储向量
      */
     public void batchGenerateAndStoreVectors() {
-        System.out.println("开始批量生成向量任务");
         executorService.submit(() -> {
             try {
-                // 初始化表结构
                 pgVectorService.initTable();
-                
-                // 这里需要注入ClothingMapper来获取所有衣物
-                // 由于我们在common模块中，不应该依赖clothing模块
-                // 所以这里只做初始化，具体的批量处理逻辑需要在业务模块中实现
-                System.out.println("批量生成向量任务已提交，正在异步处理中");
+                log.info("批量生成向量任务已提交，正在异步处理中");
             } catch (Exception e) {
-                System.err.println("批量生成向量失败: " + e.getMessage());
-                e.printStackTrace();
+                log.error("批量生成向量失败: {}", e.getMessage(), e);
             }
         });
     }

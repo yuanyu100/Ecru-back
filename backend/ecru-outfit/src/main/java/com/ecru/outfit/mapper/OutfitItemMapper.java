@@ -27,6 +27,8 @@ public interface OutfitItemMapper extends BaseMapper<OutfitItem> {
      */
     Integer deleteByOutfitAdviceId(@Param("outfitAdviceId") Long outfitAdviceId);
 
+    Integer deleteByOutfitAdviceIds(@Param("outfitAdviceIds") List<Long> outfitAdviceIds);
+
     /**
      * 批量插入搭配单品
      * @param items 单品列表

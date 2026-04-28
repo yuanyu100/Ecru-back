@@ -37,6 +37,8 @@ public class DataSourceConfig {
         MybatisSqlSessionFactoryBean bean = new MybatisSqlSessionFactoryBean();
         bean.setDataSource(dataSource);
         bean.setPlugins(interceptors.orderedStream().toArray(Interceptor[]::new));
+        bean.setMapperLocations(new PathMatchingResourcePatternResolver()
+                .getResources("classpath*:/com/ecru/**/mapper/*.xml"));
         return bean.getObject();
     }
 
@@ -44,8 +46,6 @@ public class DataSourceConfig {
     public SqlSessionFactory pgSqlSessionFactory(@Qualifier("pgDataSource") DataSource dataSource) throws Exception {
         MybatisSqlSessionFactoryBean bean = new MybatisSqlSessionFactoryBean();
         bean.setDataSource(dataSource);
-        bean.setMapperLocations(new PathMatchingResourcePatternResolver()
-                .getResources("classpath*:/mapper/postgres/**/*.xml"));
         return bean.getObject();
     }
 }

@@ -25,7 +25,7 @@ const routes = [
         path: 'dashboard',
         name: 'admin-dashboard',
         component: () => import('../views/Admin/DashboardView.vue'),
-        meta: { title: '控制台' }
+        meta: { title: '仪表盘' }
       },
       {
         path: 'users',
@@ -37,7 +37,13 @@ const routes = [
         path: 'clothing',
         name: 'admin-clothing',
         component: () => import('../views/Admin/ClothingView.vue'),
-        meta: { title: '衣物台账' }
+        meta: { title: '衣橱管理' }
+      },
+      {
+        path: 'style-images',
+        name: 'admin-style-images',
+        component: () => import('../views/Admin/StyleImagesView.vue'),
+        meta: { requiresAdmin: true, title: '风格图片管理' }
       },
       {
         path: 'api-monitor',
@@ -55,7 +61,7 @@ const routes = [
         path: 'ai-prompts',
         name: 'admin-ai-prompts',
         component: () => import('../views/Admin/AiPromptView.vue'),
-        meta: { requiresAdmin: true, title: 'AI Prompt' }
+        meta: { requiresAdmin: true, title: 'Prompt 配置' }
       },
       {
         path: 'knowledge',
@@ -67,7 +73,7 @@ const routes = [
         path: 'outfit-records',
         name: 'admin-outfit-records',
         component: () => import('../views/Admin/OutfitRecordsView.vue'),
-        meta: { requiresAdmin: true, title: '穿搭记录管理' }
+        meta: { requiresAdmin: true, title: '搭配记录管理' }
       }
     ]
   }

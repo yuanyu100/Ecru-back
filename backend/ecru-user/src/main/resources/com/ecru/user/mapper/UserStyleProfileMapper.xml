@@ -3,19 +3,19 @@
 <mapper namespace="com.ecru.user.mapper.UserStyleProfileMapper">
 
     <select id="selectByUserIdAndStyleTagId" resultType="com.ecru.user.entity.UserStyleProfile">
-        SELECT * FROM user_style_profile WHERE user_id = #{userId} AND style_tag_id = #{styleTagId}
+        SELECT * FROM user_style_profiles WHERE user_id = #{userId} AND style_tag_id = #{styleTagId}
     </select>
 
     <select id="selectByUserId" resultType="com.ecru.user.entity.UserStyleProfile">
-        SELECT * FROM user_style_profile WHERE user_id = #{userId}
+        SELECT * FROM user_style_profiles WHERE user_id = #{userId}
     </select>
 
     <select id="selectTopPreferences" resultType="com.ecru.user.entity.UserStyleProfile">
-        SELECT * FROM user_style_profile WHERE user_id = #{userId} ORDER BY preference_score DESC LIMIT #{limit}
+        SELECT * FROM user_style_profiles WHERE user_id = #{userId} ORDER BY preference_score DESC LIMIT #{limit}
     </select>
 
     <update id="updatePreferenceScore" parameterType="map">
-        UPDATE user_style_profile SET
+        UPDATE user_style_profiles SET
             preference_score = #{preferenceScore},
             interaction_count = #{interactionCount},
             updated_at = NOW()

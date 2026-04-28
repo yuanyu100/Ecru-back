@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ecru.clothing.mapper.ClothingWearLogMapper">
+
+    <select id="selectRecentWearLogs" resultType="com.ecru.clothing.entity.ClothingWearLog">
+        SELECT *
+        FROM clothing_wear_logs
+        WHERE clothing_id = #{clothingId}
+        ORDER BY worn_at DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectWearCountByPeriod" resultType="java.lang.Integer">
+        SELECT COUNT(*)
+        FROM clothing_wear_logs
+        WHERE clothing_id = #{clothingId}
+          AND worn_at BETWEEN #{startDate} AND #{endDate}
+    </select>
+
+</mapper>

@@ -10,6 +10,14 @@
         DELETE FROM outfit_items WHERE outfit_advice_id = #{outfitAdviceId}
     </delete>
 
+    <delete id="deleteByOutfitAdviceIds" parameterType="java.util.List">
+        DELETE FROM outfit_items
+        WHERE outfit_advice_id IN
+        <foreach collection="outfitAdviceIds" item="id" open="(" close=")" separator=",">
+            #{id}
+        </foreach>
+    </delete>
+
     <insert id="batchInsert" parameterType="java.util.List">
         INSERT INTO outfit_items (
             outfit_advice_id, clothing_id, item_name, item_category, item_color, 

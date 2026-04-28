@@ -65,20 +65,106 @@ const normalizeAnalysis = (item = {}) => ({
   summary: item.summary || ''
 });
 
+const streamPost = async (path, payload, handlers = {}, options = {}) => {
+  const token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+  const baseURL = apiClient.defaults.baseURL || '/api/v1';
+  const response = await fetch(`${baseURL}${path}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    },
+    signal: options.signal,
+    body: JSON.stringify(payload || {})
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || `Stream request failed: ${response.status}`);
+  }
+
+  if (!response.body) {
+    throw new Error('Stream response body is empty');
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder('utf-8');
+  let buffer = '';
+
+  const emitData = async (rawEvent) => {
+    const eventText = String(rawEvent || '').trim();
+    if (!eventText) {
+      return false;
+    }
+
+    const dataLines = eventText
+      .split(/\r?\n/)
+      .filter((line) => line.startsWith('data:'))
+      .map((line) => line.slice(5).trimStart());
+
+    const data = (dataLines.length ? dataLines.join('\n') : eventText).trim();
+    if (!data) {
+      return false;
+    }
+
+    if (data === '[DONE]') {
+      await handlers.onComplete?.();
+      return true;
+    }
+
+    if (data.startsWith('[ERROR]')) {
+      const error = new Error(data.slice(7) || 'Stream response failed');
+      await handlers.onError?.(error);
+      throw error;
+    }
+
+    await handlers.onChunk?.(data);
+    return false;
+  };
+
+  while (true) {
+    const { value, done } = await reader.read();
+    buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+
+    let separatorIndex = buffer.search(/\r?\n\r?\n/);
+    while (separatorIndex !== -1) {
+      const eventChunk = buffer.slice(0, separatorIndex);
+      buffer = buffer.slice(separatorIndex + (buffer[separatorIndex] === '\r' ? 4 : 2));
+      const shouldStop = await emitData(eventChunk);
+      if (shouldStop) {
+        return;
+      }
+      separatorIndex = buffer.search(/\r?\n\r?\n/);
+    }
+
+    if (done) {
+      const finalChunk = buffer.trim();
+      if (finalChunk) {
+        await emitData(finalChunk);
+      }
+      return;
+    }
+  }
+};
+
 export const knowledgeApi = {
   search: async (query, type = 'all', limit = 10) => {
     const response = await apiClient.get('/knowledge/search', {
       params: { query, type, limit }
     });
     const payload = response.data?.data || {};
+    const rawItems = asArray(payload.items).length ? payload.items : payload.results;
+    const normalizedItems = asArray(rawItems).map(normalizeSearchItem);
 
     return {
       ...response.data,
       data: {
         ...payload,
-        items: asArray(payload.items).map(normalizeSearchItem),
-        total: Number(payload.total || 0),
-        type: payload.type || type
+        items: normalizedItems,
+        results: normalizedItems,
+        total: Number(payload.total || normalizedItems.length || 0),
+        type: payload.type || type,
+        query: payload.query || query
       }
     };
   },
@@ -123,6 +209,9 @@ export const knowledgeApi = {
       }
     };
   },
+
+  askMaterialQuestionStream: async (payload, handlers = {}, options = {}) =>
+    streamPost('/knowledge/materials/ask/stream', payload, handlers, options),
 
   analyzeMaterialLabel: async ({ image, question, materialHint }) => {
     const formData = new FormData();

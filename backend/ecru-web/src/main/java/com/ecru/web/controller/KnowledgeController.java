@@ -12,6 +12,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.Part;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
+import reactor.core.publisher.Flux;
 
 import java.util.Map;
 
@@ -78,6 +80,16 @@ public class KnowledgeController {
                 request.getMaterial(),
                 request.getQuestion(),
                 userId));
+    }
+
+    @PostMapping(value = "/materials/ask/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @Operation(summary = "材质问答流式输出", description = "围绕材质、面料和洗护知识进行流式问答，仅返回文本结果")
+    public Flux<String> askMaterialQuestionStream(@Valid @RequestBody MaterialQuestionRequest request) {
+        Long userId = UserContext.getCurrentUserId();
+        return materialKnowledgeAssistantService
+                .askMaterialQuestionStream(request.getMaterial(), request.getQuestion(), userId)
+                .doOnError(error -> log.error("材质知识流式问答失败", error))
+                .onErrorResume(error -> Flux.just("[ERROR]" + error.getMessage()));
     }
 
     @PostMapping("/materials/analyze")

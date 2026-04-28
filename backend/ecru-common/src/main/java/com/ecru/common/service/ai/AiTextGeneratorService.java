@@ -129,7 +129,7 @@ public class AiTextGeneratorService {
     }
 
     /**
-     * 鐢熸垚鑷畾涔夌郴缁熸彁绀虹殑鏂囨湰鍝嶅簲锛屽け璐ユ椂杩斿洖 null锛屼氦鐢变笂灞傚喅瀹氬洖閫€绛栫暐銆?
+     * 生成自定义系统提示的文本响应，失败时返回 null，交由上层决定回退策略。
      */
     public String generateCustomResponse(String systemPrompt, String prompt,
                                          Map<String, Object> context, Long userId) {
@@ -160,8 +160,8 @@ public class AiTextGeneratorService {
 
                 if (!response.isSuccessful()) {
                     monitorContext.markFailed(AiApiMonitorWrapper.ErrorType.HTTP_ERROR,
-                            "API璋冪敤澶辫触: " + response.code(), response.code());
-                    throw new IOException("API璋冪敤澶辫触: " + response.code() + " " + response.message() + " - " + responseBody);
+                            "API调用失败: " + response.code(), response.code());
+                    throw new IOException("API调用失败: " + response.code() + " " + response.message() + " - " + responseBody);
                 }
 
                 JSONObject responseJson = JSON.parseObject(responseBody);
@@ -173,7 +173,7 @@ public class AiTextGeneratorService {
                 return content;
             }
         } catch (Exception e) {
-            log.error("鐢熸垚鑷畾涔夋枃鏈洖澶嶅け璐? {}", e.getMessage(), e);
+            log.error("生成自定义文本回复失败: {}", e.getMessage(), e);
             if (monitorContext.getStatus() == 1) {
                 monitorContext.markFailed(AiApiMonitorWrapper.ErrorType.BUSINESS_ERROR,
                         e.getMessage(), null);
@@ -263,7 +263,7 @@ public class AiTextGeneratorService {
 
         JSONObject systemMessage = new JSONObject();
         systemMessage.put("role", "system");
-        systemMessage.put("content", "你是一位专业的时尚搭配顾问，根据用户提供的信息和衣橱中的衣物，生成个性化的搭配建议。请考虑天气、场合、用户风格偏好等因素，提供详细的搭配方案和专业分析。");
+
         systemMessage.put("content", promptSettingsService.getChatSystemPrompt());
         messages.add(systemMessage);
 
@@ -337,7 +337,7 @@ public class AiTextGeneratorService {
         StringBuilder userContent = new StringBuilder();
         userContent.append(prompt == null ? "" : prompt);
         if (context != null && !context.isEmpty()) {
-            userContent.append("\n\n鍙傝€冧笂涓嬫枃锛?").append(JSON.toJSONString(context));
+            userContent.append("\n\n参考上下文：").append(JSON.toJSONString(context));
         }
         String finalContent = userContent.toString();
         if (finalContent.length() > 3000) {

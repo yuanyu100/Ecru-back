@@ -11,7 +11,7 @@ import java.math.BigDecimal;
  * 存储用户对各种风格标签的偏好分数
  */
 @Data
-@TableName("user_style_profile")
+@TableName("user_style_profiles")
 public class UserStyleProfile {
     @TableId(type = IdType.AUTO)
     private Long id;

@@ -44,4 +44,8 @@ public interface OutfitAdviceRecordMapper extends BaseMapper<OutfitAdviceRecord>
      */
     Integer countByUserId(@Param("userId") Long userId);
 
+    List<OutfitAdviceRecord> selectHomeRecommendations(@Param("userId") Long userId, @Param("limit") Integer limit);
+
+    Integer deleteHomeRecommendations(@Param("userId") Long userId);
+
 }

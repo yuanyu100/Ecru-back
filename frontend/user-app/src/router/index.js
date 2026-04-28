@@ -86,6 +86,12 @@ const routes = [
     path: '/chat',
     name: 'chat',
     component: () => import('../views/ChatView.vue'),
+    meta: { requiresAuth: true, keepAlive: true }
+  },
+  {
+    path: '/home/recommendations/:id',
+    name: 'home-recommendation-detail',
+    component: () => import('../views/HomeRecommendationDetailView.vue'),
     meta: { requiresAuth: true }
   },
   {

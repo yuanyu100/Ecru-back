@@ -8,6 +8,7 @@
         <p class="eyebrow">衣橱</p>
         <h1>添加衣物</h1>
       </div>
+      <button class="import-link" type="button" @click="goToImport">订单导入</button>
     </header>
 
     <form class="editor-card" @submit.prevent="submitForm">
@@ -19,7 +20,14 @@
             <img :src="imagePreview" alt="preview" />
           </template>
           <template v-else>
-            <span>选择照片后会先上传到 MinIO</span>
+            <span class="upload-hint">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <rect x="3" y="3" width="18" height="18" rx="4" stroke="currentColor" stroke-width="1.4"/>
+                <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/>
+                <path d="M3 15l5-5 4 4 3-3 6 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <span>点击上传衣物图片</span>
+            </span>
           </template>
         </label>
       </section>
@@ -47,10 +55,7 @@
             <span>分类</span>
             <select v-model="formData.category" :required="!useAiRecognition">
               <option value="">请选择分类</option>
-              <option value="上装">上装</option>
-              <option value="下装">下装</option>
-              <option value="鞋履">鞋履</option>
-              <option value="配饰">配饰</option>
+              <option v-for="option in clothingCategoryOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
             </select>
           </label>
           <label>
@@ -94,6 +99,7 @@
 import { reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { wardrobeApi } from '../api/wardrobe';
+import { clothingCategoryOptions } from '../constants/clothingCategories';
 
 const router = useRouter();
 const fileInput = ref(null);
@@ -159,13 +165,17 @@ const submitForm = async () => {
 const goBack = () => {
   router.push('/wardrobe');
 };
+
+const goToImport = () => {
+  router.push('/wardrobe/import');
+};
 </script>
 
 <style scoped>
 .editor-page {
   min-height: 100vh;
   padding: 20px 16px 92px;
-  background: linear-gradient(180deg, #f7efdf 0%, #efe1c8 100%);
+  background: linear-gradient(180deg, var(--bg-base) 0%, var(--bg-soft) 100%);
 }
 
 .editor-header {
@@ -180,40 +190,52 @@ const goBack = () => {
   place-items: center;
   width: 34px;
   height: 34px;
-  border: 1px solid rgba(145, 104, 49, 0.14);
+  border: 1px solid var(--line-soft);
   border-radius: 50%;
-  background: rgba(255, 251, 244, 0.88);
+  background: var(--surface-strong);
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .icon-back span {
   width: 10px;
   height: 10px;
-  border-left: 1.5px solid #5d4523;
-  border-bottom: 1.5px solid #5d4523;
+  border-left: 1.5px solid var(--accent-strong);
+  border-bottom: 1.5px solid var(--accent-strong);
   transform: rotate(45deg);
   margin-left: 4px;
+}
+
+.import-link {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .eyebrow {
   margin-bottom: 4px;
   font-size: 12px;
-  color: #8f6a37;
+  color: var(--text-soft);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .editor-header h1,
 .section-block h2 {
-  color: #5d4523;
+  color: var(--text-main);
 }
 
 .editor-card {
   padding: 18px;
   border-radius: 24px;
-  background: rgba(255, 251, 244, 0.92);
-  border: 1px solid rgba(145, 104, 49, 0.14);
-  box-shadow: 0 18px 44px rgba(109, 78, 38, 0.08);
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  box-shadow: var(--shadow-card);
 }
 
 .section-block + .section-block {
@@ -225,9 +247,9 @@ const goBack = () => {
   align-items: center;
   justify-content: center;
   min-height: 220px;
-  border: 2px dashed #d1b88b;
+  border: 2px dashed var(--line-strong);
   border-radius: 18px;
-  background: #fffdf8;
+  background: var(--surface-strong);
   overflow: hidden;
   cursor: pointer;
 }
@@ -242,11 +264,20 @@ const goBack = () => {
   object-fit: cover;
 }
 
+.upload-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-faint);
+  font-size: 13px;
+}
+
 .switch-row {
   display: flex;
   gap: 18px;
   margin-top: 12px;
-  color: #6c522f;
+  color: var(--text-soft);
 }
 
 .form-grid {
@@ -258,16 +289,17 @@ const goBack = () => {
 .form-grid label {
   display: grid;
   gap: 8px;
-  color: #6c522f;
+  color: var(--text-soft);
   font-size: 14px;
 }
 
 .form-grid input,
 .form-grid select {
-  border: 1px solid #d9c39b;
+  border: 1px solid var(--line-strong);
   border-radius: 14px;
   padding: 12px 14px;
-  background: #fffdf8;
+  background: var(--surface-strong);
+  color: var(--text-main);
 }
 
 .wide {
@@ -290,13 +322,13 @@ const goBack = () => {
 }
 
 .ghost-button {
-  background: #ead7b8;
-  color: #5d4523;
+  background: var(--bg-soft);
+  color: var(--text-main);
 }
 
 .primary-button {
-  background: #6b4b1f;
-  color: #fff8ef;
+  background: var(--accent-strong);
+  color: var(--surface-strong);
 }
 
 .primary-button:disabled {

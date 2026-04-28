@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS user_settings (
 -- 用户登录日志表
 CREATE TABLE IF NOT EXISTS user_login_logs (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '日志ID',
-    user_id BIGINT NOT NULL COMMENT '用户ID',
+    user_id BIGINT COMMENT '用户ID，用户名不存在等失败场景允许为空',
     login_type TINYINT NOT NULL DEFAULT 1 COMMENT '登录类型：1-密码，2-短信，3-第三方',
     login_ip VARCHAR(50) COMMENT '登录IP',
     login_device VARCHAR(200) COMMENT '登录设备信息',
@@ -136,21 +136,6 @@ CREATE TABLE IF NOT EXISTS clothings (
     INDEX idx_deleted (is_deleted),
     INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='衣物表';
-
--- 衣物与风格标签关联表
-CREATE TABLE IF NOT EXISTS clothing_style_tags (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    clothing_id BIGINT NOT NULL COMMENT '衣物ID',
-    style_tag_id BIGINT NOT NULL COMMENT '风格标签ID',
-    is_ai_tagged BOOLEAN DEFAULT FALSE COMMENT '是否AI自动标记',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
-    FOREIGN KEY (clothing_id) REFERENCES clothings(id) ON DELETE CASCADE,
-    FOREIGN KEY (style_tag_id) REFERENCES style_tags(id) ON DELETE CASCADE,
-    UNIQUE KEY uk_clothing_style (clothing_id, style_tag_id),
-    INDEX idx_clothing_id (clothing_id),
-    INDEX idx_style_tag_id (style_tag_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='衣物风格标签关联表';
 
 -- 衣物穿着记录表
 CREATE TABLE IF NOT EXISTS clothing_wear_logs (
@@ -457,29 +442,6 @@ INSERT IGNORE INTO style_tags (name, category, is_preset) VALUES
 ('法式复古', '复古', TRUE),
 ('Vintage', '复古', TRUE),
 ('美式复古', '复古', TRUE);
-
--- 搜索配置表
-CREATE TABLE IF NOT EXISTS search_config (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '配置ID',
-    config_key VARCHAR(100) NOT NULL COMMENT '配置键',
-    config_value VARCHAR(500) NOT NULL COMMENT '配置值',
-    description VARCHAR(255) COMMENT '配置描述',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    UNIQUE KEY uk_config_key (config_key),
-    INDEX idx_config_key (config_key)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='搜索配置表';
-
--- 初始化搜索配置（如果需要）
-INSERT IGNORE INTO search_config (config_key, config_value, description) VALUES
-('default_top_k', '10', '默认返回结果数量'),
-('similarity_threshold', '0.7', '相似度阈值（0-1之间）'),
-('max_query_length', '500', '最大查询文本长度'),
-('enable_hybrid_search', 'true', '是否启用混合检索'),
-('vector_dimension', '1536', '向量维度'),
-('embedding_model', 'text-embedding-3-small', '默认Embedding模型'),
-('max_search_results', '50', '最大返回结果数量'),
-('enable_search_history', 'true', '是否记录检索历史');
 
 -- ================================================
 -- 6. 权限设置

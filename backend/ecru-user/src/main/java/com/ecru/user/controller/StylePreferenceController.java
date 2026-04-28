@@ -22,7 +22,7 @@ import java.util.List;
  * 处理风格标签、风格图片和用户偏好相关的请求
  */
 @RestController
-@RequestMapping("/api/v1/style-preferences")
+@RequestMapping("/style-preferences")
 @Tag(name = "风格偏好模块", description = "风格标签、图片和用户偏好管理接口")
 public class StylePreferenceController {
     
@@ -61,7 +61,7 @@ public class StylePreferenceController {
     @Operation(summary = "获取风格标签分类", description = "获取所有风格标签的分类列表")
     @GetMapping("/tags/categories")
     public Result<List<String>> getTagCategories() {
-        List<String> categories = styleTagService.getTagCategories();
+        List<String> categories = styleImageService.getAvailableCategories();
         return Result.success(categories);
     }
     

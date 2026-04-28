@@ -38,10 +38,7 @@
             <span>分类</span>
             <select v-model="formData.category" required>
               <option value="">请选择分类</option>
-              <option value="上装">上装</option>
-              <option value="下装">下装</option>
-              <option value="鞋履">鞋履</option>
-              <option value="配饰">配饰</option>
+              <option v-for="option in clothingCategoryOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
             </select>
           </label>
           <label>
@@ -95,6 +92,7 @@
 import { onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { wardrobeApi } from '../api/wardrobe';
+import { clothingCategoryOptions } from '../constants/clothingCategories';
 
 const router = useRouter();
 const route = useRoute();
