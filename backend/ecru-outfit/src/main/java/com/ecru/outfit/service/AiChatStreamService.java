@@ -31,6 +31,10 @@ import java.util.Locale;
 @Service
 public class AiChatStreamService {
 
+    private static final Set<String> GENERIC_TITLES = new HashSet<>(Arrays.asList(
+            "新对话", "新的对话", "对话", "聊天", "会话", "标题"
+    ));
+
     @Autowired
     private AiConversationMapper conversationMapper;
 
@@ -192,7 +196,8 @@ public class AiChatStreamService {
         return streamService.generateStreamResponse(
                 request.getMessage(),
                 chatContext.getChatHistory(),
-                chatContext.getContext()
+                chatContext.getContext(),
+                userId
         )
         .doOnNext(chunk -> {
             // 累积完整响应
@@ -242,6 +247,7 @@ public class AiChatStreamService {
             // 更新会话消息计数
             Integer count = chatMessageMapper.countByConversationId(conversation.getId());
             conversationMapper.updateMessageCount(conversation.getId(), count);
+            conversation.setMessageCount(count);
 
             // 生成会话标题(如果是新会话)
             if (isNewConversation && conversation.getTitle() == null) {
@@ -550,14 +556,27 @@ public class AiChatStreamService {
             String systemPrompt = promptSettingsService.getConversationTitlePrompt();
             String prompt = "用户：" + truncateStr(userMessage, 80) + "\nAI：" + truncateStr(aiReply, 80);
             String title = textGeneratorService.generateCustomResponse(systemPrompt, prompt, null, userId);
-            if (title != null) {
-                title = title.trim().replaceAll("[\"'\\u201c\\u201d\\u2018\\u2019]", "");
-            }
-            return (title != null && !title.isEmpty()) ? title.substring(0, Math.min(title.length(), 15)) : truncateStr(userMessage, 15);
+            return normalizeConversationTitle(title, userMessage);
         } catch (Exception e) {
             log.warn("AI标题生成失败，降级为截断: {}", e.getMessage());
             return truncateStr(userMessage, 15);
         }
+    }
+
+    private String normalizeConversationTitle(String title, String userMessage) {
+        String normalized = title == null ? "" : title.trim()
+                .replaceAll("[\"'\\u201c\\u201d\\u2018\\u2019]", "")
+                .replaceAll("\\s+", " ");
+
+        if (!normalized.isEmpty()) {
+            normalized = normalized.substring(0, Math.min(normalized.length(), 15));
+        }
+
+        if (normalized.isEmpty() || GENERIC_TITLES.contains(normalized)) {
+            return truncateStr(userMessage, 15);
+        }
+
+        return normalized;
     }
 
     private String truncateStr(String s, int max) {

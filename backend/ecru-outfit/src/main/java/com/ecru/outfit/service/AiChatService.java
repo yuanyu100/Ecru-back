@@ -34,6 +34,10 @@ import java.util.stream.Collectors;
 @Service
 public class AiChatService {
 
+    private static final Set<String> GENERIC_TITLES = new HashSet<>(Arrays.asList(
+            "新对话", "新的对话", "对话", "聊天", "会话", "标题"
+    ));
+
     @Autowired
     private AiConversationMapper conversationMapper;
 
@@ -106,7 +110,7 @@ public class AiChatService {
                 String aiResponse = buildGreetingResponse();
                 Long aiMessageId = saveAiMessage(conversation.getId(), userId, aiResponse, Collections.emptyList(), context);
 
-                updateConversationMessageCount(conversation.getId());
+                conversation.setMessageCount(updateConversationMessageCount(conversation.getId()));
                 updateConversationTitleIfNeeded(conversation, isNewConversation, userMessage, aiResponse, userId);
                 cacheChatContext(conversation.getSessionId(), chatHistory, userMessage, aiResponse);
 
@@ -129,7 +133,7 @@ public class AiChatService {
                 String aiResponse = buildIdentityResponse();
                 Long aiMessageId = saveAiMessage(conversation.getId(), userId, aiResponse, Collections.emptyList(), context);
 
-                updateConversationMessageCount(conversation.getId());
+                conversation.setMessageCount(updateConversationMessageCount(conversation.getId()));
                 updateConversationTitleIfNeeded(conversation, isNewConversation, userMessage, aiResponse, userId);
                 cacheChatContext(conversation.getSessionId(), chatHistory, userMessage, aiResponse);
 
@@ -163,7 +167,7 @@ public class AiChatService {
             Long aiMessageId = saveAiMessage(conversation.getId(), userId, aiResponse, recommendedClothes, context);
 
             // 12. 更新会话消息计数
-            updateConversationMessageCount(conversation.getId());
+            conversation.setMessageCount(updateConversationMessageCount(conversation.getId()));
 
             // 13. 生成会话标题(如果是新会话)
             updateConversationTitleIfNeeded(conversation, isNewConversation, userMessage, aiResponse, userId);
@@ -659,14 +663,27 @@ public class AiChatService {
             String systemPrompt = promptSettingsService.getConversationTitlePrompt();
             String prompt = "用户：" + truncateStr(userMessage, 80) + "\nAI：" + truncateStr(aiReply, 80);
             String title = textGeneratorService.generateCustomResponse(systemPrompt, prompt, null, userId);
-            if (title != null) {
-                title = title.trim().replaceAll("[\"'“”‘’]", "");
-            }
-            return (title != null && !title.isEmpty()) ? title.substring(0, Math.min(title.length(), 15)) : truncateStr(userMessage, 15);
+            return normalizeConversationTitle(title, userMessage);
         } catch (Exception e) {
             log.warn("AI标题生成失败，降级为截断: {}", e.getMessage());
             return truncateStr(userMessage, 15);
         }
+    }
+
+    private String normalizeConversationTitle(String title, String userMessage) {
+        String normalized = title == null ? "" : title.trim()
+                .replaceAll("[\"'“”‘’]", "")
+                .replaceAll("\\s+", " ");
+
+        if (!normalized.isEmpty()) {
+            normalized = normalized.substring(0, Math.min(normalized.length(), 15));
+        }
+
+        if (normalized.isEmpty() || GENERIC_TITLES.contains(normalized)) {
+            return truncateStr(userMessage, 15);
+        }
+
+        return normalized;
     }
 
     private String truncateStr(String s, int max) {
@@ -691,9 +708,10 @@ public class AiChatService {
         return response;
     }
 
-    private void updateConversationMessageCount(Long conversationId) {
+    private Integer updateConversationMessageCount(Long conversationId) {
         Integer count = chatMessageMapper.countByConversationId(conversationId);
         conversationMapper.updateMessageCount(conversationId, count);
+        return count == null ? 0 : count;
     }
 
     /**

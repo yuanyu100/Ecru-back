@@ -3,6 +3,7 @@ package com.ecru.common.service.ai;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
+import com.ecru.common.dto.ai.AiApiCallContext;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.Call;
 import okhttp3.Callback;
@@ -25,6 +26,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
 @Service("aiTextGeneratorStreamService")
@@ -45,6 +48,9 @@ public class AiTextGeneratorStreamService {
     @Autowired
     private AiPromptSettingsService promptSettingsService;
 
+    @Autowired
+    private AiApiMonitorService monitorService;
+
     private OkHttpClient okHttpClient;
 
     @PostConstruct
@@ -59,14 +65,34 @@ public class AiTextGeneratorStreamService {
     public Flux<String> generateStreamResponse(String prompt,
                                                List<Map<String, String>> chatHistory,
                                                Map<String, Object> context) {
-        return generateStreamResponseWithCustomPrompt(null, prompt, chatHistory, context);
+        return generateStreamResponse(prompt, chatHistory, context, null);
+    }
+
+    public Flux<String> generateStreamResponse(String prompt,
+                                               List<Map<String, String>> chatHistory,
+                                               Map<String, Object> context,
+                                               Long userId) {
+        return generateStreamResponseWithCustomPrompt(null, prompt, chatHistory, context, userId);
     }
 
     public Flux<String> generateStreamResponseWithCustomPrompt(String systemPrompt,
                                                                String prompt,
                                                                List<Map<String, String>> chatHistory,
                                                                Map<String, Object> context) {
+        return generateStreamResponseWithCustomPrompt(systemPrompt, prompt, chatHistory, context, null);
+    }
+
+    public Flux<String> generateStreamResponseWithCustomPrompt(String systemPrompt,
+                                                               String prompt,
+                                                               List<Map<String, String>> chatHistory,
+                                                               Map<String, Object> context,
+                                                               Long userId) {
         return Flux.create(sink -> {
+            AiApiCallContext monitorContext = AiApiCallContext.create(
+                    AiApiMonitorWrapper.Scene.STREAM_CHAT, modelName, userId
+            );
+            AtomicBoolean recorded = new AtomicBoolean(false);
+            AtomicInteger responseLength = new AtomicInteger(0);
             try {
                 String endpoint = "/chat/completions";
                 String fullUrl = baseUrl + endpoint;
@@ -109,6 +135,7 @@ public class AiTextGeneratorStreamService {
                 messages.add(userMessage);
 
                 requestBody.put("messages", messages);
+                monitorContext.setPromptLength(requestBody.toJSONString().length());
 
                 RequestBody body = RequestBody.create(
                         requestBody.toJSONString(),
@@ -128,6 +155,7 @@ public class AiTextGeneratorStreamService {
                         log.info("AI stream request cancelled by client");
                         call.cancel();
                     }
+                    recordCancelledIfNeeded(monitorContext, recorded, responseLength.get());
                 });
 
                 call.enqueue(new Callback() {
@@ -135,11 +163,15 @@ public class AiTextGeneratorStreamService {
                     public void onFailure(Call call, IOException e) {
                         if (call.isCanceled() || sink.isCancelled()) {
                             log.info("AI stream request cancelled before completion");
+                            recordCancelledIfNeeded(monitorContext, recorded, responseLength.get());
                             sink.complete();
                             return;
                         }
 
                         log.error("流式请求失败: {}", e.getMessage(), e);
+                        monitorContext.markFailed(AiApiMonitorWrapper.ErrorType.NETWORK_ERROR, e.getMessage(), null);
+                        monitorContext.setResponseLength(responseLength.get());
+                        recordOnce(monitorContext, recorded);
                         sink.next("[ERROR]" + e.getMessage());
                         sink.complete();
                     }
@@ -149,6 +181,13 @@ public class AiTextGeneratorStreamService {
                         if (!response.isSuccessful()) {
                             String errorBody = response.body() != null ? response.body().string() : "Unknown error";
                             log.error("API调用失败: {} {} - {}", response.code(), response.message(), errorBody);
+                            monitorContext.markFailed(
+                                    AiApiMonitorWrapper.ErrorType.HTTP_ERROR,
+                                    "API调用失败: " + response.code() + " " + response.message(),
+                                    response.code()
+                            );
+                            monitorContext.setResponseLength(responseLength.get());
+                            recordOnce(monitorContext, recorded);
                             if (!sink.isCancelled()) {
                                 sink.next("[ERROR]API调用失败: " + response.code());
                                 sink.complete();
@@ -167,6 +206,9 @@ public class AiTextGeneratorStreamService {
 
                                 String data = line.substring(6);
                                 if ("[DONE]".equals(data)) {
+                                    monitorContext.markSuccess(response.code());
+                                    monitorContext.setResponseLength(responseLength.get());
+                                    recordOnce(monitorContext, recorded);
                                     sink.next("[DONE]");
                                     sink.complete();
                                     return;
@@ -195,6 +237,7 @@ public class AiTextGeneratorStreamService {
 
                                     String content = delta.getString("content");
                                     if (content != null && !content.isEmpty()) {
+                                        responseLength.addAndGet(content.length());
                                         sink.next(content);
                                     }
                                 } catch (Exception e) {
@@ -204,13 +247,22 @@ public class AiTextGeneratorStreamService {
                         } catch (Exception e) {
                             if (call.isCanceled() || sink.isCancelled()) {
                                 log.info("AI stream response closed after cancellation");
+                                recordCancelledIfNeeded(monitorContext, recorded, responseLength.get());
                                 sink.complete();
                                 return;
                             }
 
                             log.error("读取流式响应失败: {}", e.getMessage(), e);
+                            monitorContext.markFailed(AiApiMonitorWrapper.ErrorType.PARSE_ERROR, e.getMessage(), response.code());
+                            monitorContext.setResponseLength(responseLength.get());
+                            recordOnce(monitorContext, recorded);
                             sink.next("[ERROR]" + e.getMessage());
                         } finally {
+                            if (!recorded.get() && !call.isCanceled() && !sink.isCancelled()) {
+                                monitorContext.markSuccess(response.code());
+                                monitorContext.setResponseLength(responseLength.get());
+                                recordOnce(monitorContext, recorded);
+                            }
                             if (!sink.isCancelled()) {
                                 sink.complete();
                             }
@@ -219,10 +271,28 @@ public class AiTextGeneratorStreamService {
                 });
             } catch (Exception e) {
                 log.error("生成流式响应失败: {}", e.getMessage(), e);
+                monitorContext.markFailed(AiApiMonitorWrapper.ErrorType.BUSINESS_ERROR, e.getMessage(), null);
+                monitorContext.setResponseLength(responseLength.get());
+                recordOnce(monitorContext, recorded);
                 sink.next("[ERROR]" + e.getMessage());
                 sink.complete();
             }
         });
+    }
+
+    private void recordCancelledIfNeeded(AiApiCallContext context, AtomicBoolean recorded, int responseLength) {
+        if (recorded.get()) {
+            return;
+        }
+        context.markFailed(AiApiMonitorWrapper.ErrorType.BUSINESS_ERROR, "stream cancelled", 499);
+        context.setResponseLength(responseLength);
+        recordOnce(context, recorded);
+    }
+
+    private void recordOnce(AiApiCallContext context, AtomicBoolean recorded) {
+        if (recorded.compareAndSet(false, true)) {
+            monitorService.recordApiCall(context);
+        }
     }
 
     private String buildSystemPrompt(Map<String, Object> context) {
