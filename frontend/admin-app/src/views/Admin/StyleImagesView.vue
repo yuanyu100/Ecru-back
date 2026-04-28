@@ -292,11 +292,16 @@ const buildStyleSummaryFromTagIds = (tagIds = []) => {
 };
 
 const resolveGalleryCategory = (item = {}) => {
+  const styleCategory = normalizeCategory(item.styleCategory);
+  if (styleCategory) {
+    return styleCategory;
+  }
+
   const tagCategories = Array.isArray(item.tags)
     ? [...new Set(item.tags.map((tag) => normalizeCategory(tag.category)).filter(Boolean))]
     : [];
 
-  return tagCategories[0] || normalizeCategory(item.styleCategory) || '__uncategorized__';
+  return tagCategories[0] || '__uncategorized__';
 };
 
 const categoryGroups = computed(() => {
@@ -432,6 +437,25 @@ const resetDraft = () => {
   stylePickerOpen.value = false;
 };
 
+const applySavedItem = (item) => {
+  if (!item?.id) {
+    return;
+  }
+
+  const nextItems = [...items.value];
+  const index = nextItems.findIndex((current) => current.id === item.id);
+  if (index >= 0) {
+    nextItems.splice(index, 1, item);
+  } else {
+    nextItems.unshift(item);
+  }
+
+  items.value = nextItems;
+  activeCategory.value = resolveGalleryCategory(item);
+  ensureActiveCategory();
+  editItem(item);
+};
+
 const editItem = (item) => {
   Object.assign(draft, {
     id: item.id,
@@ -500,14 +524,19 @@ const saveItem = async () => {
   saving.value = true;
   try {
     const payload = normalizePayload();
+    let result;
     if (draft.id) {
-      await styleImageAdminApi.updateStyleImage(draft.id, payload);
+      result = await styleImageAdminApi.updateStyleImage(draft.id, payload);
     } else {
-      await styleImageAdminApi.createStyleImage(payload);
+      result = await styleImageAdminApi.createStyleImage(payload);
     }
 
-    await loadImages();
-    resetDraft();
+    const savedItem = result?.data || null;
+    if (savedItem?.id) {
+      applySavedItem(savedItem);
+    } else {
+      await loadImages();
+    }
   } catch (error) {
     console.error('Save style image failed:', error);
     alert(error.response?.data?.message || '保存风格图片失败');

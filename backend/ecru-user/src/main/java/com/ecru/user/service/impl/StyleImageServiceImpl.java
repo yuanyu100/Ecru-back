@@ -11,6 +11,8 @@ import com.ecru.user.service.StyleImageService;
 import com.ecru.user.service.StyleTagService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -81,8 +83,8 @@ public class StyleImageServiceImpl implements StyleImageService {
         StyleImageVO vo = new StyleImageVO();
         vo.setId(image.getId());
         vo.setImageUrl(image.getImageUrl());
-        vo.setTitle(image.getTitle());
-        vo.setSource(image.getSource());
+        vo.setTitle(resolveTitle(image));
+        vo.setSource(StringUtils.hasText(image.getSource()) ? image.getSource() : "手工标注");
         vo.setSourceUrl(image.getSourceUrl());
         vo.setPrice(image.getPrice());
         vo.setStyleCategory(image.getStyleCategory());
@@ -96,7 +98,28 @@ public class StyleImageServiceImpl implements StyleImageService {
             .filter(tag -> tag != null)
             .collect(Collectors.toList());
         vo.setTags(tagVOs);
+
+        if (!StringUtils.hasText(vo.getTitle())) {
+            String fallbackTitle = tagVOs.stream()
+                    .map(StyleTagVO::getName)
+                    .filter(StringUtils::hasText)
+                    .distinct()
+                    .collect(Collectors.joining(" / "));
+            vo.setTitle(StringUtils.hasText(fallbackTitle)
+                    ? fallbackTitle
+                    : (StringUtils.hasText(image.getStyleCategory()) ? image.getStyleCategory() : "未命名风格图片"));
+        }
         
         return vo;
+    }
+
+    private String resolveTitle(StyleImage image) {
+        if (StringUtils.hasText(image.getTitle())) {
+            return image.getTitle();
+        }
+        if (StringUtils.hasText(image.getStyleCategory())) {
+            return image.getStyleCategory();
+        }
+        return null;
     }
 }
