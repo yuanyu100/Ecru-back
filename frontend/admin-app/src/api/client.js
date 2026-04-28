@@ -27,10 +27,29 @@ export const deriveRole = (user) => {
   }
 
   if (user.role) {
-    return user.role;
+    const normalizedRole = String(user.role).toUpperCase();
+    if (normalizedRole.includes('ADMIN')) {
+      return 'ADMIN';
+    }
+    return 'USER';
+  }
+
+  if (user.userId === 1 || user.id === 1) {
+    return 'ADMIN';
   }
 
   return 'USER';
+};
+
+export const normalizeCurrentUser = (user) => {
+  if (!user) {
+    return null;
+  }
+
+  return {
+    ...user,
+    role: deriveRole(user)
+  };
 };
 
 export const unwrapResult = (response) => response?.data ?? response;

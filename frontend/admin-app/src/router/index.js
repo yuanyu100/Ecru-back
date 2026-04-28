@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { authApi } from '../api/auth';
+import { isAdminUser } from '../utils/adminRole';
 
 const routes = [
   {
@@ -61,13 +62,25 @@ const routes = [
         path: 'ai-prompts',
         name: 'admin-ai-prompts',
         component: () => import('../views/Admin/AiPromptView.vue'),
-        meta: { requiresAdmin: true, title: 'Prompt 配置' }
+        meta: { requiresAdmin: true, title: '提示词配置' }
       },
       {
         path: 'knowledge',
         name: 'admin-knowledge',
         component: () => import('../views/Admin/KnowledgeView.vue'),
         meta: { requiresAdmin: true, title: '知识库管理' }
+      },
+      {
+        path: 'knowledge/:type/create',
+        name: 'admin-knowledge-create',
+        component: () => import('../views/Admin/KnowledgeEditorView.vue'),
+        meta: { requiresAdmin: true, title: '新建知识条目' }
+      },
+      {
+        path: 'knowledge/:type/:id/edit',
+        name: 'admin-knowledge-edit',
+        component: () => import('../views/Admin/KnowledgeEditorView.vue'),
+        meta: { requiresAdmin: true, title: '编辑知识条目' }
       },
       {
         path: 'outfit-records',
@@ -97,7 +110,7 @@ router.beforeEach((to) => {
     return '/login';
   }
 
-  if (requiresAdmin && currentUser?.role !== 'ADMIN') {
+  if (requiresAdmin && !isAdminUser(currentUser)) {
     return '/dashboard';
   }
 

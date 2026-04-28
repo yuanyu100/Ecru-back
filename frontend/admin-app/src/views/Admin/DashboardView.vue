@@ -1,55 +1,115 @@
 <template>
   <div class="admin-page">
+    <section class="split-hero">
+      <article class="hero-card">
+        <p class="header-tag">后台概览</p>
+        <h2>后台状态清晰集中，适合日常巡检与异常定位</h2>
+        <p class="panel-subtitle">
+          当前工作台已经接入用户、衣橱、知识库与 AI 调用监控接口，适合管理员和运营人员进行统一巡检。
+        </p>
+
+        <div class="hero-metrics">
+          <div class="hero-metric">
+            <span>近 24 小时调用</span>
+            <strong>{{ stats.aiCalls }}</strong>
+          </div>
+          <div class="hero-metric">
+            <span>监控健康度</span>
+            <strong>{{ stats.healthUp ? '正常' : '异常' }}</strong>
+          </div>
+          <div class="hero-metric">
+            <span>知识条目</span>
+            <strong>{{ stats.knowledgeCount }}</strong>
+          </div>
+          <div class="hero-metric">
+            <span>搭配记录</span>
+            <strong>{{ stats.outfitRecordCount }}</strong>
+          </div>
+        </div>
+      </article>
+
+      <aside class="insight-list">
+        <article class="insight-item">
+          <span>当前角色</span>
+          <strong>{{ isAdmin ? '管理员视角' : '运营视角' }}</strong>
+          <p>{{ isAdmin ? '可访问完整后台模块。' : '当前仅开放与账号相关的后台能力。' }}</p>
+        </article>
+        <article class="insight-item">
+          <span>衣物资产</span>
+          <strong>{{ stats.clothingCount }}</strong>
+          <p>当前账号或后台范围内已接入的衣物数据总量。</p>
+        </article>
+        <article class="insight-item">
+          <span>用户规模</span>
+          <strong>{{ stats.userCount }}</strong>
+          <p>用于快速判断近期用户规模和后台维护范围。</p>
+        </article>
+      </aside>
+    </section>
+
     <div class="stats-grid">
       <article class="stat-card">
         <span class="stat-label">用户总数</span>
         <strong>{{ stats.userCount }}</strong>
+        <p class="stat-note">管理员可查看全量用户列表与状态。</p>
       </article>
       <article class="stat-card">
-        <span class="stat-label">当前账号衣物数</span>
+        <span class="stat-label">当前衣物数</span>
         <strong>{{ stats.clothingCount }}</strong>
+        <p class="stat-note">按当前权限范围统计衣橱资产。</p>
       </article>
       <article class="stat-card">
-        <span class="stat-label">今日 AI 调用</span>
+        <span class="stat-label">近 24 小时 AI 调用</span>
         <strong>{{ stats.aiCalls }}</strong>
+        <p class="stat-note">管理员视角默认统计全用户近 24 小时调用活跃度。</p>
       </article>
       <article v-if="isAdmin" class="stat-card">
         <span class="stat-label">AI 会话数</span>
         <strong>{{ stats.aiConversationCount }}</strong>
+        <p class="stat-note">用于观察会话规模和问答活跃度。</p>
       </article>
       <article v-if="isAdmin" class="stat-card">
-        <span class="stat-label">知识库条目</span>
+        <span class="stat-label">知识条目</span>
         <strong>{{ stats.knowledgeCount }}</strong>
+        <p class="stat-note">面料、指南和洗护知识总量。</p>
       </article>
       <article v-if="isAdmin" class="stat-card">
-        <span class="stat-label">穿搭记录数</span>
+        <span class="stat-label">搭配记录</span>
         <strong>{{ stats.outfitRecordCount }}</strong>
+        <p class="stat-note">沉淀的 AI 搭配推荐结果与反馈。</p>
       </article>
       <article class="stat-card">
-        <span class="stat-label">监控健康状态</span>
+        <span class="stat-label">监控健康度</span>
         <strong :class="stats.healthUp ? 'status-up' : 'status-down'">
-          {{ stats.healthUp ? 'UP' : 'DOWN' }}
+          {{ stats.healthUp ? '正常' : '异常' }}
         </strong>
+        <p class="stat-note">基于后端健康检查接口返回结果。</p>
       </article>
     </div>
 
     <div class="panel-grid">
       <section class="panel-card">
         <div class="panel-head">
-          <h2>系统说明</h2>
+          <div>
+            <h2>后台接入说明</h2>
+            <p class="panel-subtitle">帮助当前操作者快速理解后台覆盖范围与权限边界。</p>
+          </div>
         </div>
         <ul class="plain-list">
-          <li>当前后台已经接入真实登录、用户列表、衣物列表、知识库管理和 AI 监控接口。</li>
+          <li>当前后台已接入真实登录、用户列表、衣物列表、知识库管理和 AI 监控接口。</li>
           <li>用户管理仅管理员可见，后端当前以 `userId = 1` 识别管理员。</li>
-          <li>衣物页当前是“当前登录账号视角”，后端暂时没有完整的全局衣物管理接口。</li>
-          <li>知识库页已支持面料、指南、洗护标的新增、编辑和启停用维护。</li>
-          <li>穿搭记录页支持检索全局 AI 穿搭结果，并查看推荐单品与用户反馈详情。</li>
+          <li>衣物页当前是“当前登录账号视角”，后端暂未提供完整的全局衣物管理接口。</li>
+          <li>知识库页已支持面料、指南、洗护标的新建、编辑、批量导入与停启用维护。</li>
+          <li>搭配记录页支持检索全局 AI 穿搭结果，并查看推荐单品与用户反馈详情。</li>
         </ul>
       </section>
 
       <section class="panel-card">
         <div class="panel-head">
-          <h2>最近 AI 调用</h2>
+          <div>
+            <h2>最近 AI 调用</h2>
+            <p class="panel-subtitle">便于快速查看场景、模型、状态与响应时间。</p>
+          </div>
         </div>
         <div v-if="recentCalls.length" class="table-shell compact">
           <table class="data-table">
@@ -65,7 +125,11 @@
               <tr v-for="call in recentCalls" :key="call.id">
                 <td>{{ call.scene || '-' }}</td>
                 <td>{{ call.model || '-' }}</td>
-                <td>{{ call.status === 1 ? '成功' : '失败' }}</td>
+                <td>
+                  <span class="badge" :class="call.status === 1 ? 'badge-green' : 'badge-red'">
+                    {{ call.status === 1 ? '成功' : '失败' }}
+                  </span>
+                </td>
                 <td>{{ call.responseTime ?? 0 }} ms</td>
               </tr>
             </tbody>
@@ -85,9 +149,9 @@ import { clothingApi } from '../../api/clothing';
 import { knowledgeAdminApi } from '../../api/knowledge';
 import { monitorApi } from '../../api/monitor';
 import { outfitAdminApi } from '../../api/outfit';
-import { authApi } from '../../api/auth';
+import { getCurrentAdminFlag } from '../../utils/adminRole';
 
-const isAdmin = authApi.getCurrentUser()?.role === 'ADMIN';
+const isAdmin = getCurrentAdminFlag();
 const stats = reactive({
   userCount: 0,
   clothingCount: 0,
@@ -101,7 +165,7 @@ const recentCalls = ref([]);
 
 const loadDashboard = async () => {
   const requests = isAdmin
-      ? [
+    ? [
         adminApi.getUsers({ page: 1, size: 1 }).catch(() => null),
         aiChatAdminApi.getOverview().catch(() => null),
         outfitAdminApi.getOverview().catch(() => null),
@@ -148,7 +212,7 @@ const loadDashboard = async () => {
   }
 
   if (monitorResult?.success) {
-    stats.aiCalls = monitorResult.data?.todayTotalCalls || 0;
+    stats.aiCalls = monitorResult.data?.recent24hTotalCalls || monitorResult.data?.todayTotalCalls || 0;
     recentCalls.value = monitorResult.data?.recentCalls || [];
   }
 

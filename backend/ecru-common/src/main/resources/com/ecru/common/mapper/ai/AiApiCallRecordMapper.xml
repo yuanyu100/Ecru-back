@@ -30,4 +30,34 @@
         WHERE create_date = #{today}
     </select>
 
+    <select id="selectSummarySince" resultType="map">
+        SELECT
+            COUNT(*) AS total_calls,
+            SUM(CASE WHEN status = 1 THEN 1 ELSE 0 END) AS success_calls,
+            SUM(CASE WHEN status = 0 THEN 1 ELSE 0 END) AS failed_calls,
+            AVG(response_time) AS avg_response_time,
+            SUM(total_tokens) AS total_tokens
+        FROM ai_api_call_record
+        WHERE created_at &gt;= #{startTime}
+    </select>
+
+    <select id="selectUserStatsSince" resultType="map">
+        SELECT
+            r.user_id,
+            COALESCE(u.username, '未知用户') AS username,
+            COALESCE(u.nickname, '') AS nickname,
+            COALESCE(u.role, 'USER') AS role,
+            COUNT(*) AS total_calls,
+            SUM(CASE WHEN r.status = 1 THEN 1 ELSE 0 END) AS success_calls,
+            SUM(CASE WHEN r.status = 0 THEN 1 ELSE 0 END) AS failed_calls,
+            AVG(r.response_time) AS avg_response_time,
+            SUM(r.total_tokens) AS total_tokens,
+            MAX(r.created_at) AS last_call_at
+        FROM ai_api_call_record r
+        LEFT JOIN users u ON u.id = r.user_id
+        WHERE r.created_at &gt;= #{startTime}
+        GROUP BY r.user_id, u.username, u.nickname, u.role
+        ORDER BY total_calls DESC, last_call_at DESC
+    </select>
+
 </mapper>

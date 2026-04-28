@@ -33,7 +33,7 @@
               <td>{{ user.username }}</td>
               <td>{{ user.email || '-' }}</td>
               <td>{{ user.nickname || '-' }}</td>
-              <td>{{ user.role || 'USER' }}</td>
+              <td>{{ formatRole(user.role) }}</td>
               <td>
                 <span class="badge" :class="user.status === 1 ? 'badge-green' : 'badge-red'">
                   {{ user.status === 1 ? '启用' : '禁用' }}
@@ -69,6 +69,7 @@ const loading = ref(false);
 const submittingId = ref(null);
 
 const formatDate = (value) => (value ? String(value).replace('T', ' ') : '-');
+const formatRole = (role) => (String(role || '').toUpperCase().includes('ADMIN') ? '管理员' : '普通用户');
 
 const loadUsers = async () => {
   loading.value = true;

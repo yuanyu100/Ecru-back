@@ -3,13 +3,13 @@
     <section class="panel-card">
       <div class="panel-head">
         <div>
-          <h2>AI Monitor</h2>
-          <p class="panel-subtitle">Dashboard, trends, latency and failure distribution.</p>
+          <h2>AI 调用监控</h2>
+          <p class="panel-subtitle">管理员视角下查看全用户近 24 小时调用总览、分布和按用户聚合结果。</p>
         </div>
         <div class="toolbar">
-          <span class="panel-subtitle">{{ loading ? 'Refreshing...' : `Updated ${lastLoadedAt}` }}</span>
+          <span class="panel-subtitle">{{ loading ? '刷新中...' : `上次更新：${lastLoadedAt}` }}</span>
           <button class="secondary-button" type="button" :disabled="loading" @click="loadMonitor">
-            Refresh
+            刷新数据
           </button>
         </div>
       </div>
@@ -18,30 +18,76 @@
 
       <div class="stats-grid">
         <article class="stat-card">
-          <span class="stat-label">Today Calls</span>
-          <strong>{{ dashboard.todayTotalCalls || 0 }}</strong>
+          <span class="stat-label">近 24 小时调用</span>
+          <strong>{{ dashboard.recent24hTotalCalls || 0 }}</strong>
         </article>
         <article class="stat-card">
-          <span class="stat-label">Success Rate</span>
-          <strong>{{ formatPercent(dashboard.todaySuccessRate) }}</strong>
+          <span class="stat-label">近 24 小时成功率</span>
+          <strong>{{ formatPercent(dashboard.recent24hSuccessRate) }}</strong>
         </article>
         <article class="stat-card">
-          <span class="stat-label">Avg Response</span>
-          <strong>{{ formatMs(dashboard.todayAvgResponseTime) }}</strong>
+          <span class="stat-label">近 24 小时平均耗时</span>
+          <strong>{{ formatMs(dashboard.recent24hAvgResponseTime) }}</strong>
         </article>
         <article class="stat-card">
-          <span class="stat-label">Today Tokens</span>
-          <strong>{{ dashboard.todayTotalTokens || 0 }}</strong>
+          <span class="stat-label">近 24 小时令牌消耗</span>
+          <strong>{{ dashboard.recent24hTotalTokens || 0 }}</strong>
         </article>
       </div>
+    </section>
+
+    <section class="panel-card">
+      <div class="panel-head">
+        <div>
+          <h2>按用户分类</h2>
+          <p class="panel-subtitle">展示近 24 小时各用户的调用次数、成功率、平均耗时和最近调用时间。</p>
+        </div>
+      </div>
+
+      <div v-if="userStats.length" class="table-shell">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>用户</th>
+              <th>角色</th>
+              <th>调用次数</th>
+              <th>成功次数</th>
+              <th>失败次数</th>
+              <th>成功率</th>
+              <th>平均耗时</th>
+              <th>令牌消耗</th>
+              <th>最近调用</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in userStats" :key="`${item.userId}-${item.username}`">
+              <td>
+                <div class="user-cell">
+                  <strong>{{ item.nickname || item.username || '未知用户' }}</strong>
+                  <span>{{ item.username || '-' }}</span>
+                </div>
+              </td>
+              <td>{{ formatRole(item.role) }}</td>
+              <td>{{ item.totalCalls || 0 }}</td>
+              <td>{{ item.successCalls || 0 }}</td>
+              <td>{{ item.failedCalls || 0 }}</td>
+              <td>{{ formatPercent(item.successRate) }}</td>
+              <td>{{ formatMs(item.avgResponseTime) }}</td>
+              <td>{{ item.totalTokens || 0 }}</td>
+              <td>{{ formatDate(item.lastCallAt) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p v-else class="empty-tip">近 24 小时暂无可展示的用户调用数据。</p>
     </section>
 
     <div class="panel-grid">
       <section class="panel-card">
         <div class="panel-head">
           <div>
-            <h2>7-Day Trend</h2>
-            <p class="panel-subtitle">Aggregated by day.</p>
+            <h2>近 7 天趋势</h2>
+            <p class="panel-subtitle">按天聚合，便于快速判断整体调用波动。</p>
           </div>
         </div>
 
@@ -49,11 +95,11 @@
           <table class="data-table">
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Calls</th>
-                <th>Success</th>
-                <th>Avg Response</th>
-                <th>Tokens</th>
+                <th>日期</th>
+                <th>调用次数</th>
+                <th>成功率</th>
+                <th>平均耗时</th>
+                <th>令牌消耗</th>
               </tr>
             </thead>
             <tbody>
@@ -72,8 +118,8 @@
       <section class="panel-card">
         <div class="panel-head">
           <div>
-            <h2>Today by Hour</h2>
-            <p class="panel-subtitle">24-hour breakdown.</p>
+            <h2>今日分时趋势</h2>
+            <p class="panel-subtitle">按小时拆分，查看当日调用密度和延迟变化。</p>
           </div>
         </div>
 
@@ -81,11 +127,11 @@
           <table class="data-table">
             <thead>
               <tr>
-                <th>Hour</th>
-                <th>Calls</th>
-                <th>Success</th>
-                <th>Avg Response</th>
-                <th>P95</th>
+                <th>小时</th>
+                <th>调用次数</th>
+                <th>成功率</th>
+                <th>平均耗时</th>
+                <th>P95 耗时</th>
               </tr>
             </thead>
             <tbody>
@@ -106,8 +152,8 @@
       <section class="panel-card">
         <div class="panel-head">
           <div>
-            <h2>Scene Distribution</h2>
-            <p class="panel-subtitle">Grouped by business scene.</p>
+            <h2>按场景分类</h2>
+            <p class="panel-subtitle">按业务场景查看调用量、成功率和资源消耗。</p>
           </div>
         </div>
 
@@ -115,11 +161,11 @@
           <table class="data-table">
             <thead>
               <tr>
-                <th>Scene</th>
-                <th>Calls</th>
-                <th>Success</th>
-                <th>Avg Response</th>
-                <th>Tokens</th>
+                <th>场景</th>
+                <th>调用次数</th>
+                <th>成功率</th>
+                <th>平均耗时</th>
+                <th>令牌消耗</th>
               </tr>
             </thead>
             <tbody>
@@ -133,14 +179,14 @@
             </tbody>
           </table>
         </div>
-        <p v-else class="empty-tip">No scene statistics yet.</p>
+        <p v-else class="empty-tip">近 24 小时暂无场景统计数据。</p>
       </section>
 
       <section class="panel-card">
         <div class="panel-head">
           <div>
-            <h2>Model Distribution</h2>
-            <p class="panel-subtitle">Grouped by model name.</p>
+            <h2>按模型分类</h2>
+            <p class="panel-subtitle">按模型名称查看调用量、成功率和资源消耗。</p>
           </div>
         </div>
 
@@ -148,11 +194,11 @@
           <table class="data-table">
             <thead>
               <tr>
-                <th>Model</th>
-                <th>Calls</th>
-                <th>Success</th>
-                <th>Avg Response</th>
-                <th>Tokens</th>
+                <th>模型</th>
+                <th>调用次数</th>
+                <th>成功率</th>
+                <th>平均耗时</th>
+                <th>Token</th>
               </tr>
             </thead>
             <tbody>
@@ -166,7 +212,7 @@
             </tbody>
           </table>
         </div>
-        <p v-else class="empty-tip">No model statistics yet.</p>
+        <p v-else class="empty-tip">近 24 小时暂无模型统计数据。</p>
       </section>
     </div>
 
@@ -174,25 +220,25 @@
       <section class="panel-card">
         <div class="panel-head">
           <div>
-            <h2>Error Distribution</h2>
-            <p class="panel-subtitle">Failures in the last 24 hours.</p>
+            <h2>错误分布</h2>
+            <p class="panel-subtitle">统计近 24 小时失败调用的错误类型。</p>
           </div>
         </div>
 
         <div v-if="errorDistribution.length" class="chip-grid">
           <article v-for="item in errorDistribution" :key="`${item.error_type}-${item.count}`" class="metric-chip">
-            <span>{{ item.error_type || 'UNKNOWN' }}</span>
+            <span>{{ item.error_type || '未知错误' }}</span>
             <strong>{{ item.count || 0 }}</strong>
           </article>
         </div>
-        <p v-else class="empty-tip">No failures recorded in the last 24 hours.</p>
+        <p v-else class="empty-tip">近 24 小时没有失败调用。</p>
       </section>
 
       <section class="panel-card">
         <div class="panel-head">
           <div>
-            <h2>Recent Calls</h2>
-            <p class="panel-subtitle">Latest AI API requests.</p>
+            <h2>最近调用记录</h2>
+            <p class="panel-subtitle">展示最近的 AI 请求，便于定位异常和核对场景。</p>
           </div>
         </div>
 
@@ -200,22 +246,22 @@
           <table class="data-table">
             <thead>
               <tr>
-                <th>Time</th>
-                <th>Scene</th>
-                <th>Model</th>
-                <th>Status</th>
-                <th>Latency</th>
-                <th>HTTP</th>
+                <th>时间</th>
+                <th>场景</th>
+                <th>模型</th>
+                <th>状态</th>
+                <th>耗时</th>
+                <th>状态码</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="record in records" :key="record.id">
                 <td>{{ formatDate(record.createdAt) }}</td>
-                <td>{{ record.scene || 'UNKNOWN' }}</td>
-                <td>{{ record.model || 'UNKNOWN' }}</td>
+                <td>{{ record.scene || '未知场景' }}</td>
+                <td>{{ record.model || '未知模型' }}</td>
                 <td>
                   <span class="badge" :class="record.status === 1 ? 'badge-green' : 'badge-red'">
-                    {{ record.status === 1 ? 'SUCCESS' : 'FAILED' }}
+                    {{ record.status === 1 ? '成功' : '失败' }}
                   </span>
                 </td>
                 <td>{{ formatMs(record.responseTime) }}</td>
@@ -224,7 +270,7 @@
             </tbody>
           </table>
         </div>
-        <p v-else class="empty-tip">No recent call records.</p>
+        <p v-else class="empty-tip">暂无最近调用记录。</p>
       </section>
     </div>
   </div>
@@ -236,26 +282,30 @@ import { monitorApi } from '../../api/monitor';
 
 const loading = ref(false);
 const errorMessage = ref('');
-const lastLoadedAt = ref('never');
+const lastLoadedAt = ref('尚未加载');
 const records = ref([]);
 const weeklyTrend = ref([]);
 const hourlyTrend = ref([]);
 const sceneStats = ref([]);
 const modelStats = ref([]);
 const errorDistribution = ref([]);
+const userStats = ref([]);
 
 const dashboard = reactive({
   todayTotalCalls: 0,
   todaySuccessRate: 0,
   todayAvgResponseTime: 0,
-  todayTotalTokens: 0
+  todayTotalTokens: 0,
+  recent24hTotalCalls: 0,
+  recent24hSuccessRate: 0,
+  recent24hAvgResponseTime: 0,
+  recent24hTotalTokens: 0
 });
 
 const formatDate = (value) => (value ? String(value).replace('T', ' ') : '-');
-
 const formatMs = (value) => `${Number(value || 0).toFixed(0)} ms`;
-
 const formatPercent = (value) => `${Number(value || 0).toFixed(2)}%`;
+const formatRole = (role) => (String(role || '').toUpperCase().includes('ADMIN') ? '管理员' : '普通用户');
 
 const loadMonitor = async () => {
   loading.value = true;
@@ -264,14 +314,18 @@ const loadMonitor = async () => {
   try {
     const result = await monitorApi.getDashboard();
     if (!result?.success || !result.data) {
-      throw new Error(result?.message || 'Failed to load monitor dashboard');
+      throw new Error(result?.message || '加载 AI 监控数据失败');
     }
 
     Object.assign(dashboard, {
       todayTotalCalls: result.data.todayTotalCalls || 0,
       todaySuccessRate: result.data.todaySuccessRate || 0,
       todayAvgResponseTime: result.data.todayAvgResponseTime || 0,
-      todayTotalTokens: result.data.todayTotalTokens || 0
+      todayTotalTokens: result.data.todayTotalTokens || 0,
+      recent24hTotalCalls: result.data.recent24hTotalCalls || 0,
+      recent24hSuccessRate: result.data.recent24hSuccessRate || 0,
+      recent24hAvgResponseTime: result.data.recent24hAvgResponseTime || 0,
+      recent24hTotalTokens: result.data.recent24hTotalTokens || 0
     });
 
     weeklyTrend.value = result.data.weeklyTrend || [];
@@ -280,10 +334,11 @@ const loadMonitor = async () => {
     modelStats.value = result.data.modelStats || [];
     errorDistribution.value = result.data.errorDistribution || [];
     records.value = result.data.recentCalls || [];
+    userStats.value = result.data.userStats || [];
     lastLoadedAt.value = new Date().toLocaleString('zh-CN');
   } catch (error) {
     console.error('Load monitor dashboard failed:', error);
-    errorMessage.value = error.message || 'Failed to load monitor dashboard';
+    errorMessage.value = error.message || '加载 AI 监控数据失败';
   } finally {
     loading.value = false;
   }
@@ -320,6 +375,16 @@ onMounted(loadMonitor);
 .metric-chip strong {
   font-size: 24px;
   color: #18212f;
+}
+
+.user-cell {
+  display: grid;
+  gap: 4px;
+}
+
+.user-cell span {
+  color: #5f6b7a;
+  font-size: 12px;
 }
 
 .error-text {

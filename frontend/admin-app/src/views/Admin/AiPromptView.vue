@@ -3,9 +3,9 @@
     <section class="panel-card">
       <div class="panel-head stacked-head">
         <div>
-          <h2>AI Prompt 配置</h2>
+          <h2>AI 提示词配置</h2>
           <p class="panel-subtitle">
-            后台可直接维护聊天系统提示词、问候语和身份介绍。保存后写库，后续对话直接生效。
+            后台可直接维护聊天系统提示词、问候语和身份介绍。保存后写入数据库，后续对话直接生效。
           </p>
         </div>
         <div class="toolbar">
@@ -117,9 +117,9 @@ const loadSettings = async () => {
       applyPayload(result.data);
       return;
     }
-    setMessage(result?.message || '加载 Prompt 配置失败。', 'error');
+    setMessage(result?.message || '加载提示词配置失败。', 'error');
   } catch (error) {
-    setMessage(error?.response?.data?.message || error?.message || '加载 Prompt 配置失败。', 'error');
+    setMessage(error?.response?.data?.message || error?.message || '加载提示词配置失败。', 'error');
   } finally {
     loading.value = false;
   }
@@ -138,13 +138,13 @@ const saveSettings = async () => {
 
     if (result?.code === 200) {
       applyPayload(result.data);
-      setMessage('Prompt 配置已保存并入库。', 'success');
+      setMessage('提示词配置已保存并入库。', 'success');
       return;
     }
 
-    setMessage(result?.message || '保存 Prompt 配置失败。', 'error');
+    setMessage(result?.message || '保存提示词配置失败。', 'error');
   } catch (error) {
-    setMessage(error?.response?.data?.message || error?.message || '保存 Prompt 配置失败。', 'error');
+    setMessage(error?.response?.data?.message || error?.message || '保存提示词配置失败。', 'error');
   } finally {
     saving.value = false;
   }

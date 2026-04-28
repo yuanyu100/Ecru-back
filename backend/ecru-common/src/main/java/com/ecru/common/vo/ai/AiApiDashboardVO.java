@@ -43,6 +43,36 @@ public class AiApiDashboardVO {
     private Integer todayTotalTokens;
 
     /**
+     * 近24小时总调用次数
+     */
+    private Integer recent24hTotalCalls;
+
+    /**
+     * 近24小时成功次数
+     */
+    private Integer recent24hSuccessCalls;
+
+    /**
+     * 近24小时失败次数
+     */
+    private Integer recent24hFailedCalls;
+
+    /**
+     * 近24小时成功率
+     */
+    private BigDecimal recent24hSuccessRate;
+
+    /**
+     * 近24小时平均响应时间（毫秒）
+     */
+    private BigDecimal recent24hAvgResponseTime;
+
+    /**
+     * 近24小时总token消耗
+     */
+    private Integer recent24hTotalTokens;
+
+    /**
      * 近7天调用趋势（按天）
      */
     private List<Map<String, Object>> weeklyTrend;
@@ -71,4 +101,9 @@ public class AiApiDashboardVO {
      * 错误类型分布
      */
     private List<Map<String, Object>> errorDistribution;
+
+    /**
+     * 按用户聚合的调用统计
+     */
+    private List<UserAiMonitorStatsVO> userStats;
 }

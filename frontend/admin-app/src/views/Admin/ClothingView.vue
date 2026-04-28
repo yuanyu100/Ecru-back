@@ -78,9 +78,10 @@
 import { onMounted, reactive, ref } from 'vue';
 import { clothingApi } from '../../api/clothing';
 import { authApi } from '../../api/auth';
+import { isAdminUser } from '../../utils/adminRole';
 
 const currentUser = authApi.getCurrentUser();
-const isAdmin = currentUser?.role === 'ADMIN';
+const isAdmin = isAdminUser(currentUser);
 const items = ref([]);
 const loading = ref(false);
 const deletingId = ref(null);

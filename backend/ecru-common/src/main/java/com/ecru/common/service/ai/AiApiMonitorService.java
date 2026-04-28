@@ -12,6 +12,7 @@ import com.ecru.common.mapper.ai.AiApiStatsDailyMapper;
 import com.ecru.common.mapper.ai.AiApiStatsHourlyMapper;
 import com.ecru.common.vo.ai.AiApiCallRecordVO;
 import com.ecru.common.vo.ai.AiApiDashboardVO;
+import com.ecru.common.vo.ai.UserAiMonitorStatsVO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -96,6 +97,8 @@ public class AiApiMonitorService {
         AiApiDashboardVO dashboard = new AiApiDashboardVO();
         LocalDate today = LocalDate.now();
         String todayText = today.format(DATE_FORMATTER);
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime recent24hStart = now.minusHours(24);
 
         try {
             Map<String, Object> todayStats = callRecordMapper.selectTodayStats(todayText);
@@ -123,6 +126,17 @@ public class AiApiMonitorService {
                 dashboard.setTodaySuccessRate(BigDecimal.ZERO);
             }
 
+            Map<String, Object> recent24hStats = callRecordMapper.selectSummarySince(recent24hStart);
+            applySummaryStats(
+                    recent24hStats,
+                    dashboard::setRecent24hTotalCalls,
+                    dashboard::setRecent24hSuccessCalls,
+                    dashboard::setRecent24hFailedCalls,
+                    dashboard::setRecent24hAvgResponseTime,
+                    dashboard::setRecent24hTotalTokens,
+                    dashboard::setRecent24hSuccessRate
+            );
+
             LocalDate weekStart = today.minusDays(6);
             LocalDateTime weekStartTime = weekStart.atStartOfDay();
             LocalDateTime tomorrowStart = today.plusDays(1).atStartOfDay();
@@ -134,7 +148,8 @@ public class AiApiMonitorService {
             dashboard.setSceneStats(buildDimensionStats(todayRecords, "scene"));
             dashboard.setModelStats(buildDimensionStats(todayRecords, "model"));
             dashboard.setRecentCalls(getRecentCalls(20));
-            dashboard.setErrorDistribution(callRecordMapper.selectErrorDistribution(LocalDateTime.now().minusDays(1)));
+            dashboard.setErrorDistribution(callRecordMapper.selectErrorDistribution(recent24hStart));
+            dashboard.setUserStats(buildUserStats(callRecordMapper.selectUserStatsSince(recent24hStart)));
         } catch (Exception e) {
             log.error("Failed to build AI monitor dashboard: {}", e.getMessage(), e);
         }
@@ -487,6 +502,65 @@ public class AiApiMonitorService {
             return BigDecimal.ZERO;
         }
         return BigDecimal.valueOf(successCalls * 100.0 / totalCalls).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private void applySummaryStats(
+            Map<String, Object> summary,
+            java.util.function.Consumer<Integer> totalSetter,
+            java.util.function.Consumer<Integer> successSetter,
+            java.util.function.Consumer<Integer> failedSetter,
+            java.util.function.Consumer<BigDecimal> avgSetter,
+            java.util.function.Consumer<Integer> tokensSetter,
+            java.util.function.Consumer<BigDecimal> rateSetter
+    ) {
+        int totalCalls = 0;
+        int successCalls = 0;
+        int failedCalls = 0;
+        BigDecimal avgResponseTime = BigDecimal.ZERO;
+        int totalTokens = 0;
+
+        if (summary != null) {
+            totalCalls = getIntValue(summary.get("total_calls"));
+            successCalls = getIntValue(summary.get("success_calls"));
+            failedCalls = getIntValue(summary.get("failed_calls"));
+            avgResponseTime = getBigDecimalValue(summary.get("avg_response_time"));
+            totalTokens = getIntValue(summary.get("total_tokens"));
+        }
+
+        totalSetter.accept(totalCalls);
+        successSetter.accept(successCalls);
+        failedSetter.accept(failedCalls);
+        avgSetter.accept(avgResponseTime);
+        tokensSetter.accept(totalTokens);
+        rateSetter.accept(calculateSuccessRate(successCalls, totalCalls));
+    }
+
+    private List<UserAiMonitorStatsVO> buildUserStats(List<Map<String, Object>> rows) {
+        List<UserAiMonitorStatsVO> result = new ArrayList<>();
+        if (rows == null) {
+            return result;
+        }
+
+        for (Map<String, Object> row : rows) {
+            UserAiMonitorStatsVO item = new UserAiMonitorStatsVO();
+            item.setUserId(row.get("user_id") == null ? null : Long.valueOf(row.get("user_id").toString()));
+            item.setUsername(row.get("username") == null ? "未知用户" : row.get("username").toString());
+            item.setNickname(row.get("nickname") == null ? "" : row.get("nickname").toString());
+            item.setRole(row.get("role") == null ? "USER" : row.get("role").toString());
+            item.setTotalCalls(getIntValue(row.get("total_calls")));
+            item.setSuccessCalls(getIntValue(row.get("success_calls")));
+            item.setFailedCalls(getIntValue(row.get("failed_calls")));
+            item.setSuccessRate(calculateSuccessRate(item.getSuccessCalls(), item.getTotalCalls()));
+            item.setAvgResponseTime(getBigDecimalValue(row.get("avg_response_time")));
+            item.setTotalTokens(getIntValue(row.get("total_tokens")));
+            Object lastCallAt = row.get("last_call_at");
+            if (lastCallAt instanceof LocalDateTime time) {
+                item.setLastCallAt(time);
+            }
+            result.add(item);
+        }
+
+        return result;
     }
 
     private BigDecimal calculateAverage(long total, int count) {

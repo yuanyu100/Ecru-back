@@ -1,4 +1,4 @@
-import { apiClient, deriveRole } from './client';
+import { apiClient, normalizeCurrentUser } from './client';
 
 export const authApi = {
   async login(credentials) {
@@ -10,12 +10,11 @@ export const authApi = {
     const loginResult = response.data?.data;
 
     if (loginResult?.accessToken) {
-      const currentUser = {
+      const currentUser = normalizeCurrentUser({
         ...(loginResult.user || {}),
-        role: deriveRole(loginResult.user),
         accessToken: loginResult.accessToken,
         refreshToken: loginResult.refreshToken
-      };
+      });
 
       localStorage.setItem('accessToken', loginResult.accessToken);
       localStorage.setItem('token', loginResult.accessToken);
@@ -37,7 +36,13 @@ export const authApi = {
 
   getCurrentUser() {
     const userStr = localStorage.getItem('user');
-    return userStr ? JSON.parse(userStr) : null;
+    if (!userStr) {
+      return null;
+    }
+
+    const currentUser = normalizeCurrentUser(JSON.parse(userStr));
+    localStorage.setItem('user', JSON.stringify(currentUser));
+    return currentUser;
   },
 
   isAuthenticated() {
