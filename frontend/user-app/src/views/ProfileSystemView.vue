@@ -90,10 +90,17 @@ import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 
 const router = useRouter();
-const currentTheme = ref(localStorage.getItem('ecru-theme') || 'system');
+const resolveDisplayTheme = (theme) => {
+  if (theme === 'system') {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'night' : 'sand';
+  }
+
+  return theme || 'sand';
+};
+
+const currentTheme = ref(resolveDisplayTheme(localStorage.getItem('ecru-theme')));
 
 const themes = [
-  { label: '跟随系统', value: 'system' },
   { label: '米黄', value: 'sand' },
   { label: '冷灰', value: 'cool' },
   { label: '暗夜', value: 'night' }

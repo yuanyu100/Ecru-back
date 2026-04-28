@@ -28,4 +28,6 @@ public interface StyleImageTagMapper extends BaseMapper<StyleImageTag> {
     int batchInsert(@Param("tags") List<StyleImageTag> tags);
 
     int deleteByImageId(@Param("imageId") Long imageId);
+
+    Integer countDistinctActiveStyleTagIds();
 }

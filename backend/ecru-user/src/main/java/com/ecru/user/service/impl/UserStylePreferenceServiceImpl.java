@@ -4,6 +4,7 @@ import com.ecru.user.entity.UserStylePreferenceLog;
 import com.ecru.user.entity.UserStyleProfile;
 import com.ecru.user.entity.StyleImageTag;
 import com.ecru.user.dto.request.StylePreferenceFeedbackRequest;
+import com.ecru.user.dto.response.StyleLearningProgressVO;
 import com.ecru.user.dto.response.UserStyleProfileVO;
 import com.ecru.user.dto.response.StyleTagVO;
 import com.ecru.user.mapper.UserStylePreferenceLogMapper;
@@ -39,8 +40,6 @@ public class UserStylePreferenceServiceImpl implements UserStylePreferenceServic
     
     @Autowired
     private StyleImageService styleImageService;
-    
-    private static final Integer LEARNING_THRESHOLD = 50; // 学习阈值
     
     @Override
     @Transactional
@@ -85,10 +84,25 @@ public class UserStylePreferenceServiceImpl implements UserStylePreferenceServic
     }
     
     @Override
-    public Integer getLearningProgress(Long userId) {
-        Integer totalLogs = preferenceLogMapper.countByUserId(userId);
-        Integer progress = (totalLogs * 100) / LEARNING_THRESHOLD;
-        return Math.min(progress, 100);
+    public StyleLearningProgressVO getLearningProgress(Long userId) {
+        StyleLearningProgressVO result = new StyleLearningProgressVO();
+        Integer totalActiveTags = styleImageTagMapper.countDistinctActiveStyleTagIds();
+        if (totalActiveTags == null || totalActiveTags <= 0) {
+            result.setProgressPercent(0);
+            result.setCoveredTagCount(0);
+            result.setTotalTagCount(0);
+            return result;
+        }
+
+        long coveredTags = styleProfileMapper.selectByUserId(userId).stream()
+                .map(UserStyleProfile::getStyleTagId)
+                .distinct()
+                .count();
+        int progress = (int) Math.round((coveredTags * 100.0) / totalActiveTags);
+        result.setProgressPercent(Math.max(0, Math.min(progress, 100)));
+        result.setCoveredTagCount((int) coveredTags);
+        result.setTotalTagCount(totalActiveTags);
+        return result;
     }
     
     @Override

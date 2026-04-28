@@ -3,7 +3,7 @@
 <mapper namespace="com.ecru.user.mapper.StyleImageMapper">
 
     <select id="selectByStyleCategory" resultType="com.ecru.user.entity.StyleImage">
-        SELECT * FROM style_images WHERE style_category = #{styleCategory}
+        SELECT * FROM style_images WHERE style_category LIKE CONCAT('%', #{styleCategory}, '%')
         <if test="excludeImageId != null">
             AND id != #{excludeImageId}
         </if>

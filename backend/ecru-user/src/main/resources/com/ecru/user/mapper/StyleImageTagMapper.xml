@@ -22,4 +22,11 @@
         DELETE FROM style_image_tags WHERE image_id = #{imageId}
     </delete>
 
+    <select id="countDistinctActiveStyleTagIds" resultType="java.lang.Integer">
+        SELECT COUNT(DISTINCT sit.style_tag_id)
+        FROM style_image_tags sit
+        INNER JOIN style_images si ON si.id = sit.image_id
+        WHERE si.is_active = true
+    </select>
+
 </mapper>

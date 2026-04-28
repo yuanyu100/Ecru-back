@@ -1,6 +1,7 @@
 package com.ecru.user.service;
 
 import com.ecru.user.dto.request.StylePreferenceFeedbackRequest;
+import com.ecru.user.dto.response.StyleLearningProgressVO;
 import com.ecru.user.dto.response.UserStyleProfileVO;
 import java.util.List;
 
@@ -27,7 +28,7 @@ public interface UserStylePreferenceService {
     /**
      * 获取用户偏好学习进度
      */
-    Integer getLearningProgress(Long userId);
+    StyleLearningProgressVO getLearningProgress(Long userId);
     
     /**
      * 重置用户风格画像

@@ -3,6 +3,7 @@ package com.ecru.user.controller;
 import com.ecru.user.dto.request.StylePreferenceFeedbackRequest;
 import com.ecru.user.dto.request.StyleImageQueryRequest;
 import com.ecru.user.dto.response.StyleImageVO;
+import com.ecru.user.dto.response.StyleLearningProgressVO;
 import com.ecru.user.dto.response.StyleTagVO;
 import com.ecru.user.dto.response.UserStyleProfileVO;
 import com.ecru.user.service.StyleTagService;
@@ -124,9 +125,9 @@ public class StylePreferenceController {
     
     @Operation(summary = "获取学习进度", description = "获取用户风格偏好学习的进度")
     @GetMapping("/progress")
-    public Result<Integer> getLearningProgress() {
+    public Result<StyleLearningProgressVO> getLearningProgress() {
         Long userId = UserContext.getCurrentUserId();
-        Integer progress = userStylePreferenceService.getLearningProgress(userId);
+        StyleLearningProgressVO progress = userStylePreferenceService.getLearningProgress(userId);
         return Result.success(progress);
     }
     
