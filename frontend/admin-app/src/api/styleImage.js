@@ -36,5 +36,10 @@ export const styleImageAdminApi = {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
     return response.data;
+  },
+
+  async getStyleTags() {
+    const response = await apiClient.get('/style-preferences/tags');
+    return response.data;
   }
 };

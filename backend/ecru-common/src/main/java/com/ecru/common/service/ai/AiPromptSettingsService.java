@@ -13,4 +13,6 @@ public interface AiPromptSettingsService {
     String getGreetingReply();
 
     String getIdentityReply();
+
+    String getConversationTitlePrompt();
 }

@@ -87,6 +87,7 @@ public class StyleImageServiceImpl implements StyleImageService {
         vo.setPrice(image.getPrice());
         vo.setStyleCategory(image.getStyleCategory());
         vo.setCreatedAt(image.getCreatedAt());
+        vo.setUpdatedAt(image.getUpdatedAt());
         
         // 获取图片的标签
         List<StyleImageTag> imageTags = styleImageTagMapper.selectByImageId(image.getId());

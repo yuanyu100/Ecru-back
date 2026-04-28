@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Data
 public class AdminStyleImageUpsertRequest {
@@ -21,6 +22,8 @@ public class AdminStyleImageUpsertRequest {
 
     @NotBlank(message = "风格分类不能为空")
     private String styleCategory;
+
+    private List<Long> styleTagIds;
 
     private Boolean isActive;
 }

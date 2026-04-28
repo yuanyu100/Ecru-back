@@ -20,4 +20,5 @@ public class StyleImageVO {
     private String styleCategory;
     private List<StyleTagVO> tags;
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }

@@ -1,9 +1,12 @@
 <template>
   <div class="home-page">
-    <button class="weather-text" type="button" @click="refreshWeather" :disabled="isWeatherLoading">
-      <span>{{ weatherDisplay.location }}</span>
-      <span>{{ isWeatherLoading ? '定位中' : `${weatherDisplay.temperatureText} ${weatherDisplay.weatherCondition}` }}</span>
-    </button>
+    <div class="weather-area">
+      <span class="status-dot" aria-hidden="true"></span>
+      <button class="weather-text" type="button" @click="refreshWeather" :disabled="isWeatherLoading">
+        <span>{{ weatherDisplay.location }}</span>
+        <span>{{ isWeatherLoading ? '定位中' : `${weatherDisplay.temperatureText} ${weatherDisplay.weatherCondition}` }}</span>
+      </button>
+    </div>
 
     <main class="page-main">
       <section class="prompt-stage">
@@ -16,10 +19,19 @@
           </p>
         </div>
 
-        <button class="prompt-line" type="button" @click="openChat" aria-label="打开穿搭对话">
-          <span class="prompt-line-copy">我想...</span>
-          <span class="prompt-line-arrow" aria-hidden="true"></span>
-        </button>
+        <div class="prompt-line" role="group" aria-label="穿搭对话输入">
+          <input
+            v-model="promptInput"
+            class="prompt-line-input"
+            type="text"
+            placeholder="我想..."
+            aria-label="输入穿搭想法"
+            @keydown.enter="sendPrompt"
+          />
+          <button class="prompt-line-send" type="button" :disabled="!promptInput.trim()" @click="sendPrompt" aria-label="发送">
+            <span class="prompt-line-arrow" aria-hidden="true"></span>
+          </button>
+        </div>
 
         <button
           v-if="showFlowToggle"
@@ -40,12 +52,11 @@
         ref="recommendationSectionRef"
         class="recommendation-section"
       >
-        <div class="section-head">
-          <p>今日推荐</p>
-          <button class="text-link" type="button" @click="rebuildInspirations">换一组</button>
-        </div>
-
-        <div class="recommendation-grid">
+        <div class="recommendation-wrap">
+          <button class="refresh-btn" type="button" @click="rebuildInspirations" aria-label="换一组">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 8A9 9 0 1 0 21 13" stroke-linecap="round"/><polyline points="20 3 20 8 15 8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <div class="recommendation-grid">
           <article
             v-for="card in visibleCards"
             :key="card.id"
@@ -83,15 +94,17 @@
               <p>{{ card.note }}</p>
             </div>
           </article>
+          </div>
         </div>
       </section>
 
       <section v-else-if="showEmptySection" class="empty-section">
-        <div class="section-head">
-          <p>今日推荐</p>
-          <button class="text-link" type="button" @click="rebuildInspirations">重试</button>
+        <div class="recommendation-wrap">
+          <button class="refresh-btn" type="button" @click="rebuildInspirations" aria-label="重试">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 8A9 9 0 1 0 21 13" stroke-linecap="round"/><polyline points="20 3 20 8 15 8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <p>{{ emptyReason }}</p>
         </div>
-        <p>{{ emptyReason }}</p>
       </section>
     </main>
   </div>
@@ -144,6 +157,7 @@ const fallbackCards = [
   }
 ];
 
+const promptInput = ref('');
 const typedHeadline = ref('');
 const headlineVisible = ref(true);
 const homeHeadlines = ref([defaultHeadline]);
@@ -334,6 +348,12 @@ const openChat = () => {
   router.push('/chat');
 };
 
+const sendPrompt = () => {
+  const text = promptInput.value.trim();
+  if (!text) return;
+  router.push({ path: '/chat', query: { q: text } });
+};
+
 const openRecommendation = (card) => {
   if (!isAuthenticated.value) {
     router.push('/login');
@@ -464,11 +484,17 @@ onBeforeUnmount(() => {
     linear-gradient(180deg, var(--bg-base) 0%, var(--bg-soft) 100%);
 }
 
-.weather-text {
+.weather-area {
   position: fixed;
   top: 18px;
   right: 18px;
   z-index: 8;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.weather-text {
   display: grid;
   gap: 2px;
   border: none;
@@ -498,8 +524,8 @@ onBeforeUnmount(() => {
 }
 
 .prompt-stage {
-  min-height: 78vh;
-  padding-top: 52vh;
+  min-height: 62vh;
+  padding-top: 38vh;
 }
 
 .prompt-copy {
@@ -533,22 +559,45 @@ onBeforeUnmount(() => {
 .prompt-line {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 14px;
   width: min(100%, 420px);
   margin: 34px auto 0;
-  padding: 14px 0 12px;
-  border: none;
   border-bottom: 1px solid var(--line-strong);
   background: transparent;
-  color: var(--text-main);
-  cursor: pointer;
 }
 
-.prompt-line-copy {
-  color: var(--text-faint);
+.prompt-line-input {
+  flex: 1;
+  padding: 14px 0 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-main);
   font-size: 15px;
-  text-align: left;
+  outline: none;
+}
+
+.prompt-line-input::placeholder {
+  color: var(--text-faint);
+}
+
+.prompt-line-send {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity 150ms ease;
+}
+
+.prompt-line-send:not(:disabled) {
+  opacity: 1;
+}
+
+.prompt-line-send:disabled {
+  cursor: default;
 }
 
 .prompt-line-arrow {
@@ -564,22 +613,27 @@ onBeforeUnmount(() => {
 .flow-toggle {
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
-  margin: 42px 0 0 auto;
+  width: 24px;
+  height: 24px;
+  margin: 64px 0 0 auto;
   border: none;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--surface-strong) 94%, transparent);
-  color: var(--text-faint);
-  box-shadow: 0 6px 16px rgba(62, 52, 38, 0.08);
+  background: transparent;
+  color: color-mix(in srgb, var(--text-faint) 68%, transparent);
   cursor: pointer;
+  transition: color 150ms ease, transform 150ms ease;
+}
+
+.flow-toggle:hover {
+  color: color-mix(in srgb, var(--text-soft) 76%, transparent);
+  transform: translateY(-1px);
 }
 
 .flow-toggle-icon {
   position: relative;
   display: block;
-  width: 14px;
-  height: 18px;
+  width: 8px;
+  height: 12px;
 }
 
 .flow-toggle-icon::before,
@@ -587,10 +641,10 @@ onBeforeUnmount(() => {
   content: '';
   position: absolute;
   left: 50%;
-  width: 8px;
-  height: 8px;
-  border-right: 1.6px solid currentColor;
-  border-bottom: 1.6px solid currentColor;
+  width: 6px;
+  height: 6px;
+  border-right: 1.25px solid currentColor;
+  border-bottom: 1.25px solid currentColor;
 }
 
 .flow-toggle-icon.collapsed::before {
@@ -599,36 +653,39 @@ onBeforeUnmount(() => {
 }
 
 .flow-toggle-icon.collapsed::after {
-  top: 6px;
+  top: 5px;
   transform: translateX(-50%) rotate(45deg);
 }
 
 .flow-toggle-icon.expanded::before {
-  top: 4px;
+  top: 3px;
   transform: translateX(-50%) rotate(-135deg);
 }
 
 .flow-toggle-icon.expanded::after {
-  top: 10px;
+  top: 8px;
   transform: translateX(-50%) rotate(-135deg);
 }
 
 .recommendation-section,
 .empty-section {
-  padding-top: 36px;
+  padding-top: 24px;
+}
+
+.recommendation-wrap {
+  position: relative;
+  padding: 36px 16px 20px;
+  border-radius: 24px;
+  border: 1px solid var(--line-soft);
+  background: color-mix(in srgb, var(--surface-strong) 90%, transparent);
+  box-shadow: 0 4px 20px rgba(62, 52, 38, 0.06);
 }
 
 .section-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-
-.section-head p {
-  color: var(--text-faint);
-  font-size: 10px;
-  letter-spacing: 0.18em;
+  justify-content: flex-end;
+  margin-bottom: 12px;
 }
 
 .text-link {
@@ -637,6 +694,55 @@ onBeforeUnmount(() => {
   color: var(--text-soft);
   font-size: 11px;
   cursor: pointer;
+}
+
+.refresh-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: color 150ms ease, transform 400ms ease;
+}
+
+.refresh-btn:hover {
+  color: var(--text-soft);
+  transform: rotate(180deg);
+}
+
+.refresh-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.refresh-btn svg path,
+.refresh-btn svg polyline {
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent-strong) 64%, white 12%);
+  animation: status-breathe 3.6s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes status-breathe {
+  0%, 100% { transform: scale(0.92); opacity: 0.55; }
+  50%       { transform: scale(1.14); opacity: 0.9; }
 }
 
 .recommendation-grid {
@@ -768,14 +874,14 @@ onBeforeUnmount(() => {
     padding: 0 28px 40px;
   }
 
-  .weather-text {
+  .weather-area {
     top: 24px;
     right: 30px;
   }
 
   .prompt-stage {
-    min-height: 74vh;
-    padding-top: 42vh;
+    min-height: 58vh;
+    padding-top: 32vh;
   }
 
   .prompt-copy {

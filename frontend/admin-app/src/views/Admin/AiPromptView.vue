@@ -53,6 +53,16 @@
             ></textarea>
           </label>
 
+          <label class="prompt-field">
+            <span>会话标题生成提示词</span>
+            <textarea
+              v-model.trim="form.conversationTitlePrompt"
+              class="text-input textarea-input prompt-textarea"
+              rows="7"
+              placeholder="例如：根据用户消息和 AI 回复生成简洁中文标题"
+            ></textarea>
+          </label>
+
           <section class="preview-card">
             <h3>当前设计意图</h3>
             <ul class="plain-list">
@@ -77,7 +87,8 @@ const saving = ref(false);
 const form = reactive({
   chatSystemPrompt: '',
   greetingReply: '',
-  identityReply: ''
+  identityReply: '',
+  conversationTitlePrompt: ''
 });
 
 const message = reactive({
@@ -94,6 +105,7 @@ const applyPayload = (payload = {}) => {
   form.chatSystemPrompt = payload.chatSystemPrompt || '';
   form.greetingReply = payload.greetingReply || '';
   form.identityReply = payload.identityReply || '';
+  form.conversationTitlePrompt = payload.conversationTitlePrompt || '';
 };
 
 const loadSettings = async () => {
@@ -120,7 +132,8 @@ const saveSettings = async () => {
     const result = await aiPromptApi.updateChatSettings({
       chatSystemPrompt: form.chatSystemPrompt,
       greetingReply: form.greetingReply,
-      identityReply: form.identityReply
+      identityReply: form.identityReply,
+      conversationTitlePrompt: form.conversationTitlePrompt
     });
 
     if (result?.code === 200) {

@@ -107,7 +107,7 @@ public class AiChatService {
                 Long aiMessageId = saveAiMessage(conversation.getId(), userId, aiResponse, Collections.emptyList(), context);
 
                 updateConversationMessageCount(conversation.getId());
-                updateConversationTitleIfNeeded(conversation, isNewConversation, userMessage);
+                updateConversationTitleIfNeeded(conversation, isNewConversation, userMessage, aiResponse, userId);
                 cacheChatContext(conversation.getSessionId(), chatHistory, userMessage, aiResponse);
 
                 return buildChatResponse(conversation, aiResponse, Collections.emptyList(), weatherInfo, aiMessageId, isNewConversation);
@@ -130,7 +130,7 @@ public class AiChatService {
                 Long aiMessageId = saveAiMessage(conversation.getId(), userId, aiResponse, Collections.emptyList(), context);
 
                 updateConversationMessageCount(conversation.getId());
-                updateConversationTitleIfNeeded(conversation, isNewConversation, userMessage);
+                updateConversationTitleIfNeeded(conversation, isNewConversation, userMessage, aiResponse, userId);
                 cacheChatContext(conversation.getSessionId(), chatHistory, userMessage, aiResponse);
 
                 return buildChatResponse(conversation, aiResponse, Collections.emptyList(), weatherInfo, aiMessageId, isNewConversation);
@@ -166,7 +166,7 @@ public class AiChatService {
             updateConversationMessageCount(conversation.getId());
 
             // 13. 生成会话标题(如果是新会话)
-            updateConversationTitleIfNeeded(conversation, isNewConversation, userMessage);
+            updateConversationTitleIfNeeded(conversation, isNewConversation, userMessage, aiResponse, userId);
 
             // 14. 缓存上下文到Redis
             cacheChatContext(conversation.getSessionId(), chatHistory, userMessage, aiResponse);
@@ -641,14 +641,37 @@ public class AiChatService {
     }
 
     /**
-     * 更新会话消息计数
+     * 更新会话标题（如果是新会话）
      */
-    private void updateConversationTitleIfNeeded(AiConversation conversation, boolean isNewConversation, String firstMessage) {
+    private void updateConversationTitleIfNeeded(AiConversation conversation, boolean isNewConversation, String userMessage, String aiReply, Long userId) {
         if (isNewConversation && conversation.getTitle() == null) {
-            String title = generateConversationTitle(firstMessage);
+            String title = generateConversationTitle(userMessage, aiReply, userId);
             conversation.setTitle(title);
             conversationMapper.updateById(conversation);
         }
+    }
+
+    /**
+     * 用 AI 生成会话标题，失败时降级为截断
+     */
+    private String generateConversationTitle(String userMessage, String aiReply, Long userId) {
+        try {
+            String systemPrompt = promptSettingsService.getConversationTitlePrompt();
+            String prompt = "用户：" + truncateStr(userMessage, 80) + "\nAI：" + truncateStr(aiReply, 80);
+            String title = textGeneratorService.generateCustomResponse(systemPrompt, prompt, null, userId);
+            if (title != null) {
+                title = title.trim().replaceAll("[\"'“”‘’]", "");
+            }
+            return (title != null && !title.isEmpty()) ? title.substring(0, Math.min(title.length(), 15)) : truncateStr(userMessage, 15);
+        } catch (Exception e) {
+            log.warn("AI标题生成失败，降级为截断: {}", e.getMessage());
+            return truncateStr(userMessage, 15);
+        }
+    }
+
+    private String truncateStr(String s, int max) {
+        if (s == null || s.isEmpty()) return "新对话";
+        return s.length() <= max ? s : s.substring(0, max) + "…";
     }
 
     private ChatResponseDTO buildChatResponse(AiConversation conversation,
@@ -671,16 +694,6 @@ public class AiChatService {
     private void updateConversationMessageCount(Long conversationId) {
         Integer count = chatMessageMapper.countByConversationId(conversationId);
         conversationMapper.updateMessageCount(conversationId, count);
-    }
-
-    /**
-     * 生成会话标题
-     */
-    private String generateConversationTitle(String firstMessage) {
-        if (firstMessage == null || firstMessage.length() <= 20) {
-            return firstMessage != null ? firstMessage : "新对话";
-        }
-        return firstMessage.substring(0, 20) + "...";
     }
 
     /**

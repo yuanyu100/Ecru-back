@@ -47,6 +47,9 @@ public class AiChatStreamService {
     private AiTextGeneratorStreamService streamService;
 
     @Autowired
+    private com.ecru.common.service.ai.AiTextGeneratorService textGeneratorService;
+
+    @Autowired
     private com.ecru.common.service.ai.AiPromptSettingsService promptSettingsService;
 
     @Autowired(required = false)
@@ -100,6 +103,7 @@ public class AiChatStreamService {
                 chatContext.setRecommendedClothes(Collections.emptyList());
                 chatContext.setNeedClothingSearch(false);
                 chatContext.setIsNewConversation(isNewConversation);
+                chatContext.setUserMessage(normalizedMessage);
                 chatContext.setDirectResponse(buildGreetingResponse());
                 contextRef.set(chatContext);
                 return String.format("[SESSION]%s|%s|%s",
@@ -118,6 +122,7 @@ public class AiChatStreamService {
                 chatContext.setRecommendedClothes(Collections.emptyList());
                 chatContext.setNeedClothingSearch(false);
                 chatContext.setIsNewConversation(isNewConversation);
+                chatContext.setUserMessage(normalizedMessage);
                 chatContext.setDirectResponse(buildIdentityResponse());
                 contextRef.set(chatContext);
                 return String.format("[SESSION]%s|%s|%s",
@@ -150,6 +155,7 @@ public class AiChatStreamService {
             chatContext.setRecommendedClothes(recommendedClothes);
             chatContext.setNeedClothingSearch(needClothingSearch);
             chatContext.setIsNewConversation(isNewConversation);
+            chatContext.setUserMessage(normalizedMessage);
             contextRef.set(chatContext);
 
             // 返回会话信息作为第一条消息
@@ -239,10 +245,8 @@ public class AiChatStreamService {
 
             // 生成会话标题(如果是新会话)
             if (isNewConversation && conversation.getTitle() == null) {
-                String title = generateConversationTitle(
-                    chatContext.getChatHistory().isEmpty() ? "新对话" : 
-                    chatContext.getChatHistory().get(chatContext.getChatHistory().size() - 1).get("content")
-                );
+                String userMsg = chatContext.getUserMessage();
+                String title = generateConversationTitle(userMsg, fullResponse, chatContext.getUserId());
                 conversation.setTitle(title);
                 conversation.setUpdatedAt(LocalDateTime.now());
                 conversationMapper.updateById(conversation);
@@ -539,13 +543,26 @@ public class AiChatStreamService {
     }
 
     /**
-     * 生成会话标题
+     * 用 AI 生成会话标题，失败时降级为截断
      */
-    private String generateConversationTitle(String firstMessage) {
-        if (firstMessage == null || firstMessage.length() <= 20) {
-            return firstMessage != null ? firstMessage : "新对话";
+    private String generateConversationTitle(String userMessage, String aiReply, Long userId) {
+        try {
+            String systemPrompt = promptSettingsService.getConversationTitlePrompt();
+            String prompt = "用户：" + truncateStr(userMessage, 80) + "\nAI：" + truncateStr(aiReply, 80);
+            String title = textGeneratorService.generateCustomResponse(systemPrompt, prompt, null, userId);
+            if (title != null) {
+                title = title.trim().replaceAll("[\"'\\u201c\\u201d\\u2018\\u2019]", "");
+            }
+            return (title != null && !title.isEmpty()) ? title.substring(0, Math.min(title.length(), 15)) : truncateStr(userMessage, 15);
+        } catch (Exception e) {
+            log.warn("AI标题生成失败，降级为截断: {}", e.getMessage());
+            return truncateStr(userMessage, 15);
         }
-        return firstMessage.substring(0, 20) + "...";
+    }
+
+    private String truncateStr(String s, int max) {
+        if (s == null || s.isEmpty()) return "新对话";
+        return s.length() <= max ? s : s.substring(0, max) + "…";
     }
 
     /**
@@ -560,6 +577,7 @@ public class AiChatStreamService {
         private boolean needClothingSearch;
         private boolean isNewConversation;
         private String directResponse;
+        private String userMessage;
 
         // Getters and Setters
         public AiConversation getConversation() { return conversation; }
@@ -578,5 +596,7 @@ public class AiChatStreamService {
         public void setIsNewConversation(boolean isNewConversation) { this.isNewConversation = isNewConversation; }
         public String getDirectResponse() { return directResponse; }
         public void setDirectResponse(String directResponse) { this.directResponse = directResponse; }
+        public String getUserMessage() { return userMessage; }
+        public void setUserMessage(String userMessage) { this.userMessage = userMessage; }
     }
 }

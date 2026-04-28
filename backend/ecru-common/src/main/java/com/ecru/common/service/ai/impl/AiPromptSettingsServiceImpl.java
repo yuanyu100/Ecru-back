@@ -24,6 +24,7 @@ public class AiPromptSettingsServiceImpl extends ServiceImpl<AiPromptSettingMapp
     private static final String CHAT_SYSTEM_PROMPT_KEY = "chat.system_prompt";
     private static final String GREETING_REPLY_KEY = "chat.greeting_reply";
     private static final String IDENTITY_REPLY_KEY = "chat.identity_reply";
+    private static final String CONVERSATION_TITLE_PROMPT_KEY = "chat.conversation_title_prompt";
 
     private static final String DEFAULT_CHAT_SYSTEM_PROMPT = String.join("\n",
             "\u4f60\u662f Ecru\uff0c\u4e00\u4f4d\u5b89\u9759\u3001\u514b\u5236\u3001\u53ef\u9760\u7684\u79c1\u4eba\u8863\u6a71\u52a9\u624b\u3002",
@@ -44,12 +45,16 @@ public class AiPromptSettingsServiceImpl extends ServiceImpl<AiPromptSettingMapp
             "\u8fd9\u91cc\u4e0d\u505a\u82b1\u91cc\u80e1\u54e8\u7684\u7a7f\u642d App\uff0c\u800c\u662f\u505a\u4e00\u4e2a\u6700\u5b89\u9759\u7684\u79c1\u4eba\u8863\u6a71\uff0c\u4e5f\u50cf\u8bb0\u5fc6\u91cc\u5bb6\u91cc\u5927\u8863\u67dc\u7684\u989c\u8272\u3002",
             "\u4f60\u53ef\u4ee5\u628a\u6211\u5f53\u6210\u957f\u671f\u966a\u4f60\u6574\u7406\u8863\u670d\u3001\u8bb0\u5f55\u98ce\u683c\u3001\u505a\u65e5\u5e38\u642d\u914d\u7684\u79c1\u4eba\u8863\u6a71\u52a9\u624b\u3002");
 
+    private static final String DEFAULT_CONVERSATION_TITLE_PROMPT =
+            "\u4f60\u662f\u4e00\u4e2a\u5bf9\u8bdd\u6807\u9898\u751f\u6210\u52a9\u624b\u3002\u6839\u636e\u7528\u6237\u6d88\u606f\u548cAI\u56de\u590d\uff0c\u751f\u6210\u4e00\u4e2a\u7b80\u6d01\u7684\u4e2d\u6587\u6807\u9898\uff0c\u4e0d\u8d85\u8fc710\u4e2a\u5b57\uff0c\u4e0d\u52a0\u5f15\u53f7\uff0c\u4e0d\u52a0\u6807\u70b9\u7b26\u53f7\uff0c\u76f4\u63a5\u8f93\u51fa\u6807\u9898\u6587\u5b57\u3002";
+
     private static final Map<String, String> DEFAULT_DESCRIPTIONS = new LinkedHashMap<>();
 
     static {
         DEFAULT_DESCRIPTIONS.put(CHAT_SYSTEM_PROMPT_KEY, "Main system prompt for AI chat");
         DEFAULT_DESCRIPTIONS.put(GREETING_REPLY_KEY, "Local reply used for greeting messages");
         DEFAULT_DESCRIPTIONS.put(IDENTITY_REPLY_KEY, "Local reply used for identity questions");
+        DEFAULT_DESCRIPTIONS.put(CONVERSATION_TITLE_PROMPT_KEY, "Prompt used for generating conversation titles");
     }
 
     @Override
@@ -59,6 +64,7 @@ public class AiPromptSettingsServiceImpl extends ServiceImpl<AiPromptSettingMapp
         dto.setChatSystemPrompt(readSetting(settings, CHAT_SYSTEM_PROMPT_KEY, DEFAULT_CHAT_SYSTEM_PROMPT));
         dto.setGreetingReply(readSetting(settings, GREETING_REPLY_KEY, DEFAULT_GREETING_REPLY));
         dto.setIdentityReply(readSetting(settings, IDENTITY_REPLY_KEY, DEFAULT_IDENTITY_REPLY));
+        dto.setConversationTitlePrompt(readSetting(settings, CONVERSATION_TITLE_PROMPT_KEY, DEFAULT_CONVERSATION_TITLE_PROMPT));
         return dto;
     }
 
@@ -69,6 +75,7 @@ public class AiPromptSettingsServiceImpl extends ServiceImpl<AiPromptSettingMapp
         upsertSetting(CHAT_SYSTEM_PROMPT_KEY, request.getChatSystemPrompt(), updatedBy, now);
         upsertSetting(GREETING_REPLY_KEY, request.getGreetingReply(), updatedBy, now);
         upsertSetting(IDENTITY_REPLY_KEY, request.getIdentityReply(), updatedBy, now);
+        upsertSetting(CONVERSATION_TITLE_PROMPT_KEY, request.getConversationTitlePrompt(), updatedBy, now);
         return getChatPromptSettings();
     }
 
@@ -85,6 +92,11 @@ public class AiPromptSettingsServiceImpl extends ServiceImpl<AiPromptSettingMapp
     @Override
     public String getIdentityReply() {
         return getChatPromptSettings().getIdentityReply();
+    }
+
+    @Override
+    public String getConversationTitlePrompt() {
+        return getChatPromptSettings().getConversationTitlePrompt();
     }
 
     private Map<String, String> loadSettingsMap() {
@@ -140,6 +152,9 @@ public class AiPromptSettingsServiceImpl extends ServiceImpl<AiPromptSettingMapp
         }
         if (IDENTITY_REPLY_KEY.equals(key)) {
             return DEFAULT_IDENTITY_REPLY;
+        }
+        if (CONVERSATION_TITLE_PROMPT_KEY.equals(key)) {
+            return DEFAULT_CONVERSATION_TITLE_PROMPT;
         }
         return "";
     }

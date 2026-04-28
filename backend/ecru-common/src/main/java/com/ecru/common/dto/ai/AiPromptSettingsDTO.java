@@ -10,4 +10,6 @@ public class AiPromptSettingsDTO {
     private String greetingReply;
 
     private String identityReply;
+
+    private String conversationTitlePrompt;
 }

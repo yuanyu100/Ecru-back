@@ -26,4 +26,6 @@ public interface StyleImageTagMapper extends BaseMapper<StyleImageTag> {
      * 批量插入图片标签关联
      */
     int batchInsert(@Param("tags") List<StyleImageTag> tags);
+
+    int deleteByImageId(@Param("imageId") Long imageId);
 }
