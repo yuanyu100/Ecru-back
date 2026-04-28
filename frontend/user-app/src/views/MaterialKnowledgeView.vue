@@ -10,10 +10,6 @@
       </div>
     </header>
 
-    <section class="panel-card intro-card">
-      <p>这里不再单独做问答。想问材质好不好、想上传水洗标图片分析，直接去对话页即可。</p>
-    </section>
-
     <section class="panel-card">
       <div class="section-head">
         <p class="section-caption">常见面料</p>
@@ -423,7 +419,6 @@ const goBack = () => {
   padding: 16px;
 }
 
-.intro-card p,
 .fabric-card p,
 .guide-card p,
 .result-card p,
