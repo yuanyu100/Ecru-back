@@ -161,30 +161,34 @@ public class AiApiMonitorService {
      * Return recent call records, preferring Redis when available.
      */
     public List<AiApiCallRecordVO> getRecentCalls(int limit) {
-        List<AiApiCallRecordVO> result = new ArrayList<>();
-
-        try {
-            if (redisTemplate != null) {
+        if (redisTemplate != null) {
+            try {
                 String json = redisTemplate.opsForValue().get(RECENT_CALLS_KEY);
                 if (json != null) {
                     List<AiApiCallRecord> records = JSON.parseArray(json, AiApiCallRecord.class);
                     int endIndex = Math.min(limit, records.size());
+                    List<AiApiCallRecordVO> result = new ArrayList<>(endIndex);
                     for (int i = 0; i < endIndex; i++) {
                         result.add(convertToVO(records.get(i)));
                     }
                     return result;
                 }
+            } catch (Exception e) {
+                log.warn("Failed to load recent AI API calls from Redis, fallback to DB: {}", e.getMessage());
             }
+        }
 
+        try {
             List<AiApiCallRecord> records = callRecordMapper.selectRecentCalls(limit);
+            List<AiApiCallRecordVO> result = new ArrayList<>(records.size());
             for (AiApiCallRecord record : records) {
                 result.add(convertToVO(record));
             }
+            return result;
         } catch (Exception e) {
-            log.error("Failed to load recent AI API calls: {}", e.getMessage(), e);
+            log.error("Failed to load recent AI API calls from DB: {}", e.getMessage(), e);
+            return new ArrayList<>();
         }
-
-        return result;
     }
 
     /**
