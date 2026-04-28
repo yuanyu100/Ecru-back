@@ -4,19 +4,22 @@
       <button class="icon-button" type="button" aria-label="返回" @click="goBack">
         <span></span>
       </button>
-      <div>
-        <p class="header-caption">收藏灵感</p>
-        <h1>把你想留下的搭配灵感都放在这里</h1>
-      </div>
+      <h1>收藏灵感</h1>
     </header>
 
     <section class="saved-section">
       <div class="section-head">
-        <div>
-          <p class="section-caption">本地收藏</p>
-          <h2>推荐流里手动收藏的灵感卡片</h2>
-        </div>
-        <button v-if="localLooks.length" class="text-button" type="button" @click="clearLocalLooks">清空</button>
+        <h2>灵感卡片</h2>
+        <button
+          v-if="localLooks.length"
+          class="icon-action"
+          type="button"
+          aria-label="清空收藏灵感"
+          title="清空收藏灵感"
+          @click="clearLocalLooks"
+        >
+          ×
+        </button>
       </div>
 
       <div v-if="localLooks.length" class="saved-grid">
@@ -30,6 +33,16 @@
           @keydown.enter.prevent="openSavedLook(item)"
           @keydown.space.prevent="openSavedLook(item)"
         >
+          <button
+            class="save-button saved"
+            type="button"
+            aria-label="取消收藏"
+            title="取消收藏"
+            @click.stop="removeLocalLook(item.id)"
+          >
+            ★
+          </button>
+
           <div class="look-board">
             <div
               v-for="(boardItem, index) in resolveBoardItems(item)"
@@ -47,29 +60,23 @@
               </div>
             </div>
 
-            <div v-if="item.mood" class="board-stamp">
-              <span>{{ item.mood }}</span>
-            </div>
           </div>
 
           <div class="look-copy">
             <strong>{{ item.title || '收藏灵感' }}</strong>
-            <p>{{ item.note || '从推荐流里留下的一张灵感卡片。' }}</p>
+            <p>{{ item.note || '已收藏' }}</p>
           </div>
         </article>
       </div>
       <div v-else class="empty-shell">
-        <p>你还没有收藏灵感卡片，先去推荐流里挑几套留下来。</p>
+        <p>还没有收藏内容</p>
       </div>
     </section>
 
     <section class="saved-section">
       <div class="section-head">
-        <div>
-          <p class="section-caption">方案收藏</p>
-          <h2>你标记过收藏的搭配记录</h2>
-        </div>
-        <button v-if="!isAuthenticated" class="text-button" type="button" @click="goLogin">去登录</button>
+        <h2>搭配记录</h2>
+        <button v-if="!isAuthenticated" class="text-button" type="button" @click="goLogin">登录</button>
       </div>
 
       <div v-if="isAuthenticated && favoriteLookCards.length" class="saved-grid">
@@ -83,6 +90,17 @@
           @keydown.enter.prevent="openOutfitDetail(item.id)"
           @keydown.space.prevent="openOutfitDetail(item.id)"
         >
+          <button
+            :class="['save-button', item.isFavorite ? 'saved' : '']"
+            type="button"
+            :aria-label="item.isFavorite ? '取消收藏' : '收藏'"
+            :title="item.isFavorite ? '取消收藏' : '收藏'"
+            :disabled="favoriteLoadingIds.includes(item.id)"
+            @click.stop="toggleFavoriteLook(item)"
+          >
+            {{ item.isFavorite ? '★' : '☆' }}
+          </button>
+
           <div class="look-board">
             <div
               v-for="(boardItem, index) in resolveBoardItems(item)"
@@ -107,12 +125,12 @@
 
           <div class="look-copy">
             <strong>{{ item.outfitName || '收藏方案' }}</strong>
-            <p>{{ item.outfitDescription || '点击查看完整搭配记录。' }}</p>
+            <p>{{ item.outfitDescription || '已收藏' }}</p>
           </div>
         </article>
       </div>
       <div v-else class="empty-shell">
-        <p>{{ isAuthenticated ? '你还没有收藏任何搭配记录。' : '登录后可以查看你收藏过的搭配记录。' }}</p>
+        <p>{{ isAuthenticated ? '还没有收藏内容' : '登录后查看' }}</p>
       </div>
     </section>
   </div>
@@ -128,6 +146,7 @@ const router = useRouter();
 const historyItems = ref([]);
 const localLooks = ref([]);
 const favoriteLookBoards = ref({});
+const favoriteLoadingIds = ref([]);
 
 const fallbackBoardItems = [
   { category: '上装', imageUrl: '' },
@@ -200,9 +219,18 @@ const loadFavoriteLooks = async () => {
   }
 };
 
+const persistLocalLooks = (items = []) => {
+  localStorage.setItem('savedLooks', JSON.stringify(items));
+  localLooks.value = items;
+};
+
 const clearLocalLooks = () => {
   localStorage.removeItem('savedLooks');
-  loadLocalLooks();
+  localLooks.value = [];
+};
+
+const removeLocalLook = (id) => {
+  persistLocalLooks(localLooks.value.filter((item) => item.id !== id));
 };
 
 const goBack = () => {
@@ -215,6 +243,31 @@ const goBack = () => {
 
 const goLogin = () => router.push('/login');
 const openOutfitDetail = (id) => router.push(`/outfit/history/${id}`);
+
+const toggleFavoriteLook = async (item) => {
+  if (!item?.id || favoriteLoadingIds.value.includes(item.id)) {
+    return;
+  }
+
+  favoriteLoadingIds.value = [...favoriteLoadingIds.value, item.id];
+  const nextValue = !item.isFavorite;
+
+  historyItems.value = historyItems.value.map((historyItem) =>
+    historyItem.id === item.id ? { ...historyItem, isFavorite: nextValue } : historyItem
+  );
+
+  try {
+    await outfitApi.toggleFavorite(item.id, nextValue);
+  } catch (error) {
+    historyItems.value = historyItems.value.map((historyItem) =>
+      historyItem.id === item.id ? { ...historyItem, isFavorite: item.isFavorite } : historyItem
+    );
+    console.error('Toggle favorite failed:', error);
+    alert(error.response?.data?.message || '更新收藏状态失败');
+  } finally {
+    favoriteLoadingIds.value = favoriteLoadingIds.value.filter((id) => id !== item.id);
+  }
+};
 
 const canOpenSavedLook = (item) => isAuthenticated.value && item?.id && !String(item.id).startsWith('guest-look-');
 
@@ -283,25 +336,22 @@ onMounted(async () => {
 }
 
 .saved-header {
-  gap: 14px;
-  align-items: flex-start;
-}
-
-.header-caption,
-.section-caption {
-  color: var(--text-faint);
-  font-size: 12px;
-  letter-spacing: 0.12em;
+  gap: 12px;
 }
 
 .saved-header h1,
 .section-head h2 {
-  margin-top: 6px;
+  margin: 0;
   color: var(--text-main);
 }
 
+.saved-header h1 {
+  flex: 1;
+  font-size: 20px;
+}
+
 .saved-section {
-  margin-top: 28px;
+  margin-top: 20px;
 }
 
 .saved-grid {
@@ -322,6 +372,7 @@ onMounted(async () => {
 .look-card {
   overflow: hidden;
   padding: 0;
+  position: relative;
 }
 
 .interactive-card {
@@ -440,13 +491,13 @@ onMounted(async () => {
 .empty-shell p {
   margin-top: 10px;
   color: var(--text-soft);
-  line-height: 1.7;
+  line-height: 1.5;
 }
 
 .look-copy p {
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
   overflow: hidden;
 }
 
@@ -457,17 +508,18 @@ onMounted(async () => {
 }
 
 .icon-button,
-.text-button {
+.text-button,
+.icon-action,
+.save-button {
   border: none;
-  background: transparent;
   cursor: pointer;
 }
 
 .icon-button {
   display: inline-grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   border: 1px solid var(--line-soft);
   background: color-mix(in srgb, var(--surface-strong) 90%, transparent);
@@ -482,8 +534,39 @@ onMounted(async () => {
   margin-left: 4px;
 }
 
+.icon-action {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--surface-quiet) 88%, transparent);
+  color: var(--text-soft);
+  font-size: 14px;
+}
+
 .text-button {
   color: var(--accent);
+}
+
+.save-button {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 3;
+  padding: 0;
+  background: transparent;
+  color: rgba(118, 103, 82, 0.72);
+  font-size: 18px;
+}
+
+.save-button.saved {
+  color: #d2ab62;
+}
+
+.save-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 @media (min-width: 768px) {
