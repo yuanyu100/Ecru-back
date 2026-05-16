@@ -18,6 +18,7 @@ public class StyleImageVO {
     private String sourceUrl;
     private BigDecimal price;
     private String styleCategory;
+    private Boolean isActive;
     private List<StyleTagVO> tags;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

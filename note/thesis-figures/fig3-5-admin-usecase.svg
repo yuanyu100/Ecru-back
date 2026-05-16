@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="820" viewBox="0 0 1240 820">
+  <defs>
+    <style>
+      .title { font: 700 30px 'Microsoft YaHei', 'Noto Sans SC', sans-serif; fill: #111; }
+      .system { fill: #fff; stroke: #111; stroke-width: 2.2; }
+      .actor { stroke: #111; stroke-width: 2; fill: none; }
+      .actorText { font: 700 22px 'Microsoft YaHei', 'Noto Sans SC', sans-serif; fill: #111; }
+      .header { font: 700 24px 'Microsoft YaHei', 'Noto Sans SC', sans-serif; fill: #111; }
+      .usecase { fill: #fff; stroke: #222; stroke-width: 1.8; }
+      .label { font: 18px 'Microsoft YaHei', 'Noto Sans SC', sans-serif; fill: #111; }
+      .small { font: 16px 'Microsoft YaHei', 'Noto Sans SC', sans-serif; fill: #111; }
+      .line { stroke: #222; stroke-width: 1.6; fill: none; }
+      .dash { stroke: #222; stroke-width: 1.5; fill: none; stroke-dasharray: 8 6; }
+    </style>
+  </defs>
+
+  <text x="620" y="48" text-anchor="middle" class="title">图3-5 管理员用例图</text>
+
+  <rect x="214" y="92" width="924" height="660" class="system"/>
+  <text x="676" y="130" text-anchor="middle" class="header">管理端子系统</text>
+
+  <circle cx="102" cy="244" r="22" class="actor"/>
+  <line x1="102" y1="266" x2="102" y2="336" class="actor"/>
+  <line x1="62" y1="290" x2="142" y2="290" class="actor"/>
+  <line x1="102" y1="336" x2="72" y2="386" class="actor"/>
+  <line x1="102" y1="336" x2="132" y2="386" class="actor"/>
+  <text x="102" y="428" text-anchor="middle" class="actorText">管理员</text>
+
+  <ellipse cx="448" cy="194" rx="126" ry="36" class="usecase"/>
+  <text x="448" y="200" text-anchor="middle" class="label">查看用户台账</text>
+  <ellipse cx="448" cy="290" rx="126" ry="36" class="usecase"/>
+  <text x="448" y="296" text-anchor="middle" class="label">查看衣物台账</text>
+  <ellipse cx="448" cy="386" rx="126" ry="36" class="usecase"/>
+  <text x="448" y="392" text-anchor="middle" class="label">查看推荐与会话记录</text>
+  <ellipse cx="448" cy="482" rx="126" ry="36" class="usecase"/>
+  <text x="448" y="488" text-anchor="middle" class="label">维护知识条目</text>
+  <ellipse cx="448" cy="578" rx="126" ry="36" class="usecase"/>
+  <text x="448" y="584" text-anchor="middle" class="label">配置提示词模板</text>
+  <ellipse cx="448" cy="674" rx="126" ry="36" class="usecase"/>
+  <text x="448" y="680" text-anchor="middle" class="label">查看 AI 运行监控</text>
+
+  <ellipse cx="834" cy="258" rx="114" ry="34" class="usecase"/>
+  <text x="834" y="264" text-anchor="middle" class="label">筛选分页</text>
+  <ellipse cx="834" cy="386" rx="114" ry="34" class="usecase"/>
+  <text x="834" y="392" text-anchor="middle" class="label">查看明细</text>
+  <ellipse cx="834" cy="546" rx="114" ry="34" class="usecase"/>
+  <text x="834" y="552" text-anchor="middle" class="label">维护资源配置</text>
+  <ellipse cx="834" cy="674" rx="114" ry="34" class="usecase"/>
+  <text x="834" y="680" text-anchor="middle" class="label">观察成功率与耗时</text>
+
+  <line x1="142" y1="290" x2="322" y2="194" class="line"/>
+  <line x1="142" y1="302" x2="322" y2="290" class="line"/>
+  <line x1="142" y1="314" x2="322" y2="386" class="line"/>
+  <line x1="142" y1="326" x2="322" y2="482" class="line"/>
+  <line x1="142" y1="338" x2="322" y2="578" class="line"/>
+  <line x1="142" y1="350" x2="322" y2="674" class="line"/>
+
+  <line x1="574" y1="194" x2="720" y2="258" class="line"/>
+  <line x1="574" y1="290" x2="720" y2="258" class="line"/>
+  <line x1="574" y1="386" x2="720" y2="386" class="line"/>
+  <line x1="574" y1="482" x2="720" y2="546" class="line"/>
+  <line x1="574" y1="578" x2="720" y2="546" class="line"/>
+  <line x1="574" y1="674" x2="720" y2="674" class="line"/>
+
+  <line x1="720" y1="258" x2="700" y2="258" class="dash"/>
+  <polygon points="700,258 712,252 712,264" fill="#fff" stroke="#222" stroke-width="1.5"/>
+  <text x="656" y="240" text-anchor="middle" class="small">&lt;&lt;include&gt;&gt;</text>
+
+  <line x1="720" y1="386" x2="700" y2="386" class="dash"/>
+  <polygon points="700,386 712,380 712,392" fill="#fff" stroke="#222" stroke-width="1.5"/>
+  <text x="656" y="368" text-anchor="middle" class="small">&lt;&lt;include&gt;&gt;</text>
+
+  <line x1="720" y1="546" x2="700" y2="546" class="dash"/>
+  <polygon points="700,546 712,540 712,552" fill="#fff" stroke="#222" stroke-width="1.5"/>
+  <text x="656" y="528" text-anchor="middle" class="small">&lt;&lt;include&gt;&gt;</text>
+
+  <line x1="720" y1="674" x2="700" y2="674" class="dash"/>
+  <polygon points="700,674 712,668 712,680" fill="#fff" stroke="#222" stroke-width="1.5"/>
+  <text x="656" y="656" text-anchor="middle" class="small">&lt;&lt;extend&gt;&gt;</text>
+</svg>

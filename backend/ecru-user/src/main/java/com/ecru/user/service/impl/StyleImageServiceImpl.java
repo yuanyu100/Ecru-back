@@ -88,6 +88,7 @@ public class StyleImageServiceImpl implements StyleImageService {
         vo.setSourceUrl(image.getSourceUrl());
         vo.setPrice(image.getPrice());
         vo.setStyleCategory(image.getStyleCategory());
+        vo.setIsActive(image.getIsActive());
         vo.setCreatedAt(image.getCreatedAt());
         vo.setUpdatedAt(image.getUpdatedAt());
         

@@ -2,10 +2,7 @@
   <div class="admin-page knowledge-editor-page">
     <section class="panel-card">
       <div class="panel-head">
-        <div>
-          <h2>{{ isEdit ? `编辑${currentTabLabel}` : `新建${currentTabLabel}` }}</h2>
-          <p class="panel-subtitle">独立编辑页只处理当前条目，避免列表页和表单页混在一起。</p>
-        </div>
+        <h2>{{ isEdit ? `编辑${currentTabLabel}` : `新建${currentTabLabel}` }}</h2>
         <div class="toolbar">
           <button class="secondary-button" type="button" @click="goBack">返回列表</button>
         </div>
@@ -34,7 +31,6 @@
         </div>
         <p v-if="pdfFile" class="pdf-filename">已选：{{ pdfFile.name }}</p>
         <div class="import-footer">
-          <p class="panel-subtitle">上传后自动提取全文，以文件名作为指南标题。</p>
           <button
             class="primary-button"
             type="button"
@@ -49,7 +45,6 @@
       <div class="preview-card">
         <div class="preview-head">
           <strong>批量导入 {{ currentTabLabel }}</strong>
-          <span>支持 JSON 数组</span>
         </div>
 
         <div class="toolbar import-toolbar">
@@ -69,7 +64,6 @@
         ></textarea>
 
         <div class="import-footer">
-          <p class="panel-subtitle">直接粘贴 JSON 数组即可。</p>
           <button class="primary-button" type="button" :disabled="importing || !importPayload" @click="submitImport">
             {{ importing ? '导入中...' : '开始批量导入' }}
           </button>

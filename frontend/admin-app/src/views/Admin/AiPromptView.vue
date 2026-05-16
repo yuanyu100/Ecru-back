@@ -2,12 +2,7 @@
   <div class="admin-page">
     <section class="panel-card">
       <div class="panel-head stacked-head">
-        <div>
-          <h2>AI 提示词配置</h2>
-          <p class="panel-subtitle">
-            后台可直接维护聊天系统提示词、问候语和身份介绍。保存后写入数据库，后续对话直接生效。
-          </p>
-        </div>
+        <h2>AI 提示词</h2>
         <div class="toolbar">
           <button class="secondary-button" type="button" :disabled="loading || saving" @click="loadSettings">
             刷新
@@ -62,16 +57,6 @@
               placeholder="例如：根据用户消息和 AI 回复生成简洁中文标题"
             ></textarea>
           </label>
-
-          <section class="preview-card">
-            <h3>当前设计意图</h3>
-            <ul class="plain-list">
-              <li>身份名固定为 `Ecru`。</li>
-              <li>强调 “原木、原本” 的质感与克制感。</li>
-              <li>定位是最安静的私人衣橱，而不是花哨的时尚 App。</li>
-              <li>语气应稳定、简洁、可信，像记忆中家里大衣柜的颜色。</li>
-            </ul>
-          </section>
         </div>
       </div>
     </section>
@@ -184,17 +169,6 @@ onMounted(loadSettings);
 
 .prompt-textarea-lg {
   min-height: 520px;
-}
-
-.preview-card {
-  padding: 16px;
-  border: 1px solid #e8edf3;
-  border-radius: 16px;
-  background: #f8fafc;
-}
-
-.preview-card h3 {
-  margin: 0 0 12px;
 }
 
 .form-message {

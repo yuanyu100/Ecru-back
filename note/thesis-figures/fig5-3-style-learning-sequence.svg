@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1380" height="720" viewBox="0 0 1380 720">
+  <defs>
+    <style>
+      .title { font: 700 28px 'Microsoft YaHei', 'Noto Sans SC', sans-serif; fill: #111; }
+      .actor { fill: #fff; stroke: #222; stroke-width: 2; rx: 10; ry: 10; }
+      .name { font: 700 18px 'Microsoft YaHei', 'Noto Sans SC', sans-serif; fill: #111; }
+      .msg { font: 15px 'Microsoft YaHei', 'Noto Sans SC', sans-serif; fill: #222; }
+      .line { stroke: #222; stroke-width: 2; fill: none; }
+      .life { stroke: #999; stroke-width: 1.4; stroke-dasharray: 8 6; }
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#222"/>
+    </marker>
+  </defs>
+  <text x="690" y="40" text-anchor="middle" class="title">图5-3 风格偏好学习时序图</text>
+
+  <g transform="translate(40,90)"><rect width="140" height="50" class="actor"/><text x="70" y="31" text-anchor="middle" class="name">用户</text></g>
+  <g transform="translate(240,90)"><rect width="180" height="50" class="actor"/><text x="90" y="31" text-anchor="middle" class="name">风格学习前端</text></g>
+  <g transform="translate(500,90)"><rect width="200" height="50" class="actor"/><text x="100" y="31" text-anchor="middle" class="name">StylePreferenceController</text></g>
+  <g transform="translate(770,90)"><rect width="220" height="50" class="actor"/><text x="110" y="31" text-anchor="middle" class="name">UserStylePreferenceService</text></g>
+  <g transform="translate(1060,90)"><rect width="150" height="50" class="actor"/><text x="75" y="31" text-anchor="middle" class="name">MySQL</text></g>
+
+  <line x1="110" y1="140" x2="110" y2="670" class="life"/>
+  <line x1="330" y1="140" x2="330" y2="670" class="life"/>
+  <line x1="600" y1="140" x2="600" y2="670" class="life"/>
+  <line x1="880" y1="140" x2="880" y2="670" class="life"/>
+  <line x1="1135" y1="140" x2="1135" y2="670" class="life"/>
+
+  <line x1="110" y1="180" x2="330" y2="180" class="line" marker-end="url(#arrow)"/>
+  <text x="190" y="170" class="msg">1. 对图片执行 like / dislike / skip</text>
+
+  <line x1="330" y1="230" x2="600" y2="230" class="line" marker-end="url(#arrow)"/>
+  <text x="430" y="220" class="msg">2. POST /style-preferences/feedback</text>
+
+  <line x1="600" y1="280" x2="880" y2="280" class="line" marker-end="url(#arrow)"/>
+  <text x="690" y="270" class="msg">3. 提交反馈并触发画像更新</text>
+
+  <line x1="880" y1="330" x2="1135" y2="330" class="line" marker-end="url(#arrow)"/>
+  <text x="960" y="320" class="msg">4. 记录偏好日志</text>
+
+  <line x1="880" y1="390" x2="1135" y2="390" class="line" marker-end="url(#arrow)"/>
+  <text x="935" y="380" class="msg">5. 查询图片标签与现有画像</text>
+
+  <line x1="1135" y1="435" x2="880" y2="435" class="line" marker-end="url(#arrow)"/>
+  <text x="945" y="425" class="msg">6. 返回标签置信度和画像记录</text>
+
+  <line x1="880" y1="490" x2="1135" y2="490" class="line" marker-end="url(#arrow)"/>
+  <text x="940" y="480" class="msg">7. 计算分值后更新或新建画像</text>
+
+  <line x1="880" y1="550" x2="600" y2="550" class="line" marker-end="url(#arrow)"/>
+  <text x="705" y="540" class="msg">8. 返回处理结果</text>
+
+  <line x1="600" y1="610" x2="330" y2="610" class="line" marker-end="url(#arrow)"/>
+  <text x="430" y="600" class="msg">9. 返回最新学习状态</text>
+</svg>

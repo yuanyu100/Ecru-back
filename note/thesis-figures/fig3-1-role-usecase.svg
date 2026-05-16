@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1380" height="920" viewBox="0 0 1380 920">
+  <defs>
+    <style>
+      .title { font: 700 30px 'Microsoft YaHei', 'Noto Sans SC', sans-serif; fill: #111; }
+      .system { fill: #fff; stroke: #111; stroke-width: 2.2; }
+      .actor { stroke: #111; stroke-width: 2; fill: none; }
+      .actorText { font: 700 22px 'Microsoft YaHei', 'Noto Sans SC', sans-serif; fill: #111; }
+      .header { font: 700 24px 'Microsoft YaHei', 'Noto Sans SC', sans-serif; fill: #111; }
+      .usecase { fill: #fff; stroke: #222; stroke-width: 1.8; }
+      .label { font: 18px 'Microsoft YaHei', 'Noto Sans SC', sans-serif; fill: #111; }
+      .small { font: 16px 'Microsoft YaHei', 'Noto Sans SC', sans-serif; fill: #111; }
+      .line { stroke: #222; stroke-width: 1.6; fill: none; }
+      .dash { stroke: #222; stroke-width: 1.5; fill: none; stroke-dasharray: 8 6; }
+    </style>
+  </defs>
+
+  <text x="690" y="48" text-anchor="middle" class="title">图3-1 系统角色与核心用例图</text>
+
+  <rect x="228" y="96" width="930" height="740" class="system"/>
+  <text x="693" y="134" text-anchor="middle" class="header">AI 智能穿搭系统</text>
+
+  <circle cx="112" cy="224" r="22" class="actor"/>
+  <line x1="112" y1="246" x2="112" y2="316" class="actor"/>
+  <line x1="72" y1="270" x2="152" y2="270" class="actor"/>
+  <line x1="112" y1="316" x2="82" y2="366" class="actor"/>
+  <line x1="112" y1="316" x2="142" y2="366" class="actor"/>
+  <text x="112" y="408" text-anchor="middle" class="actorText">普通用户</text>
+
+  <circle cx="1264" cy="224" r="22" class="actor"/>
+  <line x1="1264" y1="246" x2="1264" y2="316" class="actor"/>
+  <line x1="1224" y1="270" x2="1304" y2="270" class="actor"/>
+  <line x1="1264" y1="316" x2="1234" y2="366" class="actor"/>
+  <line x1="1264" y1="316" x2="1294" y2="366" class="actor"/>
+  <text x="1264" y="408" text-anchor="middle" class="actorText">管理员</text>
+
+  <ellipse cx="456" cy="210" rx="118" ry="36" class="usecase"/>
+  <text x="456" y="216" text-anchor="middle" class="label">注册登录</text>
+  <ellipse cx="456" cy="306" rx="118" ry="36" class="usecase"/>
+  <text x="456" y="312" text-anchor="middle" class="label">维护个人资料</text>
+  <ellipse cx="456" cy="402" rx="118" ry="36" class="usecase"/>
+  <text x="456" y="408" text-anchor="middle" class="label">管理衣物信息</text>
+  <ellipse cx="456" cy="498" rx="118" ry="36" class="usecase"/>
+  <text x="456" y="504" text-anchor="middle" class="label">学习风格偏好</text>
+  <ellipse cx="456" cy="594" rx="118" ry="36" class="usecase"/>
+  <text x="456" y="600" text-anchor="middle" class="label">获取穿搭推荐</text>
+  <ellipse cx="456" cy="690" rx="118" ry="36" class="usecase"/>
+  <text x="456" y="696" text-anchor="middle" class="label">发起 AI 对话</text>
+
+  <ellipse cx="858" cy="242" rx="118" ry="36" class="usecase"/>
+  <text x="858" y="248" text-anchor="middle" class="label">图片上传</text>
+  <ellipse cx="858" cy="338" rx="118" ry="36" class="usecase"/>
+  <text x="858" y="344" text-anchor="middle" class="label">AI 识别衣物属性</text>
+  <ellipse cx="858" cy="434" rx="118" ry="36" class="usecase"/>
+  <text x="858" y="440" text-anchor="middle" class="label">查看搭配详情</text>
+  <ellipse cx="858" cy="530" rx="118" ry="36" class="usecase"/>
+  <text x="858" y="536" text-anchor="middle" class="label">检索知识库</text>
+  <ellipse cx="858" cy="626" rx="118" ry="36" class="usecase"/>
+  <text x="858" y="632" text-anchor="middle" class="label">查看用户与衣物台账</text>
+  <ellipse cx="858" cy="722" rx="118" ry="36" class="usecase"/>
+  <text x="858" y="728" text-anchor="middle" class="label">维护知识与提示词</text>
+
+  <ellipse cx="1046" cy="338" rx="96" ry="30" class="usecase"/>
+  <text x="1046" y="344" text-anchor="middle" class="small">生成标签建议</text>
+  <ellipse cx="1046" cy="530" rx="96" ry="30" class="usecase"/>
+  <text x="1046" y="536" text-anchor="middle" class="small">返回知识片段</text>
+  <ellipse cx="1046" cy="722" rx="96" ry="30" class="usecase"/>
+  <text x="1046" y="728" text-anchor="middle" class="small">查看 AI 运行监控</text>
+
+  <line x1="152" y1="270" x2="338" y2="210" class="line"/>
+  <line x1="152" y1="282" x2="338" y2="306" class="line"/>
+  <line x1="152" y1="294" x2="338" y2="402" class="line"/>
+  <line x1="152" y1="306" x2="338" y2="498" class="line"/>
+  <line x1="152" y1="318" x2="338" y2="594" class="line"/>
+  <line x1="152" y1="330" x2="338" y2="690" class="line"/>
+
+  <line x1="1182" y1="270" x2="976" y2="626" class="line"/>
+  <line x1="1182" y1="290" x2="976" y2="722" class="line"/>
+  <line x1="1182" y1="310" x2="1142" y2="722" class="line"/>
+
+  <line x1="574" y1="402" x2="740" y2="242" class="line"/>
+  <line x1="574" y1="402" x2="740" y2="338" class="line"/>
+  <line x1="574" y1="594" x2="740" y2="434" class="line"/>
+  <line x1="574" y1="690" x2="740" y2="530" class="line"/>
+
+  <line x1="976" y1="338" x2="950" y2="338" class="dash"/>
+  <polygon points="950,338 962,332 962,344" fill="#fff" stroke="#222" stroke-width="1.5"/>
+  <text x="994" y="320" text-anchor="middle" class="small">&lt;&lt;include&gt;&gt;</text>
+
+  <line x1="976" y1="530" x2="950" y2="530" class="dash"/>
+  <polygon points="950,530 962,524 962,536" fill="#fff" stroke="#222" stroke-width="1.5"/>
+  <text x="994" y="512" text-anchor="middle" class="small">&lt;&lt;include&gt;&gt;</text>
+
+  <line x1="976" y1="722" x2="950" y2="722" class="dash"/>
+  <polygon points="950,722 962,716 962,728" fill="#fff" stroke="#222" stroke-width="1.5"/>
+  <text x="996" y="704" text-anchor="middle" class="small">&lt;&lt;extend&gt;&gt;</text>
+</svg>

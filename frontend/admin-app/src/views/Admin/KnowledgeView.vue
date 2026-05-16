@@ -4,33 +4,29 @@
       <article class="stat-card">
         <span class="stat-label">面料知识</span>
         <strong>{{ overview.fabricTotal }}</strong>
-        <p class="card-meta">启用 {{ overview.fabricActive }}</p>
       </article>
       <article class="stat-card">
         <span class="stat-label">穿搭指南</span>
         <strong>{{ overview.guideTotal }}</strong>
-        <p class="card-meta">启用 {{ overview.guideActive }}</p>
       </article>
       <article class="stat-card">
         <span class="stat-label">洗护知识</span>
         <strong>{{ overview.careLabelTotal }}</strong>
-        <p class="card-meta">启用 {{ overview.careLabelActive }}</p>
       </article>
       <article class="stat-card accent-card">
         <span class="stat-label">当前筛选结果</span>
         <strong>{{ currentTotal }}</strong>
-        <p class="card-meta">{{ currentTabLabel }}</p>
       </article>
     </div>
 
     <section class="panel-card">
-      <div class="panel-head stacked-head">
-        <div>
-          <h2>知识库列表</h2>
-          <p class="panel-subtitle">列表页只负责筛选、浏览和进入新建/编辑页，不再把大表单塞在同一页。</p>
-        </div>
+      <div class="panel-head">
+        <h2>知识库</h2>
+        <button class="primary-button" type="button" @click="goCreate">新建 {{ currentTabLabel }}</button>
+      </div>
 
-        <div class="toolbar">
+      <div class="filter-bar">
+        <div class="tab-group">
           <button
             v-for="tab in tabs"
             :key="tab.value"
@@ -41,21 +37,20 @@
             {{ tab.label }}
           </button>
         </div>
-
-        <div class="toolbar">
-          <input
-            v-model.trim="filters.keyword"
-            class="text-input"
-            type="text"
-            :placeholder="`搜索${currentTabLabel}关键词`"
-          />
-          <select v-model="filters.active" class="text-input select-input">
-            <option value="">全部状态</option>
-            <option value="1">仅启用</option>
-            <option value="0">仅停用</option>
-          </select>
-          <button class="secondary-button" type="button" @click="loadCurrentTab">查询</button>
-          <button class="primary-button" type="button" @click="goCreate">新建 {{ currentTabLabel }}</button>
+        <input
+          v-model.trim="filters.keyword"
+          class="text-input filter-search"
+          type="text"
+          :placeholder="`搜索${currentTabLabel}关键词`"
+        />
+        <select v-model="filters.active" class="text-input">
+          <option value="">全部状态</option>
+          <option value="1">仅启用</option>
+          <option value="0">仅停用</option>
+        </select>
+        <div class="filter-actions">
+          <button class="secondary-button" type="button" @click="resetFilters">重置</button>
+          <button class="primary-button" type="button" @click="loadCurrentTab">查询</button>
         </div>
       </div>
 
@@ -283,6 +278,12 @@ const switchTab = async (tab) => {
   await loadCurrentTab();
 };
 
+const resetFilters = () => {
+  filters.keyword = '';
+  filters.active = '';
+  loadCurrentTab();
+};
+
 const goCreate = () => {
   router.push(`/knowledge/${activeTab.value}/create`);
 };
@@ -336,9 +337,10 @@ onMounted(async () => {
   gap: 20px;
 }
 
-.stacked-head {
-  align-items: flex-start;
-  flex-direction: column;
+.tab-group {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .tab-button {
@@ -356,11 +358,6 @@ onMounted(async () => {
   color: #fff;
 }
 
-.card-meta {
-  margin: 8px 0 0;
-  color: #5f6b7a;
-}
-
 .action-cell {
   display: flex;
   gap: 8px;
@@ -372,8 +369,7 @@ onMounted(async () => {
 }
 
 .accent-card .stat-label,
-.accent-card strong,
-.accent-card .card-meta {
+.accent-card strong {
   color: #fff;
 }
 </style>

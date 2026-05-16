@@ -30,7 +30,6 @@
             d="M12 12.25a3.25 3.25 0 1 0-3.25-3.25A3.25 3.25 0 0 0 12 12.25zm-5.75 6a5.75 5.75 0 0 1 11.5 0"
           />
         </svg>
-        <span v-if="item.id === 'home'" class="home-breath-dot" aria-hidden="true"></span>
       </span>
     </button>
   </div>
@@ -151,38 +150,6 @@ const isActive = (item) => {
 
 .nav-item.active .nav-icon {
   transform: translateY(-1px);
-}
-
-.home-breath-dot {
-  position: absolute;
-  top: 1px;
-  right: 0;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--accent-strong) 64%, white 12%);
-  box-shadow: 0 0 0 0 rgba(126, 92, 56, 0.18);
-  animation: home-breathe 3.6s ease-in-out infinite;
-}
-
-.nav-item.active .home-breath-dot {
-  background: var(--accent-strong);
-  box-shadow: 0 0 0 0 rgba(126, 92, 56, 0.24);
-}
-
-@keyframes home-breathe {
-  0%,
-  100% {
-    transform: scale(0.92);
-    opacity: 0.55;
-    box-shadow: 0 0 0 0 rgba(126, 92, 56, 0.06);
-  }
-
-  50% {
-    transform: scale(1.14);
-    opacity: 0.9;
-    box-shadow: 0 0 0 4px rgba(126, 92, 56, 0.02);
-  }
 }
 
 @media (min-width: 768px) {

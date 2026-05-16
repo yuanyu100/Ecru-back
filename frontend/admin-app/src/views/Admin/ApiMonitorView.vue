@@ -2,14 +2,10 @@
   <div class="admin-page">
     <section class="panel-card">
       <div class="panel-head">
-        <div>
-          <h2>AI 调用监控</h2>
-          <p class="panel-subtitle">管理员视角下查看全用户近 24 小时调用总览、分布和按用户聚合结果。</p>
-        </div>
+        <h2>AI 监控</h2>
         <div class="toolbar">
-          <span class="panel-subtitle">{{ loading ? '刷新中...' : `上次更新：${lastLoadedAt}` }}</span>
           <button class="secondary-button" type="button" :disabled="loading" @click="loadMonitor">
-            刷新数据
+            {{ loading ? '刷新中...' : '刷新' }}
           </button>
         </div>
       </div>
@@ -38,10 +34,43 @@
 
     <section class="panel-card">
       <div class="panel-head">
-        <div>
-          <h2>按用户分类</h2>
-          <p class="panel-subtitle">展示近 24 小时各用户的调用次数、成功率、平均耗时和最近调用时间。</p>
-        </div>
+        <h2>最近调用</h2>
+      </div>
+
+      <div v-if="records.length" class="table-shell">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>时间</th>
+              <th>场景</th>
+              <th>模型</th>
+              <th>状态</th>
+              <th>耗时</th>
+              <th>状态码</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="record in records" :key="record.id">
+              <td>{{ formatDate(record.createdAt) }}</td>
+              <td>{{ record.scene || '未知场景' }}</td>
+              <td>{{ record.model || '未知模型' }}</td>
+              <td>
+                <span class="badge" :class="record.status === 1 ? 'badge-green' : 'badge-red'">
+                  {{ record.status === 1 ? '成功' : '失败' }}
+                </span>
+              </td>
+              <td>{{ formatMs(record.responseTime) }}</td>
+              <td>{{ record.httpCode ?? '-' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p v-else class="empty-tip">暂无最近调用记录。</p>
+    </section>
+
+    <section class="panel-card">
+      <div class="panel-head">
+        <h2>按用户</h2>
       </div>
 
       <div v-if="userStats.length" class="table-shell">
@@ -85,10 +114,7 @@
     <div class="panel-grid">
       <section class="panel-card">
         <div class="panel-head">
-          <div>
-            <h2>近 7 天趋势</h2>
-            <p class="panel-subtitle">按天聚合，便于快速判断整体调用波动。</p>
-          </div>
+          <h2>近 7 天</h2>
         </div>
 
         <div class="table-shell">
@@ -117,10 +143,7 @@
 
       <section class="panel-card">
         <div class="panel-head">
-          <div>
-            <h2>今日分时趋势</h2>
-            <p class="panel-subtitle">按小时拆分，查看当日调用密度和延迟变化。</p>
-          </div>
+          <h2>分时（有调用）</h2>
         </div>
 
         <div class="table-shell">
@@ -135,12 +158,15 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in hourlyTrend" :key="item.hour">
+              <tr v-for="item in activeHourlyTrend" :key="item.hour">
                 <td>{{ String(item.hour).padStart(2, '0') }}:00</td>
                 <td>{{ item.totalCalls || 0 }}</td>
                 <td>{{ formatPercent(item.successRate) }}</td>
                 <td>{{ formatMs(item.avgResponseTime) }}</td>
                 <td>{{ formatMs(item.p95ResponseTime) }}</td>
+              </tr>
+              <tr v-if="!activeHourlyTrend.length">
+                <td colspan="5" style="text-align:center;color:#7c8796;">暂无分时数据</td>
               </tr>
             </tbody>
           </table>
@@ -151,10 +177,7 @@
     <div class="panel-grid">
       <section class="panel-card">
         <div class="panel-head">
-          <div>
-            <h2>按场景分类</h2>
-            <p class="panel-subtitle">按业务场景查看调用量、成功率和资源消耗。</p>
-          </div>
+          <h2>按场景</h2>
         </div>
 
         <div v-if="sceneStats.length" class="table-shell">
@@ -184,10 +207,7 @@
 
       <section class="panel-card">
         <div class="panel-head">
-          <div>
-            <h2>按模型分类</h2>
-            <p class="panel-subtitle">按模型名称查看调用量、成功率和资源消耗。</p>
-          </div>
+          <h2>按模型</h2>
         </div>
 
         <div v-if="modelStats.length" class="table-shell">
@@ -216,13 +236,9 @@
       </section>
     </div>
 
-    <div class="panel-grid bottom-grid">
-      <section class="panel-card">
+    <section class="panel-card">
         <div class="panel-head">
-          <div>
-            <h2>错误分布</h2>
-            <p class="panel-subtitle">统计近 24 小时失败调用的错误类型。</p>
-          </div>
+          <h2>错误</h2>
         </div>
 
         <div v-if="errorDistribution.length" class="chip-grid">
@@ -233,56 +249,15 @@
         </div>
         <p v-else class="empty-tip">近 24 小时没有失败调用。</p>
       </section>
-
-      <section class="panel-card">
-        <div class="panel-head">
-          <div>
-            <h2>最近调用记录</h2>
-            <p class="panel-subtitle">展示最近的 AI 请求，便于定位异常和核对场景。</p>
-          </div>
-        </div>
-
-        <div v-if="records.length" class="table-shell">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>时间</th>
-                <th>场景</th>
-                <th>模型</th>
-                <th>状态</th>
-                <th>耗时</th>
-                <th>状态码</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="record in records" :key="record.id">
-                <td>{{ formatDate(record.createdAt) }}</td>
-                <td>{{ record.scene || '未知场景' }}</td>
-                <td>{{ record.model || '未知模型' }}</td>
-                <td>
-                  <span class="badge" :class="record.status === 1 ? 'badge-green' : 'badge-red'">
-                    {{ record.status === 1 ? '成功' : '失败' }}
-                  </span>
-                </td>
-                <td>{{ formatMs(record.responseTime) }}</td>
-                <td>{{ record.httpCode ?? '-' }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <p v-else class="empty-tip">暂无最近调用记录。</p>
-      </section>
-    </div>
   </div>
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import { monitorApi } from '../../api/monitor';
 
 const loading = ref(false);
 const errorMessage = ref('');
-const lastLoadedAt = ref('尚未加载');
 const records = ref([]);
 const weeklyTrend = ref([]);
 const hourlyTrend = ref([]);
@@ -306,6 +281,8 @@ const formatDate = (value) => (value ? String(value).replace('T', ' ') : '-');
 const formatMs = (value) => `${Number(value || 0).toFixed(0)} ms`;
 const formatPercent = (value) => `${Number(value || 0).toFixed(2)}%`;
 const formatRole = (role) => (String(role || '').toUpperCase().includes('ADMIN') ? '管理员' : '普通用户');
+
+const activeHourlyTrend = computed(() => hourlyTrend.value.filter((item) => (item.totalCalls || 0) > 0));
 
 const loadMonitor = async () => {
   loading.value = true;
@@ -335,7 +312,6 @@ const loadMonitor = async () => {
     errorDistribution.value = result.data.errorDistribution || [];
     records.value = result.data.recentCalls || [];
     userStats.value = result.data.userStats || [];
-    lastLoadedAt.value = new Date().toLocaleString('zh-CN');
   } catch (error) {
     console.error('Load monitor dashboard failed:', error);
     errorMessage.value = error.message || '加载 AI 监控数据失败';
@@ -348,10 +324,6 @@ onMounted(loadMonitor);
 </script>
 
 <style scoped>
-.bottom-grid {
-  align-items: start;
-}
-
 .chip-grid {
   display: grid;
   gap: 12px;

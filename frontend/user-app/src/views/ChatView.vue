@@ -218,6 +218,7 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import { chatApi } from '../api/chat';
 import { knowledgeApi } from '../api/knowledge';
 import { weatherApi } from '../api/weather';
@@ -225,6 +226,7 @@ import { formatMessageHtml } from '../utils/messageFormat';
 
 const chatPageRef = ref(null);
 const chatHeadRef = ref(null);
+const route = useRoute();
 const composerRef = ref(null);
 const messageListRef = ref(null);
 const messageTailRef = ref(null);
@@ -943,7 +945,7 @@ onMounted(async () => {
     await loadMessages(currentSessionId.value);
   }
 
-  const pendingPrompt = localStorage.getItem('pendingChatPrompt');
+  const pendingPrompt = route.query.q || localStorage.getItem('pendingChatPrompt');
   if (pendingPrompt) {
     localStorage.removeItem('pendingChatPrompt');
     await startNewConversation();

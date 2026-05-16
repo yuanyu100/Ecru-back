@@ -7,7 +7,18 @@
       "Bash(xargs cat *)",
       "Bash(xargs grep *)",
       "Bash(grep *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(python3 -c ' *)",
+      "Bash(node *)",
+      "Bash(npm run *)",
+      "WebSearch",
+      "WebFetch(domain:plantuml.com)",
+      "WebFetch(domain:en.wikipedia.org)",
+      "Bash(pip install *)",
+      "Bash(python3 *)",
+      "Bash(where python3 *)",
+      "Bash(where python *)"
     ]
   }
 }

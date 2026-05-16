@@ -1,28 +1,22 @@
 <template>
   <div class="admin-page">
     <section class="panel-card">
-      <div class="panel-head">
-        <div>
-          <h2>{{ isAdmin ? '全局衣物管理' : '我的衣物台账' }}</h2>
-          <p class="panel-subtitle">
-            {{ isAdmin ? '管理员可跨用户查看和删除衣物。' : '当前账号只能查看自己的衣物。' }}
-          </p>
-        </div>
-        <div class="toolbar">
-          <input
-            v-model.trim="filters.keyword"
-            class="text-input"
-            type="text"
-            placeholder="搜索名称 / 分类 / 颜色"
-          />
-          <input
-            v-if="isAdmin"
-            v-model.trim="filters.ownerKeyword"
-            class="text-input"
-            type="text"
-            placeholder="搜索所属用户"
-          />
-          <button class="secondary-button" type="button" @click="loadClothings">↺</button>
+      <div class="filter-bar">
+        <input
+          v-model.trim="filters.keyword"
+          class="text-input filter-search"
+          type="text"
+          placeholder="名称 / 分类 / 颜色"
+        />
+        <AdminUserPicker
+          v-if="isAdmin"
+          v-model="filters.ownerKeyword"
+          placeholder="用户"
+          @select="handleOwnerSelect"
+        />
+        <div class="filter-actions">
+          <button class="secondary-button" type="button" @click="resetFilters">重置</button>
+          <button class="primary-button" type="button" @click="loadClothings">查询</button>
         </div>
       </div>
 
@@ -78,6 +72,7 @@
 import { onMounted, reactive, ref } from 'vue';
 import { clothingApi } from '../../api/clothing';
 import { authApi } from '../../api/auth';
+import AdminUserPicker from '../../components/AdminUserPicker.vue';
 import { isAdminUser } from '../../utils/adminRole';
 
 const currentUser = authApi.getCurrentUser();
@@ -87,7 +82,8 @@ const loading = ref(false);
 const deletingId = ref(null);
 const filters = reactive({
   keyword: '',
-  ownerKeyword: ''
+  ownerKeyword: '',
+  userId: undefined
 });
 
 const formatDate = (value) => (value ? String(value).replace('T', ' ') : '-');
@@ -105,6 +101,18 @@ const renderTags = (value) => {
   }
 };
 
+const handleOwnerSelect = (user) => {
+  filters.ownerKeyword = user.username || '';
+  filters.userId = user.userId || user.id || undefined;
+};
+
+const resetFilters = () => {
+  filters.keyword = '';
+  filters.ownerKeyword = '';
+  filters.userId = undefined;
+  loadClothings();
+};
+
 const loadClothings = async () => {
   loading.value = true;
   try {
@@ -112,6 +120,7 @@ const loadClothings = async () => {
       ? await clothingApi.getAdminClothings({
           page: 1,
           size: 50,
+          userId: filters.userId,
           keyword: filters.keyword,
           ownerKeyword: filters.ownerKeyword
         })
