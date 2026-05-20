@@ -1,31 +1,24 @@
 package com.ecru.common.service.ai;
 
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONArray;
-import com.alibaba.fastjson2.JSONObject;
 import com.ecru.common.dto.ai.AiApiCallContext;
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.model.chat.request.ChatRequest;
+import dev.langchain4j.model.chat.response.ChatResponse;
+import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
+import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
+import dev.langchain4j.model.output.TokenUsage;
 import lombok.extern.slf4j.Slf4j;
-import okhttp3.Call;
-import okhttp3.Callback;
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
-import okhttp3.ResponseBody;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
-import javax.annotation.PostConstruct;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -33,17 +26,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Service("aiTextGeneratorStreamService")
 public class AiTextGeneratorStreamService {
 
-    @Value("${ai.siliconflow.api-key:sk-rfukaeuhisaxyfjyfnigayueguxsfwikfswwjubmggxhwvvb}")
-    private String apiKey;
-
-    @Value("${ai.siliconflow.base-url:https://api.siliconflow.cn/v1}")
-    private String baseUrl;
+    private static final double STREAM_TEMPERATURE = 0.7d;
+    private static final int STREAM_MAX_TOKENS = 2048;
 
     @Value("${ai.siliconflow.model:Qwen/Qwen3-VL-8B-Instruct}")
     private String modelName;
-
-    @Value("${ai.siliconflow.timeout:300000}")
-    private Integer timeout;
 
     @Autowired
     private AiPromptSettingsService promptSettingsService;
@@ -51,16 +38,8 @@ public class AiTextGeneratorStreamService {
     @Autowired
     private AiApiMonitorService monitorService;
 
-    private OkHttpClient okHttpClient;
-
-    @PostConstruct
-    public void init() {
-        this.okHttpClient = new OkHttpClient.Builder()
-                .connectTimeout(timeout, TimeUnit.MILLISECONDS)
-                .readTimeout(timeout, TimeUnit.MILLISECONDS)
-                .writeTimeout(timeout, TimeUnit.MILLISECONDS)
-                .build();
-    }
+    @Autowired
+    private OpenAiStreamingChatModel streamingChatModel;
 
     public Flux<String> generateStreamResponse(String prompt,
                                                List<Map<String, String>> chatHistory,
@@ -92,185 +71,64 @@ public class AiTextGeneratorStreamService {
                     AiApiMonitorWrapper.Scene.STREAM_CHAT, modelName, userId
             );
             AtomicBoolean recorded = new AtomicBoolean(false);
+            AtomicBoolean cancelled = new AtomicBoolean(false);
             AtomicInteger responseLength = new AtomicInteger(0);
+
             try {
-                String endpoint = "/chat/completions";
-                String fullUrl = baseUrl + endpoint;
-                log.info("AI Stream API URL: {}", fullUrl);
-                log.info("AI Stream Model: {}", modelName);
-
-                JSONObject requestBody = new JSONObject();
-                requestBody.put("model", modelName);
-                requestBody.put("temperature", 0.7);
-                requestBody.put("max_tokens", 2048);
-                requestBody.put("stream", true);
-
-                JSONArray messages = new JSONArray();
-
-                JSONObject systemMessage = new JSONObject();
-                systemMessage.put("role", "system");
-                systemMessage.put(
-                        "content",
-                        systemPrompt != null && !systemPrompt.trim().isEmpty()
-                                ? systemPrompt
-                                : buildSystemPrompt(context)
-                );
-                messages.add(systemMessage);
-
-                if (chatHistory != null && !chatHistory.isEmpty()) {
-                    log.info("聊天历史数量: {}", chatHistory.size());
-                    int startIndex = Math.max(0, chatHistory.size() - 5);
-                    for (int i = startIndex; i < chatHistory.size(); i++) {
-                        Map<String, String> message = chatHistory.get(i);
-                        JSONObject historyMessage = new JSONObject();
-                        historyMessage.put("role", message.get("role"));
-                        historyMessage.put("content", message.get("content"));
-                        messages.add(historyMessage);
-                    }
-                }
-
-                JSONObject userMessage = new JSONObject();
-                userMessage.put("role", "user");
-                userMessage.put("content", buildUserPrompt(prompt, context));
-                messages.add(userMessage);
-
-                requestBody.put("messages", messages);
-                monitorContext.setPromptLength(requestBody.toJSONString().length());
-
-                RequestBody body = RequestBody.create(
-                        requestBody.toJSONString(),
-                        MediaType.parse("application/json")
-                );
-
-                Request request = new Request.Builder()
-                        .url(fullUrl)
-                        .post(body)
-                        .addHeader("Authorization", "Bearer " + apiKey)
-                        .addHeader("Content-Type", "application/json")
+                ChatRequest request = ChatRequest.builder()
+                        .messages(buildChatMessages(systemPrompt, prompt, chatHistory, context))
+                        .temperature(STREAM_TEMPERATURE)
+                        .maxOutputTokens(STREAM_MAX_TOKENS)
                         .build();
+                monitorContext.setPromptLength(request.toString().length());
 
-                Call call = okHttpClient.newCall(request);
                 sink.onDispose(() -> {
-                    if (!call.isCanceled()) {
-                        log.info("AI stream request cancelled by client");
-                        call.cancel();
-                    }
+                    cancelled.set(true);
                     recordCancelledIfNeeded(monitorContext, recorded, responseLength.get());
                 });
 
-                call.enqueue(new Callback() {
+                streamingChatModel.chat(request, new StreamingChatResponseHandler() {
                     @Override
-                    public void onFailure(Call call, IOException e) {
-                        if (call.isCanceled() || sink.isCancelled()) {
-                            log.info("AI stream request cancelled before completion");
+                    public void onPartialResponse(String partialResponse) {
+                        if (cancelled.get() || sink.isCancelled() || partialResponse == null || partialResponse.isEmpty()) {
+                            return;
+                        }
+                        responseLength.addAndGet(partialResponse.length());
+                        sink.next(partialResponse);
+                    }
+
+                    @Override
+                    public void onCompleteResponse(ChatResponse response) {
+                        if (cancelled.get() || sink.isCancelled()) {
                             recordCancelledIfNeeded(monitorContext, recorded, responseLength.get());
-                            sink.complete();
                             return;
                         }
 
-                        log.error("流式请求失败: {}", e.getMessage(), e);
-                        monitorContext.markFailed(AiApiMonitorWrapper.ErrorType.NETWORK_ERROR, e.getMessage(), null);
+                        applyTokenUsage(monitorContext, response.tokenUsage());
+                        monitorContext.markSuccess(200);
                         monitorContext.setResponseLength(responseLength.get());
                         recordOnce(monitorContext, recorded);
-                        sink.next("[ERROR]" + e.getMessage());
+                        sink.next("[DONE]");
                         sink.complete();
                     }
 
                     @Override
-                    public void onResponse(Call call, Response response) throws IOException {
-                        if (!response.isSuccessful()) {
-                            String errorBody = response.body() != null ? response.body().string() : "Unknown error";
-                            log.error("API调用失败: {} {} - {}", response.code(), response.message(), errorBody);
-                            monitorContext.markFailed(
-                                    AiApiMonitorWrapper.ErrorType.HTTP_ERROR,
-                                    "API调用失败: " + response.code() + " " + response.message(),
-                                    response.code()
-                            );
-                            monitorContext.setResponseLength(responseLength.get());
-                            recordOnce(monitorContext, recorded);
-                            if (!sink.isCancelled()) {
-                                sink.next("[ERROR]API调用失败: " + response.code());
-                                sink.complete();
-                            }
+                    public void onError(Throwable error) {
+                        if (cancelled.get() || sink.isCancelled()) {
+                            recordCancelledIfNeeded(monitorContext, recorded, responseLength.get());
                             return;
                         }
 
-                        try (ResponseBody responseBody = response.body();
-                             BufferedReader reader = new BufferedReader(
-                                     new InputStreamReader(responseBody.byteStream(), StandardCharsets.UTF_8))) {
-                            String line;
-                            while (!sink.isCancelled() && (line = reader.readLine()) != null) {
-                                if (!line.startsWith("data: ")) {
-                                    continue;
-                                }
-
-                                String data = line.substring(6);
-                                if ("[DONE]".equals(data)) {
-                                    monitorContext.markSuccess(response.code());
-                                    monitorContext.setResponseLength(responseLength.get());
-                                    recordOnce(monitorContext, recorded);
-                                    sink.next("[DONE]");
-                                    sink.complete();
-                                    return;
-                                }
-
-                                try {
-                                    JSONObject jsonData = JSON.parseObject(data);
-                                    if (!jsonData.containsKey("choices")) {
-                                        continue;
-                                    }
-
-                                    JSONArray choices = jsonData.getJSONArray("choices");
-                                    if (choices.isEmpty()) {
-                                        continue;
-                                    }
-
-                                    JSONObject choice = choices.getJSONObject(0);
-                                    if (!choice.containsKey("delta")) {
-                                        continue;
-                                    }
-
-                                    JSONObject delta = choice.getJSONObject("delta");
-                                    if (!delta.containsKey("content")) {
-                                        continue;
-                                    }
-
-                                    String content = delta.getString("content");
-                                    if (content != null && !content.isEmpty()) {
-                                        responseLength.addAndGet(content.length());
-                                        sink.next(content);
-                                    }
-                                } catch (Exception e) {
-                                    log.warn("解析流式数据失败: {}", e.getMessage());
-                                }
-                            }
-                        } catch (Exception e) {
-                            if (call.isCanceled() || sink.isCancelled()) {
-                                log.info("AI stream response closed after cancellation");
-                                recordCancelledIfNeeded(monitorContext, recorded, responseLength.get());
-                                sink.complete();
-                                return;
-                            }
-
-                            log.error("读取流式响应失败: {}", e.getMessage(), e);
-                            monitorContext.markFailed(AiApiMonitorWrapper.ErrorType.PARSE_ERROR, e.getMessage(), response.code());
-                            monitorContext.setResponseLength(responseLength.get());
-                            recordOnce(monitorContext, recorded);
-                            sink.next("[ERROR]" + e.getMessage());
-                        } finally {
-                            if (!recorded.get() && !call.isCanceled() && !sink.isCancelled()) {
-                                monitorContext.markSuccess(response.code());
-                                monitorContext.setResponseLength(responseLength.get());
-                                recordOnce(monitorContext, recorded);
-                            }
-                            if (!sink.isCancelled()) {
-                                sink.complete();
-                            }
-                        }
+                        log.error("Failed to stream AI response: {}", error.getMessage(), error);
+                        monitorContext.markFailed(AiApiMonitorWrapper.ErrorType.BUSINESS_ERROR, error.getMessage(), null);
+                        monitorContext.setResponseLength(responseLength.get());
+                        recordOnce(monitorContext, recorded);
+                        sink.next("[ERROR]" + error.getMessage());
+                        sink.complete();
                     }
                 });
             } catch (Exception e) {
-                log.error("生成流式响应失败: {}", e.getMessage(), e);
+                log.error("Failed to start AI stream response: {}", e.getMessage(), e);
                 monitorContext.markFailed(AiApiMonitorWrapper.ErrorType.BUSINESS_ERROR, e.getMessage(), null);
                 monitorContext.setResponseLength(responseLength.get());
                 recordOnce(monitorContext, recorded);
@@ -278,6 +136,48 @@ public class AiTextGeneratorStreamService {
                 sink.complete();
             }
         });
+    }
+
+    private List<ChatMessage> buildChatMessages(String systemPrompt,
+                                                String prompt,
+                                                List<Map<String, String>> chatHistory,
+                                                Map<String, Object> context) {
+        List<ChatMessage> messages = new ArrayList<>();
+        messages.add(SystemMessage.from(resolveSystemPrompt(systemPrompt, context)));
+
+        if (chatHistory != null && !chatHistory.isEmpty()) {
+            int startIndex = Math.max(0, chatHistory.size() - 5);
+            for (int i = startIndex; i < chatHistory.size(); i++) {
+                Map<String, String> history = chatHistory.get(i);
+                if (history == null) {
+                    continue;
+                }
+                messages.add(toChatMessage(history.get("role"), history.get("content")));
+            }
+        }
+
+        messages.add(UserMessage.from(buildUserPrompt(prompt, context)));
+        return messages;
+    }
+
+    private ChatMessage toChatMessage(String role, String content) {
+        String safeContent = content == null ? "" : content;
+        if ("system".equalsIgnoreCase(role)) {
+            return SystemMessage.from(safeContent);
+        }
+        if ("assistant".equalsIgnoreCase(role)) {
+            return AiMessage.from(safeContent);
+        }
+        return UserMessage.from(safeContent);
+    }
+
+    private void applyTokenUsage(AiApiCallContext context, TokenUsage tokenUsage) {
+        if (tokenUsage == null) {
+            return;
+        }
+        context.setInputTokens(tokenUsage.inputTokenCount());
+        context.setOutputTokens(tokenUsage.outputTokenCount());
+        context.setTotalTokens(tokenUsage.totalTokenCount());
     }
 
     private void recordCancelledIfNeeded(AiApiCallContext context, AtomicBoolean recorded, int responseLength) {
@@ -295,63 +195,75 @@ public class AiTextGeneratorStreamService {
         }
     }
 
-    private String buildSystemPrompt(Map<String, Object> context) {
-        StringBuilder prompt = new StringBuilder();
-        prompt.append(promptSettingsService.getChatSystemPrompt());
-        prompt.append("你是一位专业的时尚搭配顾问。");
-
-        prompt.setLength(0);
-        prompt.append(promptSettingsService.getChatSystemPrompt());
-        Boolean needClothingSearch = context != null && Boolean.TRUE.equals(context.get("needClothingSearch"));
-        if (needClothingSearch != null && !needClothingSearch) {
-            prompt.append("用户只是打招呼或闲聊，请友好地回应，不需要推荐衣物。");
-        } else {
-            prompt.append("根据用户提供的信息和衣橱中的衣物，生成个性化的搭配建议。");
-            prompt.append("请考虑天气、场合、用户风格偏好等因素，提供详细的搭配方案和专业分析。");
+    private String resolveSystemPrompt(String systemPrompt, Map<String, Object> context) {
+        if (systemPrompt != null && !systemPrompt.trim().isEmpty()) {
+            return systemPrompt;
         }
 
+        StringBuilder prompt = new StringBuilder(promptSettingsService.getChatSystemPrompt());
+        boolean needClothingSearch = context != null && Boolean.TRUE.equals(context.get("needClothingSearch"));
+        if (needClothingSearch) {
+            prompt.append("\n请优先基于候选衣物给出可执行的穿搭建议。");
+        } else {
+            prompt.append("\n如果用户只是闲聊、问候或问身份，不要强行推荐衣物。");
+        }
         return prompt.toString();
     }
 
     private String buildUserPrompt(String prompt, Map<String, Object> context) {
         StringBuilder userContent = new StringBuilder();
-        userContent.append(prompt);
+        userContent.append(prompt == null ? "" : prompt);
 
-        if (context != null) {
-            userContent.append("\n\n");
+        if (context != null && !context.isEmpty()) {
+            userContent.append("\n\n参考上下文:\n");
 
-            if (context.containsKey("weather")) {
-                userContent.append("天气信息：").append(context.get("weather")).append("\n");
-            }
-            if (context.containsKey("occasion")) {
-                userContent.append("场合：").append(context.get("occasion")).append("\n");
+            Object weather = context.get("weather");
+            if (weather != null) {
+                userContent.append("天气: ").append(weather).append("\n");
             }
 
-            Boolean needClothingSearch = Boolean.TRUE.equals(context.get("needClothingSearch"));
+            Object occasion = context.get("occasion");
+            if (occasion != null) {
+                userContent.append("场景: ").append(occasion).append("\n");
+            }
+
+            Object negativePreferences = context.get("negativePreferences");
+            if (negativePreferences != null) {
+                userContent.append("用户不喜欢: ").append(negativePreferences).append("\n");
+            }
+
+            boolean needClothingSearch = Boolean.TRUE.equals(context.get("needClothingSearch"));
             if (needClothingSearch && context.containsKey("clothes")) {
                 @SuppressWarnings("unchecked")
                 List<Map<String, Object>> clothes = (List<Map<String, Object>>) context.get("clothes");
                 if (clothes != null && !clothes.isEmpty()) {
-                    userContent.append("衣橱中的衣物：\n");
+                    userContent.append("可用衣物:\n");
                     int limit = Math.min(5, clothes.size());
                     for (int i = 0; i < limit; i++) {
                         Map<String, Object> cloth = clothes.get(i);
-                        userContent.append(i + 1).append(". ")
+                        userContent.append(i + 1)
+                                .append(". ")
                                 .append(cloth.get("name"))
-                                .append(" (").append(cloth.get("category")).append(")")
-                                .append(" - 颜色：").append(cloth.get("color"))
+                                .append(" (")
+                                .append(cloth.get("category"))
+                                .append(")")
+                                .append(" - 颜色: ")
+                                .append(cloth.get("color"))
                                 .append("\n");
                     }
                 } else {
-                    userContent.append("（用户衣橱中暂无匹配衣物）\n");
+                    userContent.append("当前没有可直接推荐的衣物候选。\n");
                 }
-            }
-
-            if (context.containsKey("negativePreferences")) {
-                userContent.append("用户不喜欢：").append(context.get("negativePreferences")).append("\n");
             }
         }
 
-        return userContent.toString();
+        return limitLength(userContent.toString(), 1000);
+    }
+
+    private String limitLength(String text, int maxLength) {
+        if (text == null || text.length() <= maxLength) {
+            return text == null ? "" : text;
+        }
+        return text.substring(0, maxLength) + "...";
     }
 }

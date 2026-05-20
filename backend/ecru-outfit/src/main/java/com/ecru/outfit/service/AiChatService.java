@@ -1,6 +1,8 @@
 package com.ecru.outfit.service;
 
 import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONArray;
+import com.alibaba.fastjson2.JSONObject;
 import com.ecru.common.service.ai.AiPromptSettingsService;
 import com.ecru.common.service.ai.AiTextGeneratorService;
 import com.ecru.outfit.dto.request.ChatRequestDTO;
@@ -12,6 +14,7 @@ import com.ecru.outfit.entity.AiChatMessage;
 import com.ecru.outfit.entity.AiConversation;
 import com.ecru.outfit.mapper.AiChatMessageMapper;
 import com.ecru.outfit.mapper.AiConversationMapper;
+import com.ecru.outfit.service.agent.WardrobeChatAgentService;
 import com.ecru.outfit.service.mcp.McpWeatherService;
 import com.ecru.outfit.service.rag.RagService;
 import com.github.pagehelper.Page;
@@ -55,6 +58,9 @@ public class AiChatService {
 
     @Autowired
     private AiPromptSettingsService promptSettingsService;
+
+    @Autowired
+    private WardrobeChatAgentService wardrobeChatAgentService;
 
     @Autowired(required = false)
     private StringRedisTemplate redisTemplate;
@@ -161,7 +167,20 @@ public class AiChatService {
             Map<String, Object> context = buildContext(weatherInfo, request.getOccasion(), recommendedClothes, intentAnalysis, negativePreferences, needClothingSearch);
 
             // 10. 生成AI回复
-            String aiResponse = textGeneratorService.generateResponse(userMessage, chatHistory, context);
+            WardrobeChatAgentService.ChatAgentResult chatAgentResult = wardrobeChatAgentService.generateChatReply(
+                    userId,
+                    userMessage,
+                    request.getLocation(),
+                    request.getOccasion(),
+                    weatherInfo,
+                    chatHistory,
+                    context,
+                    recommendedClothes
+            );
+            String aiResponse = chatAgentResult.getReply();
+            if (!chatAgentResult.getRecommendedClothes().isEmpty()) {
+                recommendedClothes = chatAgentResult.getRecommendedClothes();
+            }
 
             // 11. 保存AI回复
             Long aiMessageId = saveAiMessage(conversation.getId(), userId, aiResponse, recommendedClothes, context);
@@ -615,6 +634,7 @@ public class AiChatService {
         return results;
     }
 
+
     /**
      * 构建上下文信息
      */
@@ -919,5 +939,4 @@ public class AiChatService {
 
         return vo;
     }
-
 }

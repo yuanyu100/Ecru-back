@@ -351,6 +351,7 @@ const openChat = () => {
 const sendPrompt = () => {
   const text = promptInput.value.trim();
   if (!text) return;
+  localStorage.setItem('pendingChatPrompt', text);
   router.push({ path: '/chat', query: { q: text } });
 };
 

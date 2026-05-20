@@ -218,7 +218,7 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { chatApi } from '../api/chat';
 import { knowledgeApi } from '../api/knowledge';
 import { weatherApi } from '../api/weather';
@@ -227,6 +227,7 @@ import { formatMessageHtml } from '../utils/messageFormat';
 const chatPageRef = ref(null);
 const chatHeadRef = ref(null);
 const route = useRoute();
+const router = useRouter();
 const composerRef = ref(null);
 const messageListRef = ref(null);
 const messageTailRef = ref(null);
@@ -247,6 +248,8 @@ const copiedMessageId = ref('');
 const shouldFollowLatest = ref(true);
 const currentStreamController = ref(null);
 const activeAssistantMessage = ref(null);
+const isConsumingPendingPrompt = ref(false);
+const isChatReady = ref(false);
 
 let copiedMessageTimer = null;
 let layoutResizeObserver = null;
@@ -912,6 +915,43 @@ const formatTime = (value) => {
 
 const formatAssistantMessage = (content) => formatMessageHtml(content);
 
+const normalizePendingPrompt = (value) => String(value || '').trim();
+
+const clearRoutePromptQuery = async () => {
+  if (!route.query.q) {
+    return;
+  }
+
+  const nextQuery = { ...route.query };
+  delete nextQuery.q;
+  await router.replace({ path: route.path, query: nextQuery });
+};
+
+const consumePendingPrompt = async () => {
+  if (route.path !== '/chat' || !isChatReady.value || isConsumingPendingPrompt.value) {
+    return;
+  }
+
+  const routePrompt = normalizePendingPrompt(route.query.q);
+  const storedPrompt = normalizePendingPrompt(localStorage.getItem('pendingChatPrompt'));
+  const pendingPrompt = routePrompt || storedPrompt;
+  if (!pendingPrompt) {
+    return;
+  }
+
+  isConsumingPendingPrompt.value = true;
+  try {
+    localStorage.removeItem('pendingChatPrompt');
+    await clearRoutePromptQuery();
+    await startNewConversation();
+    userInput.value = pendingPrompt;
+    await syncTextareaHeight();
+    await submitMessage();
+  } finally {
+    isConsumingPendingPrompt.value = false;
+  }
+};
+
 watch(
   () => messages.value.length,
   async () => {
@@ -922,6 +962,13 @@ watch(
 watch(historyOpen, (open) => {
   document.body.classList.toggle('drawer-open', open);
 });
+
+watch(
+  () => route.fullPath,
+  async () => {
+    await consumePendingPrompt();
+  }
+);
 
 onMounted(async () => {
   await syncTextareaHeight();
@@ -945,14 +992,8 @@ onMounted(async () => {
     await loadMessages(currentSessionId.value);
   }
 
-  const pendingPrompt = route.query.q || localStorage.getItem('pendingChatPrompt');
-  if (pendingPrompt) {
-    localStorage.removeItem('pendingChatPrompt');
-    await startNewConversation();
-    userInput.value = pendingPrompt;
-    await syncTextareaHeight();
-    await submitMessage();
-  }
+  isChatReady.value = true;
+  await consumePendingPrompt();
 });
 
 onBeforeUnmount(() => {
