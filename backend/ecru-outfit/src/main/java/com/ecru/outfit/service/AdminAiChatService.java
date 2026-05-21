@@ -153,7 +153,7 @@ public class AdminAiChatService {
         result.put("sessionId", asString(row.get("session_id")));
         result.put("title", asString(row.get("title")));
         result.put("context", asString(row.get("context")));
-        result.put("isActive", asInt(row.get("is_active")) == 1);
+        result.put("isActive", asBooleanFlag(row.get("is_active")));
         result.put("messageCount", asInt(row.get("message_count")));
         result.put("metadata", parseMap(row.get("metadata")));
         result.put("createdAt", row.get("created_at"));
@@ -224,6 +224,19 @@ public class AdminAiChatService {
 
     private int asInt(Object value) {
         return value instanceof Number number ? number.intValue() : 0;
+    }
+
+    private boolean asBooleanFlag(Object value) {
+        if (value instanceof Boolean bool) {
+            return bool;
+        }
+        if (value instanceof Number number) {
+            return number.intValue() == 1;
+        }
+        if (value instanceof String text) {
+            return "1".equals(text) || "true".equalsIgnoreCase(text);
+        }
+        return false;
     }
 
     private Long asLong(Object value) {

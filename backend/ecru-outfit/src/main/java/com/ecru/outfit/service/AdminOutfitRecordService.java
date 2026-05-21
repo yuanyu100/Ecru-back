@@ -175,7 +175,7 @@ public class AdminOutfitRecordService {
         result.put("fashionSuggestions", asString(row.get("fashion_suggestions")));
         result.put("occasion", asString(row.get("occasion")));
         result.put("suitabilityScore", row.get("suitability_score"));
-        result.put("isFavorite", asInt(row.get("is_favorite")) == 1);
+        result.put("isFavorite", asBooleanFlag(row.get("is_favorite")));
         result.put("createdAt", row.get("created_at"));
         result.put("updatedAt", row.get("updated_at"));
         result.put("username", asString(row.get("username")));
@@ -204,7 +204,7 @@ public class AdminOutfitRecordService {
         result.put("itemCategory", asString(row.get("item_category")));
         result.put("itemColor", asString(row.get("item_color")));
         result.put("itemImageUrl", asString(row.get("item_image_url")));
-        result.put("isRecommended", asInt(row.get("is_recommended")) == 1);
+        result.put("isRecommended", asBooleanFlag(row.get("is_recommended")));
         result.put("reason", asString(row.get("reason")));
         result.put("sortOrder", asInt(row.get("sort_order")));
         result.put("createdAt", row.get("created_at"));
@@ -219,7 +219,7 @@ public class AdminOutfitRecordService {
         result.put("styleRating", row.get("style_rating"));
         result.put("practicalityRating", row.get("practicality_rating"));
         result.put("weatherRating", row.get("weather_rating"));
-        result.put("isWorn", asInt(row.get("is_worn")) == 1);
+        result.put("isWorn", asBooleanFlag(row.get("is_worn")));
         result.put("wornAt", row.get("worn_at"));
         result.put("feedbackText", asString(row.get("feedback_text")));
         result.put("createdAt", row.get("created_at"));
@@ -251,6 +251,19 @@ public class AdminOutfitRecordService {
 
     private int asInt(Object value) {
         return value instanceof Number number ? number.intValue() : 0;
+    }
+
+    private boolean asBooleanFlag(Object value) {
+        if (value instanceof Boolean bool) {
+            return bool;
+        }
+        if (value instanceof Number number) {
+            return number.intValue() == 1;
+        }
+        if (value instanceof String text) {
+            return "1".equals(text) || "true".equalsIgnoreCase(text);
+        }
+        return false;
     }
 
     private Long asLong(Object value) {

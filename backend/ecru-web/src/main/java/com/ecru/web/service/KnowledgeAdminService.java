@@ -538,7 +538,7 @@ public class KnowledgeAdminService {
         result.put("suitableOccasions", asString(row.get("suitable_occasions")));
         result.put("keywords", asString(row.get("keywords")));
         result.put("source", asString(row.get("source")));
-        result.put("isActive", asInt(row.get("is_active")) == 1);
+        result.put("isActive", asBooleanFlag(row.get("is_active")));
         result.put("createdAt", row.get("created_at"));
         result.put("updatedAt", row.get("updated_at"));
         return result;
@@ -559,7 +559,7 @@ public class KnowledgeAdminService {
         result.put("coverImageCaption", asString(row.get("cover_image_caption")));
         result.put("keywords", asString(row.get("keywords")));
         result.put("source", asString(row.get("source")));
-        result.put("isActive", asInt(row.get("is_active")) == 1);
+        result.put("isActive", asBooleanFlag(row.get("is_active")));
         result.put("createdAt", row.get("created_at"));
         result.put("updatedAt", row.get("updated_at"));
         return result;
@@ -577,7 +577,7 @@ public class KnowledgeAdminService {
         result.put("dontText", asString(row.get("dont_text")));
         result.put("keywords", asString(row.get("keywords")));
         result.put("source", asString(row.get("source")));
-        result.put("isActive", asInt(row.get("is_active")) == 1);
+        result.put("isActive", asBooleanFlag(row.get("is_active")));
         result.put("createdAt", row.get("created_at"));
         result.put("updatedAt", row.get("updated_at"));
         return result;
@@ -687,6 +687,19 @@ public class KnowledgeAdminService {
 
     private int asInt(Object value) {
         return value instanceof Number number ? number.intValue() : 0;
+    }
+
+    private boolean asBooleanFlag(Object value) {
+        if (value instanceof Boolean bool) {
+            return bool;
+        }
+        if (value instanceof Number number) {
+            return number.intValue() == 1;
+        }
+        if (value instanceof String text) {
+            return "1".equals(text) || "true".equalsIgnoreCase(text);
+        }
+        return false;
     }
 
     private Long asLong(Object value) {

@@ -95,7 +95,7 @@ const loadDashboard = async () => {
         aiChatAdminApi.getOverview().catch(() => null),
         outfitAdminApi.getOverview().catch(() => null),
         knowledgeAdminApi.getOverview().catch(() => null),
-        clothingApi.getStatistics().catch(() => null),
+        clothingApi.getAdminClothings({ page: 1, size: 1 }).catch(() => null),
         monitorApi.getDashboard().catch(() => null),
         monitorApi.getHealth().catch(() => null)
       ]
@@ -133,7 +133,11 @@ const loadDashboard = async () => {
   }
 
   if (clothingResult?.code === 200) {
-    stats.clothingCount = clothingResult.data?.overview?.totalClothings || 0;
+    if (isAdmin) {
+      stats.clothingCount = Number(clothingResult.data?.total || 0);
+    } else {
+      stats.clothingCount = Number(clothingResult.data?.overview?.totalClothings || 0);
+    }
   }
 
   if (monitorResult?.success) {
