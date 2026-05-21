@@ -32,20 +32,27 @@ import java.util.Map;
 @RestController
 @RequestMapping("/admin/knowledge")
 @RequiredArgsConstructor
-@Tag(name = "管理员知识库管理", description = "面料、指南、洗护知识的后台维护接口")
+@Tag(name = "管理员知识库管理", description = "面料、指南、洗护知识后台维护接口")
 public class AdminKnowledgeController {
 
     private final KnowledgeAdminService knowledgeAdminService;
 
     @GetMapping("/overview")
-    @Operation(summary = "获取知识库概览")
+    @Operation(summary = "知识库概览")
     public Result<Map<String, Object>> getOverview() {
         requireAdmin();
         return Result.success(knowledgeAdminService.getOverview());
     }
 
+    @PostMapping("/rebuild-embeddings")
+    @Operation(summary = "重建知识库向量")
+    public Result<Map<String, Object>> rebuildEmbeddings() {
+        requireAdmin();
+        return Result.success("知识库向量回填成功", knowledgeAdminService.rebuildKnowledgeEmbeddings());
+    }
+
     @GetMapping("/fabrics")
-    @Operation(summary = "获取面料知识列表")
+    @Operation(summary = "查询面料知识列表")
     public Result<Map<String, Object>> listFabrics(AdminKnowledgeListRequest request) {
         requireAdmin();
         return Result.success(knowledgeAdminService.listFabrics(request));
@@ -82,7 +89,7 @@ public class AdminKnowledgeController {
     }
 
     @GetMapping("/guides")
-    @Operation(summary = "获取指南知识列表")
+    @Operation(summary = "查询指南知识列表")
     public Result<Map<String, Object>> listGuides(AdminKnowledgeListRequest request) {
         requireAdmin();
         return Result.success(knowledgeAdminService.listGuides(request));
@@ -103,19 +110,19 @@ public class AdminKnowledgeController {
     }
 
     @PostMapping(value = "/guides/import-pdf", consumes = "multipart/form-data")
-    @Operation(summary = "从PDF导入指南知识", description = "上传PDF文件，自动解析文本内容并写入指南知识库")
+    @Operation(summary = "从 PDF 导入指南知识")
     public Result<Map<String, Object>> importGuideFromPdf(
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "updateExisting", defaultValue = "true") boolean updateExisting) {
         requireAdmin();
         if (file == null || file.isEmpty()) {
-            return Result.error(400, "请上传PDF文件");
+            return Result.error(400, "请上传 PDF 文件");
         }
         String filename = file.getOriginalFilename();
         if (filename == null || !filename.toLowerCase().endsWith(".pdf")) {
-            return Result.error(400, "仅支持PDF格式文件");
+            return Result.error(400, "仅支持 PDF 文件");
         }
-        return Result.success("PDF导入成功", knowledgeAdminService.importGuidesFromPdf(file, updateExisting));
+        return Result.success("PDF 导入成功", knowledgeAdminService.importGuidesFromPdf(file, updateExisting));
     }
 
     @PutMapping("/guides/{id}")
@@ -135,7 +142,7 @@ public class AdminKnowledgeController {
     }
 
     @GetMapping("/care-labels")
-    @Operation(summary = "获取洗护知识列表")
+    @Operation(summary = "查询洗护知识列表")
     public Result<Map<String, Object>> listCareLabels(AdminKnowledgeListRequest request) {
         requireAdmin();
         return Result.success(knowledgeAdminService.listCareLabels(request));

@@ -57,6 +57,19 @@ public class KnowledgeAdminService {
         return result;
     }
 
+    public Map<String, Object> rebuildKnowledgeEmbeddings() {
+        int fabricCount = syncAllFabrics();
+        int guideCount = syncAllGuides();
+        int careLabelCount = syncAllCareLabels();
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("fabricCount", fabricCount);
+        result.put("guideCount", guideCount);
+        result.put("careLabelCount", careLabelCount);
+        result.put("total", fabricCount + guideCount + careLabelCount);
+        return result;
+    }
+
     public Map<String, Object> listFabrics(AdminKnowledgeListRequest request) {
         List<Object> whereArgs = new ArrayList<>();
         String where = buildWhereClause(
@@ -498,6 +511,37 @@ public class KnowledgeAdminService {
             throw new BusinessException(404, "洗护标知识不存在");
         }
         return toAdminCareLabelItem(rows.get(0));
+    }
+
+    private int syncAllFabrics() {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT id, name, alias, fabric_type, warmth_score, breathability_score, comfort_score, durability_score, " +
+                        "summary, properties, care_guide, suitable_seasons, suitable_occasions, keywords, source, is_active, created_at, updated_at " +
+                        "FROM knowledge_fabrics");
+        for (Map<String, Object> row : rows) {
+            knowledgeVectorSyncService.upsertFabric(toAdminFabricItem(row));
+        }
+        return rows.size();
+    }
+
+    private int syncAllGuides() {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT id, title, subtitle, guide_type, summary, content, author, publish_date, tags, cover_image_url, cover_image_caption, " +
+                        "keywords, source, is_active, created_at, updated_at FROM knowledge_guides");
+        for (Map<String, Object> row : rows) {
+            knowledgeVectorSyncService.upsertGuide(toAdminGuideItem(row));
+        }
+        return rows.size();
+    }
+
+    private int syncAllCareLabels() {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT id, symbol_code, symbol_name, category, instruction_text, explanation, do_text, dont_text, keywords, source, is_active, created_at, updated_at " +
+                        "FROM knowledge_care_labels");
+        for (Map<String, Object> row : rows) {
+            knowledgeVectorSyncService.upsertCareLabel(toAdminCareLabelItem(row));
+        }
+        return rows.size();
     }
 
     private String buildWhereClause(AdminKnowledgeListRequest request, List<Object> args, List<String> keywordFields) {
