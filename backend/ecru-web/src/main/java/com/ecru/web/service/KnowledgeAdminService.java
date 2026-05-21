@@ -38,9 +38,12 @@ public class KnowledgeAdminService {
     private static final int MAX_SIZE = 100;
 
     private final JdbcTemplate jdbcTemplate;
+    private final KnowledgeVectorSyncService knowledgeVectorSyncService;
 
-    public KnowledgeAdminService(@Qualifier("mysqlDataSource") DataSource dataSource) {
+    public KnowledgeAdminService(@Qualifier("mysqlDataSource") DataSource dataSource,
+                                 KnowledgeVectorSyncService knowledgeVectorSyncService) {
         this.jdbcTemplate = new JdbcTemplate(dataSource);
+        this.knowledgeVectorSyncService = knowledgeVectorSyncService;
     }
 
     public Map<String, Object> getOverview() {
@@ -161,7 +164,9 @@ public class KnowledgeAdminService {
                 trim(request.getKeywords()),
                 defaultSource(request.getSource()),
                 toActiveFlag(request.getActive()));
-        return getFabricById(id);
+        Map<String, Object> fabric = getFabricById(id);
+        knowledgeVectorSyncService.upsertFabric(fabric);
+        return fabric;
     }
 
     @Transactional
@@ -219,12 +224,15 @@ public class KnowledgeAdminService {
                 defaultSource(request.getSource()),
                 toActiveFlag(request.getActive()),
                 id);
-        return getFabricById(id);
+        Map<String, Object> fabric = getFabricById(id);
+        knowledgeVectorSyncService.upsertFabric(fabric);
+        return fabric;
     }
 
     public void deleteFabric(Long id) {
         requireExists("knowledge_fabrics", id, "面料知识不存在");
         jdbcTemplate.update("DELETE FROM knowledge_fabrics WHERE id = ?", id);
+        knowledgeVectorSyncService.delete(KnowledgeVectorSyncService.TYPE_FABRIC, id);
     }
 
     public Map<String, Object> createGuide(GuideKnowledgeUpsertRequest request) {
@@ -248,7 +256,9 @@ public class KnowledgeAdminService {
                 trim(request.getKeywords()),
                 defaultSource(request.getSource()),
                 toActiveFlag(request.getActive()));
-        return getGuideById(id);
+        Map<String, Object> guide = getGuideById(id);
+        knowledgeVectorSyncService.upsertGuide(guide);
+        return guide;
     }
 
     @Transactional
@@ -303,12 +313,15 @@ public class KnowledgeAdminService {
                 defaultSource(request.getSource()),
                 toActiveFlag(request.getActive()),
                 id);
-        return getGuideById(id);
+        Map<String, Object> guide = getGuideById(id);
+        knowledgeVectorSyncService.upsertGuide(guide);
+        return guide;
     }
 
     public void deleteGuide(Long id) {
         requireExists("knowledge_guides", id, "搭配指南不存在");
         jdbcTemplate.update("DELETE FROM knowledge_guides WHERE id = ?", id);
+        knowledgeVectorSyncService.delete(KnowledgeVectorSyncService.TYPE_GUIDE, id);
     }
 
     public Map<String, Object> createCareLabel(CareLabelKnowledgeUpsertRequest request) {
@@ -329,7 +342,9 @@ public class KnowledgeAdminService {
                 trim(request.getKeywords()),
                 defaultSource(request.getSource()),
                 toActiveFlag(request.getActive()));
-        return getCareLabelById(id);
+        Map<String, Object> careLabel = getCareLabelById(id);
+        knowledgeVectorSyncService.upsertCareLabel(careLabel);
+        return careLabel;
     }
 
     @Transactional
@@ -381,12 +396,15 @@ public class KnowledgeAdminService {
                 defaultSource(request.getSource()),
                 toActiveFlag(request.getActive()),
                 id);
-        return getCareLabelById(id);
+        Map<String, Object> careLabel = getCareLabelById(id);
+        knowledgeVectorSyncService.upsertCareLabel(careLabel);
+        return careLabel;
     }
 
     public void deleteCareLabel(Long id) {
         requireExists("knowledge_care_labels", id, "洗护标知识不存在");
         jdbcTemplate.update("DELETE FROM knowledge_care_labels WHERE id = ?", id);
+        knowledgeVectorSyncService.delete(KnowledgeVectorSyncService.TYPE_CARE_LABEL, id);
     }
 
     @Transactional

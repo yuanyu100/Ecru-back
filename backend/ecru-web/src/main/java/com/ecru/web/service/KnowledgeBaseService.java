@@ -25,9 +25,12 @@ public class KnowledgeBaseService {
     private static final int MAX_LIMIT = 20;
 
     private final JdbcTemplate jdbcTemplate;
+    private final KnowledgeVectorSyncService knowledgeVectorSyncService;
 
-    public KnowledgeBaseService(@Qualifier("mysqlDataSource") DataSource dataSource) {
+    public KnowledgeBaseService(@Qualifier("mysqlDataSource") DataSource dataSource,
+                                KnowledgeVectorSyncService knowledgeVectorSyncService) {
         this.jdbcTemplate = new JdbcTemplate(dataSource);
+        this.knowledgeVectorSyncService = knowledgeVectorSyncService;
     }
 
     public Map<String, Object> search(String query, String type, Integer limit) {
@@ -40,41 +43,24 @@ public class KnowledgeBaseService {
         int safeLimit = clampLimit(limit, DEFAULT_LIMIT);
         List<String> expandedTerms = expandTerms(trimmedQuery);
         List<Map<String, Object>> results = new ArrayList<>();
+        Set<String> seenDocumentIds = new LinkedHashSet<>();
 
-        if (searchType.includeFabric()) {
-            List<Map<String, Object>> fabrics = jdbcTemplate.queryForList(
-                    "SELECT id, name, alias, fabric_type, summary, properties, care_guide, suitable_seasons, suitable_occasions, keywords, source " +
-                            "FROM knowledge_fabrics WHERE is_active = 1 ORDER BY updated_at DESC, id ASC");
-            for (Map<String, Object> fabric : fabrics) {
-                Map<String, Object> item = toFabricSearchItem(fabric, trimmedQuery, expandedTerms);
-                if (item != null) {
-                    results.add(item);
-                }
+        for (Map<String, Object> vectorItem : searchByVector(trimmedQuery, searchType, safeLimit)) {
+            String documentId = asString(vectorItem.get("documentId"));
+            if (StringUtils.isBlank(documentId) || !seenDocumentIds.add(documentId)) {
+                continue;
             }
+            vectorItem.put("matchSource", "vector");
+            results.add(vectorItem);
         }
 
-        if (searchType.includeGuide()) {
-            List<Map<String, Object>> guides = jdbcTemplate.queryForList(
-                    "SELECT id, title, subtitle, guide_type, summary, content, tags, keywords, source " +
-                            "FROM knowledge_guides WHERE is_active = 1 ORDER BY publish_date DESC, id ASC");
-            for (Map<String, Object> guide : guides) {
-                Map<String, Object> item = toGuideSearchItem(guide, trimmedQuery, expandedTerms);
-                if (item != null) {
-                    results.add(item);
-                }
+        for (Map<String, Object> textItem : searchByText(trimmedQuery, searchType, expandedTerms)) {
+            String documentId = asString(textItem.get("documentId"));
+            if (StringUtils.isBlank(documentId) || !seenDocumentIds.add(documentId)) {
+                continue;
             }
-        }
-
-        if (searchType.includeCareLabel()) {
-            List<Map<String, Object>> careLabels = jdbcTemplate.queryForList(
-                    "SELECT id, symbol_code, symbol_name, category, instruction_text, explanation, do_text, dont_text, keywords, source " +
-                            "FROM knowledge_care_labels WHERE is_active = 1 ORDER BY category ASC, id ASC");
-            for (Map<String, Object> careLabel : careLabels) {
-                Map<String, Object> item = toCareLabelSearchItem(careLabel, trimmedQuery, expandedTerms);
-                if (item != null) {
-                    results.add(item);
-                }
-            }
+            textItem.put("matchSource", "text");
+            results.add(textItem);
         }
 
         results.sort(searchItemComparator());
@@ -105,7 +91,7 @@ public class KnowledgeBaseService {
                         "FROM knowledge_guides WHERE id = ? AND is_active = 1",
                 guideId);
         if (rows.isEmpty()) {
-            throw new BusinessException(404, "搭配指南不存在");
+            throw new BusinessException(404, "指南知识不存在");
         }
 
         Map<String, Object> row = rows.get(0);
@@ -132,7 +118,7 @@ public class KnowledgeBaseService {
                         "FROM knowledge_care_labels WHERE symbol_code = ? AND is_active = 1",
                 symbolCode);
         if (rows.isEmpty()) {
-            throw new BusinessException(404, "水洗标知识不存在");
+            throw new BusinessException(404, "洗护标识不存在");
         }
         return toCareLabelDetail(rows.get(0), 0);
     }
@@ -184,6 +170,143 @@ public class KnowledgeBaseService {
         return matched.stream().limit(clampLimit(limit, DEFAULT_MATCH_LIMIT)).toList();
     }
 
+    private List<Map<String, Object>> searchByVector(String query, SearchType searchType, int limit) {
+        List<Map<String, Object>> vectorRows = knowledgeVectorSyncService.search(query, searchType.apiValue(), limit);
+        List<Map<String, Object>> results = new ArrayList<>();
+        for (Map<String, Object> row : vectorRows) {
+            Map<String, Object> item = toVectorSearchItem(row);
+            if (item != null) {
+                results.add(item);
+            }
+        }
+        return results;
+    }
+
+    private List<Map<String, Object>> searchByText(String query, SearchType searchType, List<String> expandedTerms) {
+        List<Map<String, Object>> results = new ArrayList<>();
+
+        if (searchType.includeFabric()) {
+            List<Map<String, Object>> fabrics = jdbcTemplate.queryForList(
+                    "SELECT id, name, alias, fabric_type, summary, properties, care_guide, suitable_seasons, suitable_occasions, keywords, source " +
+                            "FROM knowledge_fabrics WHERE is_active = 1 ORDER BY updated_at DESC, id ASC");
+            for (Map<String, Object> fabric : fabrics) {
+                Map<String, Object> item = toFabricSearchItem(fabric, query, expandedTerms);
+                if (item != null) {
+                    results.add(item);
+                }
+            }
+        }
+
+        if (searchType.includeGuide()) {
+            List<Map<String, Object>> guides = jdbcTemplate.queryForList(
+                    "SELECT id, title, subtitle, guide_type, summary, content, tags, keywords, source " +
+                            "FROM knowledge_guides WHERE is_active = 1 ORDER BY publish_date DESC, id ASC");
+            for (Map<String, Object> guide : guides) {
+                Map<String, Object> item = toGuideSearchItem(guide, query, expandedTerms);
+                if (item != null) {
+                    results.add(item);
+                }
+            }
+        }
+
+        if (searchType.includeCareLabel()) {
+            List<Map<String, Object>> careLabels = jdbcTemplate.queryForList(
+                    "SELECT id, symbol_code, symbol_name, category, instruction_text, explanation, do_text, dont_text, keywords, source " +
+                            "FROM knowledge_care_labels WHERE is_active = 1 ORDER BY category ASC, id ASC");
+            for (Map<String, Object> careLabel : careLabels) {
+                Map<String, Object> item = toCareLabelSearchItem(careLabel, query, expandedTerms);
+                if (item != null) {
+                    results.add(item);
+                }
+            }
+        }
+        return results;
+    }
+
+    private Map<String, Object> toVectorSearchItem(Map<String, Object> vectorRow) {
+        String knowledgeType = asString(vectorRow.get("knowledgeType"));
+        Long knowledgeId = asLong(vectorRow.get("knowledgeId"));
+        if (knowledgeId == null || StringUtils.isBlank(knowledgeType)) {
+            return null;
+        }
+
+        double similarity = vectorRow.get("similarity") instanceof Number number ? number.doubleValue() : 0D;
+        int relevance = (int) Math.max(1, Math.min(99, Math.round(similarity * 100)));
+        return switch (knowledgeType) {
+            case KnowledgeVectorSyncService.TYPE_FABRIC -> buildVectorFabricItem(knowledgeId, relevance);
+            case KnowledgeVectorSyncService.TYPE_GUIDE -> buildVectorGuideItem(knowledgeId, relevance);
+            case KnowledgeVectorSyncService.TYPE_CARE_LABEL -> buildVectorCareLabelItem(knowledgeId, relevance);
+            default -> null;
+        };
+    }
+
+    private Map<String, Object> buildVectorFabricItem(Long fabricId, int relevance) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT id, name, alias, fabric_type, summary, properties, suitable_seasons, suitable_occasions, source " +
+                        "FROM knowledge_fabrics WHERE id = ? AND is_active = 1",
+                fabricId);
+        if (rows.isEmpty()) {
+            return null;
+        }
+        Map<String, Object> row = rows.get(0);
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("documentId", "fabric-" + row.get("id"));
+        item.put("title", row.get("name"));
+        item.put("type", "fabric");
+        item.put("content", buildSnippet(asString(row.get("summary")), asString(row.get("properties"))));
+        item.put("source", StringUtils.defaultIfBlank(asString(row.get("source")), "knowledge-fabric"));
+        item.put("relevance", relevance);
+        item.put("matchSource", "vector");
+        item.put("tags", mergeTags(
+                splitCsv(asString(row.get("suitable_seasons"))),
+                splitCsv(asString(row.get("suitable_occasions")))));
+        return item;
+    }
+
+    private Map<String, Object> buildVectorGuideItem(Long guideId, int relevance) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT id, title, summary, content, tags, source " +
+                        "FROM knowledge_guides WHERE id = ? AND is_active = 1",
+                guideId);
+        if (rows.isEmpty()) {
+            return null;
+        }
+        Map<String, Object> row = rows.get(0);
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("documentId", "guide-" + row.get("id"));
+        item.put("title", row.get("title"));
+        item.put("type", "guide");
+        item.put("content", buildSnippet(asString(row.get("summary")), asString(row.get("content"))));
+        item.put("source", StringUtils.defaultIfBlank(asString(row.get("source")), "knowledge-guide"));
+        item.put("relevance", relevance);
+        item.put("matchSource", "vector");
+        item.put("tags", splitCsv(asString(row.get("tags"))));
+        return item;
+    }
+
+    private Map<String, Object> buildVectorCareLabelItem(Long careLabelId, int relevance) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT id, symbol_name, category, instruction_text, explanation, keywords, source " +
+                        "FROM knowledge_care_labels WHERE id = ? AND is_active = 1",
+                careLabelId);
+        if (rows.isEmpty()) {
+            return null;
+        }
+        Map<String, Object> row = rows.get(0);
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("documentId", "care-label-" + row.get("id"));
+        item.put("title", row.get("symbol_name"));
+        item.put("type", "care-label");
+        item.put("content", buildSnippet(asString(row.get("instruction_text")), asString(row.get("explanation"))));
+        item.put("source", StringUtils.defaultIfBlank(asString(row.get("source")), "knowledge-care-label"));
+        item.put("relevance", relevance);
+        item.put("matchSource", "vector");
+        item.put("tags", mergeTags(
+                List.of(asString(row.get("category"))),
+                splitCsv(asString(row.get("keywords")))));
+        return item;
+    }
+
     private Map<String, Object> toFabricSearchItem(Map<String, Object> fabric, String query, List<String> terms) {
         String title = asString(fabric.get("name"));
         String body = String.join(" ",
@@ -207,6 +330,7 @@ public class KnowledgeBaseService {
         item.put("content", buildSnippet(asString(fabric.get("summary")), asString(fabric.get("properties"))));
         item.put("source", StringUtils.defaultIfBlank(asString(fabric.get("source")), "knowledge-fabric"));
         item.put("relevance", relevance);
+        item.put("matchSource", "text");
         item.put("tags", mergeTags(
                 splitCsv(asString(fabric.get("suitable_seasons"))),
                 splitCsv(asString(fabric.get("suitable_occasions")))));
@@ -234,6 +358,7 @@ public class KnowledgeBaseService {
         item.put("content", buildSnippet(asString(guide.get("summary")), asString(guide.get("content"))));
         item.put("source", StringUtils.defaultIfBlank(asString(guide.get("source")), "knowledge-guide"));
         item.put("relevance", relevance);
+        item.put("matchSource", "text");
         item.put("tags", splitCsv(asString(guide.get("tags"))));
         return item;
     }
@@ -260,6 +385,7 @@ public class KnowledgeBaseService {
         item.put("content", buildSnippet(asString(careLabel.get("instruction_text")), asString(careLabel.get("explanation"))));
         item.put("source", StringUtils.defaultIfBlank(asString(careLabel.get("source")), "knowledge-care-label"));
         item.put("relevance", relevance);
+        item.put("matchSource", "text");
         item.put("tags", mergeTags(
                 List.of(asString(careLabel.get("category"))),
                 splitCsv(asString(careLabel.get("keywords")))));
@@ -392,7 +518,7 @@ public class KnowledgeBaseService {
                 continue;
             }
             terms.addAll(expandTerms(trimmed));
-            Arrays.stream(trimmed.split("[\\s,，。；;/]+"))
+            Arrays.stream(trimmed.split("[\\s,，、;/]+"))
                     .map(String::trim)
                     .filter(StringUtils::isNotBlank)
                     .map(this::safeLower)
@@ -404,7 +530,7 @@ public class KnowledgeBaseService {
     private List<String> expandTerms(String query) {
         Set<String> terms = new LinkedHashSet<>();
         terms.add(safeLower(query));
-        for (String token : query.split("[\\s,，。；;/]+")) {
+        for (String token : query.split("[\\s,，、;/]+")) {
             if (StringUtils.isNotBlank(token)) {
                 terms.add(safeLower(token));
             }
@@ -415,20 +541,20 @@ public class KnowledgeBaseService {
         addIfMatched(terms, query, List.of("亚麻", "linen"), List.of("linen", "亚麻", "summer", "cool", "breathable"));
         addIfMatched(terms, query, List.of("牛仔", "denim"), List.of("denim", "牛仔", "casual", "daily", "jacket", "pants"));
         addIfMatched(terms, query, List.of("真丝", "丝绸", "silk"), List.of("silk", "真丝", "丝绸", "elegant", "dress", "formal"));
-        addIfMatched(terms, query, List.of("涤纶", "聚酯纤维", "polyester"), List.of("polyester", "涤纶", "聚酯纤维", "durable", "quick dry"));
-        addIfMatched(terms, query, List.of("粘胶", "人棉", "viscose", "rayon"), List.of("viscose", "rayon", "粘胶", "人棉", "soft", "drape"));
-        addIfMatched(terms, query, List.of("通勤", "上班", "职场", "office", "commute"), List.of("commute", "office", "formal", "layering"));
+        addIfMatched(terms, query, List.of("聚酯", "涤纶", "polyester"), List.of("polyester", "聚酯", "涤纶", "durable", "quick dry"));
+        addIfMatched(terms, query, List.of("粘胶", "人造丝", "viscose", "rayon"), List.of("viscose", "rayon", "粘胶", "人造丝", "soft", "drape"));
+        addIfMatched(terms, query, List.of("通勤", "办公室", "office", "commute"), List.of("commute", "office", "formal", "layering"));
         addIfMatched(terms, query, List.of("面试", "interview"), List.of("interview", "commute", "shirt", "formal"));
-        addIfMatched(terms, query, List.of("冬天", "冬季", "保暖", "winter"), List.of("winter", "warm", "coat", "wool"));
-        addIfMatched(terms, query, List.of("夏天", "夏季", "透气", "summer"), List.of("summer", "cool", "linen", "breathable"));
-        addIfMatched(terms, query, List.of("搭配", "指南", "guide"), List.of("guide", "match", "pairing", "layering"));
-        addIfMatched(terms, query, List.of("水洗标", "洗护", "洗标", "care label", "laundry"), List.of("care", "wash", "laundry", "label", "instruction"));
+        addIfMatched(terms, query, List.of("冬季", "冬天", "winter"), List.of("winter", "warm", "coat", "wool"));
+        addIfMatched(terms, query, List.of("夏季", "夏天", "summer"), List.of("summer", "cool", "linen", "breathable"));
+        addIfMatched(terms, query, List.of("指南", "穿搭", "guide"), List.of("guide", "match", "pairing", "layering"));
+        addIfMatched(terms, query, List.of("洗护", "洗标", "care label", "laundry"), List.of("care", "wash", "laundry", "label", "instruction"));
         addIfMatched(terms, query, List.of("机洗", "machine wash"), List.of("machine wash", "wash", "care"));
         addIfMatched(terms, query, List.of("手洗", "hand wash"), List.of("hand wash", "wash", "care"));
-        addIfMatched(terms, query, List.of("不可漂白", "bleach"), List.of("bleach", "do not bleach", "care"));
+        addIfMatched(terms, query, List.of("漂白", "bleach"), List.of("bleach", "do not bleach", "care"));
         addIfMatched(terms, query, List.of("熨烫", "iron"), List.of("iron", "low heat", "care"));
         addIfMatched(terms, query, List.of("干洗", "dry clean"), List.of("dry clean", "care", "clean"));
-        addIfMatched(terms, query, List.of("不可烘干", "tumble dry"), List.of("tumble dry", "do not tumble dry", "care"));
+        addIfMatched(terms, query, List.of("烘干", "tumble dry"), List.of("tumble dry", "do not tumble dry", "care"));
 
         return new ArrayList<>(terms);
     }
@@ -514,7 +640,7 @@ public class KnowledgeBaseService {
                 case "fabric", "material" -> FABRIC;
                 case "guide", "guides", "style", "match" -> GUIDE;
                 case "care", "care-label", "care_label", "label", "washing" -> CARE_LABEL;
-                default -> throw new BusinessException(400, "不支持的知识库类型");
+                default -> throw new BusinessException(400, "不支持的知识搜索类型");
             };
         }
 
@@ -533,9 +659,9 @@ public class KnowledgeBaseService {
         String apiValue() {
             return switch (this) {
                 case ALL -> "all";
-                case FABRIC -> "fabric";
-                case GUIDE -> "guide";
-                case CARE_LABEL -> "care-label";
+                case FABRIC -> KnowledgeVectorSyncService.TYPE_FABRIC;
+                case GUIDE -> KnowledgeVectorSyncService.TYPE_GUIDE;
+                case CARE_LABEL -> KnowledgeVectorSyncService.TYPE_CARE_LABEL;
             };
         }
     }

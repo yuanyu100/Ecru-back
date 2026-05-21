@@ -1,0 +1,233 @@
+package com.ecru.web.service;
+
+import com.ecru.common.exception.BusinessException;
+import com.ecru.common.service.vector.EmbeddingService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+@Slf4j
+@Service
+public class KnowledgeVectorSyncService {
+
+    public static final String TYPE_FABRIC = "fabric";
+    public static final String TYPE_GUIDE = "guide";
+    public static final String TYPE_CARE_LABEL = "care-label";
+
+    private final JdbcTemplate postgresJdbcTemplate;
+    private final EmbeddingService embeddingService;
+    private final ObjectMapper objectMapper;
+
+    @Value("${ai.siliconflow.embedding.model}")
+    private String modelName;
+
+    public KnowledgeVectorSyncService(@Qualifier("postgresJdbcTemplate") JdbcTemplate postgresJdbcTemplate,
+                                      EmbeddingService embeddingService,
+                                      ObjectMapper objectMapper) {
+        this.postgresJdbcTemplate = postgresJdbcTemplate;
+        this.embeddingService = embeddingService;
+        this.objectMapper = objectMapper;
+    }
+
+    public void upsertFabric(Map<String, Object> fabric) {
+        upsert(
+                TYPE_FABRIC,
+                asLong(fabric.get("fabricId")),
+                asString(fabric.get("name")),
+                joinText(
+                        fabric.get("name"),
+                        fabric.get("alias"),
+                        fabric.get("fabricType"),
+                        fabric.get("summary"),
+                        fabric.get("properties"),
+                        fabric.get("careGuide"),
+                        fabric.get("suitableSeasons"),
+                        fabric.get("suitableOccasions"),
+                        fabric.get("keywords")),
+                buildMetadata(TYPE_FABRIC, fabric));
+    }
+
+    public void upsertGuide(Map<String, Object> guide) {
+        upsert(
+                TYPE_GUIDE,
+                asLong(guide.get("guideId")),
+                asString(guide.get("title")),
+                joinText(
+                        guide.get("title"),
+                        guide.get("subtitle"),
+                        guide.get("guideType"),
+                        guide.get("summary"),
+                        guide.get("content"),
+                        guide.get("author"),
+                        guide.get("publishDate"),
+                        guide.get("tags"),
+                        guide.get("keywords")),
+                buildMetadata(TYPE_GUIDE, guide));
+    }
+
+    public void upsertCareLabel(Map<String, Object> careLabel) {
+        upsert(
+                TYPE_CARE_LABEL,
+                asLong(careLabel.get("careLabelId")),
+                asString(careLabel.get("symbolName")),
+                joinText(
+                        careLabel.get("symbolCode"),
+                        careLabel.get("symbolName"),
+                        careLabel.get("category"),
+                        careLabel.get("instruction"),
+                        careLabel.get("explanation"),
+                        careLabel.get("doText"),
+                        careLabel.get("dontText"),
+                        careLabel.get("keywords")),
+                buildMetadata(TYPE_CARE_LABEL, careLabel));
+    }
+
+    public void delete(String knowledgeType, Long knowledgeId) {
+        if (knowledgeId == null || StringUtils.isBlank(knowledgeType)) {
+            return;
+        }
+
+        try {
+            postgresJdbcTemplate.update(
+                    "DELETE FROM knowledge_embeddings WHERE knowledge_type = ? AND knowledge_id = ?",
+                    knowledgeType,
+                    knowledgeId);
+        } catch (Exception e) {
+            log.error("Failed to delete knowledge embedding, type={}, id={}: {}", knowledgeType, knowledgeId, e.getMessage(), e);
+            throw new BusinessException(500, "知识向量删除失败");
+        }
+    }
+
+    public List<Map<String, Object>> search(String query, String knowledgeType, Integer limit) {
+        String safeQuery = StringUtils.trimToEmpty(query);
+        if (StringUtils.isBlank(safeQuery)) {
+            return List.of();
+        }
+
+        int safeLimit = limit == null || limit < 1 ? 10 : limit;
+        float[] embedding = embeddingService.generateEmbedding(safeQuery);
+        String vectorString = arrayToVectorString(embedding);
+
+        try {
+            StringBuilder sql = new StringBuilder("""
+                    SELECT knowledge_type, knowledge_id, title, embedding_text, metadata,
+                           1 - (embedding <=> ?::vector) AS similarity
+                    FROM knowledge_embeddings
+                    """);
+            List<Object> args = new ArrayList<>();
+            args.add(vectorString);
+            if (StringUtils.isNotBlank(knowledgeType) && !"all".equalsIgnoreCase(knowledgeType)) {
+                sql.append(" WHERE knowledge_type = ? ");
+                args.add(knowledgeType);
+            }
+            sql.append(" ORDER BY similarity DESC LIMIT ? ");
+            args.add(safeLimit);
+
+            return postgresJdbcTemplate.query(sql.toString(), (rs, rowNum) -> {
+                Map<String, Object> item = new HashMap<>();
+                item.put("knowledgeType", rs.getString("knowledge_type"));
+                item.put("knowledgeId", rs.getLong("knowledge_id"));
+                item.put("title", rs.getString("title"));
+                item.put("embeddingText", rs.getString("embedding_text"));
+                item.put("metadata", rs.getString("metadata"));
+                item.put("similarity", rs.getDouble("similarity"));
+                return item;
+            }, args.toArray());
+        } catch (Exception e) {
+            log.error("Failed to search knowledge embeddings, type={}, query={}: {}", knowledgeType, safeQuery, e.getMessage(), e);
+            return List.of();
+        }
+    }
+
+    private void upsert(String knowledgeType, Long knowledgeId, String title, String embeddingText, Map<String, Object> metadata) {
+        if (knowledgeId == null) {
+            throw new BusinessException(400, "知识ID不能为空");
+        }
+
+        String safeTitle = StringUtils.defaultIfBlank(StringUtils.trimToNull(title), knowledgeType + "-" + knowledgeId);
+        String safeText = StringUtils.defaultIfBlank(StringUtils.trimToNull(embeddingText), safeTitle);
+        float[] embedding = embeddingService.generateEmbedding(safeText);
+        String vectorString = arrayToVectorString(embedding);
+
+        try {
+            String metadataJson = objectMapper.writeValueAsString(metadata);
+            postgresJdbcTemplate.update(
+                    """
+                    INSERT INTO knowledge_embeddings
+                    (knowledge_type, knowledge_id, title, embedding, embedding_model, embedding_text, metadata, created_at, updated_at)
+                    VALUES (?, ?, ?, ?::vector, ?, ?, ?::jsonb, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    ON CONFLICT (knowledge_type, knowledge_id)
+                    DO UPDATE SET
+                        title = EXCLUDED.title,
+                        embedding = EXCLUDED.embedding,
+                        embedding_model = EXCLUDED.embedding_model,
+                        embedding_text = EXCLUDED.embedding_text,
+                        metadata = EXCLUDED.metadata,
+                        updated_at = CURRENT_TIMESTAMP
+                    """,
+                    knowledgeType,
+                    knowledgeId,
+                    safeTitle,
+                    vectorString,
+                    modelName,
+                    safeText,
+                    metadataJson);
+        } catch (Exception e) {
+            log.error("Failed to sync knowledge embedding, type={}, id={}: {}", knowledgeType, knowledgeId, e.getMessage(), e);
+            throw new BusinessException(500, "知识向量同步失败");
+        }
+    }
+
+    private Map<String, Object> buildMetadata(String knowledgeType, Map<String, Object> source) {
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("knowledgeType", knowledgeType);
+        metadata.putAll(source);
+        return metadata;
+    }
+
+    private String joinText(Object... values) {
+        StringBuilder builder = new StringBuilder();
+        for (Object value : values) {
+            String text = asString(value);
+            if (StringUtils.isBlank(text)) {
+                continue;
+            }
+            if (builder.length() > 0) {
+                builder.append(' ');
+            }
+            builder.append(text.trim());
+        }
+        return builder.toString();
+    }
+
+    private String arrayToVectorString(float[] array) {
+        StringBuilder builder = new StringBuilder();
+        builder.append('[');
+        for (int i = 0; i < array.length; i++) {
+            builder.append(array[i]);
+            if (i < array.length - 1) {
+                builder.append(',');
+            }
+        }
+        builder.append(']');
+        return builder.toString();
+    }
+
+    private String asString(Object value) {
+        return value == null ? "" : String.valueOf(value);
+    }
+
+    private Long asLong(Object value) {
+        return value instanceof Number number ? number.longValue() : null;
+    }
+}
