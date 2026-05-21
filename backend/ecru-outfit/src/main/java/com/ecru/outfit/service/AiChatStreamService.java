@@ -1,19 +1,23 @@
 package com.ecru.outfit.service;
 
 import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.TypeReference;
 import com.ecru.common.service.ai.AiPromptSettingsService;
 import com.ecru.common.service.ai.AiTextGeneratorService;
 import com.ecru.common.service.ai.AiTextGeneratorStreamService;
 import com.ecru.outfit.dto.request.ChatRequestDTO;
 import com.ecru.outfit.entity.AiChatMessage;
 import com.ecru.outfit.entity.AiConversation;
+import com.ecru.outfit.entity.UserStyleArchive;
 import com.ecru.outfit.mapper.AiChatMessageMapper;
 import com.ecru.outfit.mapper.AiConversationMapper;
+import com.ecru.outfit.mapper.UserStyleArchiveMapper;
 import com.ecru.outfit.service.agent.WardrobeChatAgentService;
 import com.ecru.outfit.service.mcp.McpWeatherService;
 import com.ecru.outfit.service.rag.RagService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.util.StringUtils;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -25,6 +29,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -68,6 +73,9 @@ public class AiChatStreamService {
     @Autowired
     private WardrobeChatAgentService wardrobeChatAgentService;
 
+    @Autowired
+    private UserStyleArchiveMapper userStyleArchiveMapper;
+
     public Flux<String> chatStream(Long userId, ChatRequestDTO request) {
         AtomicReference<ChatContext> contextRef = new AtomicReference<>();
 
@@ -86,23 +94,48 @@ public class AiChatStreamService {
                     chatContext.setChatHistory(chatHistory);
                     chatContext.setIsNewConversation(isNewConversation);
                     chatContext.setUserMessage(userMessage);
+                    Map<String, Object> userStyleProfile = buildUserStyleProfile(userId);
 
                     if (isSimpleGreetingMessage(userMessage)) {
-                        chatContext.setContext(buildContext(weatherInfo, request.getOccasion(), Collections.emptyList(), false));
+                        chatContext.setContext(buildContext(
+                                weatherInfo,
+                                request.getOccasion(),
+                                Collections.emptyList(),
+                                false,
+                                userStyleProfile
+                        ));
                         chatContext.setRecommendedClothes(Collections.emptyList());
                         chatContext.setDirectResponse(buildGreetingResponse());
                     } else if (isIdentityQuestionMessage(userMessage)) {
-                        chatContext.setContext(buildContext(weatherInfo, request.getOccasion(), Collections.emptyList(), false));
+                        chatContext.setContext(buildContext(
+                                weatherInfo,
+                                request.getOccasion(),
+                                Collections.emptyList(),
+                                false,
+                                userStyleProfile
+                        ));
                         chatContext.setRecommendedClothes(Collections.emptyList());
                         chatContext.setDirectResponse(buildIdentityResponse());
                     } else {
                         boolean needClothingSearch = isNeedClothingSearchNormalized(userMessage);
                         List<Map<String, Object>> recommendedClothes = new ArrayList<>();
+                        List<String> negativePreferences = extractArchiveNegativePreferences(userStyleProfile);
                         if (needClothingSearch) {
-                            String query = generateClothingQuery(userMessage, weatherInfo, request.getOccasion());
-                            recommendedClothes = searchClothes(userId, query);
+                            String query = generateClothingQuery(
+                                    userMessage,
+                                    weatherInfo,
+                                    request.getOccasion(),
+                                    userStyleProfile
+                            );
+                            recommendedClothes = searchClothes(userId, query, negativePreferences);
                         }
-                        chatContext.setContext(buildContext(weatherInfo, request.getOccasion(), recommendedClothes, needClothingSearch));
+                        chatContext.setContext(buildContext(
+                                weatherInfo,
+                                request.getOccasion(),
+                                recommendedClothes,
+                                needClothingSearch,
+                                userStyleProfile
+                        ));
                         chatContext.setRecommendedClothes(recommendedClothes);
                     }
 
@@ -358,7 +391,10 @@ public class AiChatStreamService {
         chatMessageMapper.insert(message);
     }
 
-    private String generateClothingQuery(String userMessage, String weatherInfo, String occasion) {
+    private String generateClothingQuery(String userMessage,
+                                        String weatherInfo,
+                                        String occasion,
+                                        Map<String, Object> userStyleProfile) {
         StringBuilder builder = new StringBuilder();
         if (userMessage != null && !userMessage.isBlank()) {
             builder.append(userMessage).append(' ');
@@ -369,17 +405,21 @@ public class AiChatStreamService {
         if (occasion != null && !occasion.isBlank()) {
             builder.append(occasion).append(' ');
         }
+        if (userStyleProfile != null) {
+            appendTopPreferences(builder, userStyleProfile.get("preferredStyles"), 3);
+            appendTopPreferences(builder, userStyleProfile.get("preferredColors"), 2);
+        }
         return builder.toString().trim();
     }
 
-    private List<Map<String, Object>> searchClothes(Long userId, String query) {
+    private List<Map<String, Object>> searchClothes(Long userId, String query, List<String> negativePreferences) {
         List<Map<String, Object>> results = new ArrayList<>();
         if (query == null || query.trim().isEmpty()) {
             return results;
         }
 
         try {
-            var searchResults = ragService.searchClothes(userId, query, 8, null);
+            var searchResults = ragService.searchClothes(userId, query, 8, negativePreferences);
             for (var result : searchResults) {
                 Map<String, Object> item = new HashMap<>();
                 item.put("id", result.getClothingId());
@@ -437,7 +477,8 @@ public class AiChatStreamService {
     private Map<String, Object> buildContext(String weatherInfo,
                                              String occasion,
                                              List<Map<String, Object>> recommendedClothes,
-                                             boolean needClothingSearch) {
+                                             boolean needClothingSearch,
+                                             Map<String, Object> userStyleProfile) {
         Map<String, Object> context = new HashMap<>();
         if (weatherInfo != null) {
             context.put("weather", weatherInfo);
@@ -448,8 +489,101 @@ public class AiChatStreamService {
         if (recommendedClothes != null && !recommendedClothes.isEmpty()) {
             context.put("clothes", recommendedClothes);
         }
+        if (userStyleProfile != null && !userStyleProfile.isEmpty()) {
+            context.put("userStyleProfile", userStyleProfile);
+        }
         context.put("needClothingSearch", needClothingSearch);
         return context;
+    }
+
+    private Map<String, Object> buildUserStyleProfile(Long userId) {
+        UserStyleArchive archive = userStyleArchiveMapper.selectByUserId(userId);
+        if (archive == null) {
+            return Collections.emptyMap();
+        }
+
+        Map<String, Object> profile = new HashMap<>();
+        putListField(profile, "preferredStyles", archive.getPreferredStyles());
+        putListField(profile, "avoidedStyles", archive.getAvoidedStyles());
+        putListField(profile, "preferredColors", archive.getPreferredColors());
+        putListField(profile, "avoidedColors", archive.getAvoidedColors());
+        putTextField(profile, "bodyType", archive.getBodyType());
+        putTextField(profile, "skinTone", archive.getSkinTone());
+        putTextField(profile, "occupation", archive.getOccupation());
+        putListField(profile, "lifestyleTags", archive.getLifestyleTags());
+        return profile;
+    }
+
+    private void putTextField(Map<String, Object> profile, String key, String value) {
+        if (StringUtils.hasText(value)) {
+            profile.put(key, value.trim());
+        }
+    }
+
+    private void putListField(Map<String, Object> profile, String key, String rawValue) {
+        List<String> values = parseListField(rawValue);
+        if (!values.isEmpty()) {
+            profile.put(key, values);
+        }
+    }
+
+    private List<String> extractArchiveNegativePreferences(Map<String, Object> userStyleProfile) {
+        if (userStyleProfile == null || userStyleProfile.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Set<String> merged = new LinkedHashSet<>();
+        merged.addAll(asStringList(userStyleProfile.get("avoidedColors")));
+        return new ArrayList<>(merged);
+    }
+
+    private void appendTopPreferences(StringBuilder builder, Object value, int limit) {
+        if (limit <= 0) {
+            return;
+        }
+        List<String> values = asStringList(value);
+        for (int i = 0; i < Math.min(values.size(), limit); i++) {
+            builder.append(values.get(i)).append(' ');
+        }
+    }
+
+    private List<String> asStringList(Object value) {
+        if (value instanceof List<?> rawList) {
+            List<String> result = new ArrayList<>();
+            for (Object item : rawList) {
+                if (item == null) {
+                    continue;
+                }
+                String text = String.valueOf(item).trim();
+                if (!text.isEmpty()) {
+                    result.add(text);
+                }
+            }
+            return result;
+        }
+        return Collections.emptyList();
+    }
+
+    private List<String> parseListField(String raw) {
+        if (!StringUtils.hasText(raw)) {
+            return Collections.emptyList();
+        }
+        try {
+            if (raw.trim().startsWith("[")) {
+                return JSON.parseObject(raw, new TypeReference<List<String>>() {
+                }).stream().filter(StringUtils::hasText).map(String::trim).toList();
+            }
+        } catch (Exception ex) {
+            log.debug("Parse style profile list failed, fallback to split: {}", raw, ex);
+        }
+
+        List<String> result = new ArrayList<>();
+        for (String part : raw.split("[,，/]")) {
+            if (StringUtils.hasText(part)) {
+                result.add(part.trim());
+            }
+        }
+        return result;
     }
 
     private String generateConversationTitle(String userMessage, String aiReply, Long userId) {

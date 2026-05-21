@@ -90,8 +90,35 @@ public class WardrobeChatAgentService {
             if (intent != null) {
                 builder.append(JSON.toJSONString(intent)).append(' ');
             }
+            Object userStyleProfile = context.get("userStyleProfile");
+            if (userStyleProfile instanceof Map<?, ?> profileMap) {
+                appendTopPreferences(builder, profileMap.get("preferredStyles"), 3);
+                appendTopPreferences(builder, profileMap.get("preferredColors"), 2);
+            }
         }
         return builder.toString().trim();
+    }
+
+    private void appendTopPreferences(StringBuilder builder, Object value, int limit) {
+        if (!(value instanceof List<?> values) || limit <= 0) {
+            return;
+        }
+
+        int count = 0;
+        for (Object item : values) {
+            if (item == null) {
+                continue;
+            }
+            String text = String.valueOf(item).trim();
+            if (text.isEmpty()) {
+                continue;
+            }
+            builder.append(text).append(' ');
+            count++;
+            if (count >= limit) {
+                break;
+            }
+        }
     }
 
     private ChatAgentResult parseChatAgentResult(String rawResponse, List<Map<String, Object>> recommendedClothes) {

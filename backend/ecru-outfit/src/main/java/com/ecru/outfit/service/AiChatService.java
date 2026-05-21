@@ -3,6 +3,7 @@ package com.ecru.outfit.service;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
+import com.alibaba.fastjson2.TypeReference;
 import com.ecru.common.service.ai.AiPromptSettingsService;
 import com.ecru.common.service.ai.AiTextGeneratorService;
 import com.ecru.outfit.dto.request.ChatRequestDTO;
@@ -12,8 +13,10 @@ import com.ecru.outfit.dto.response.ChatResponseDTO;
 import com.ecru.outfit.dto.response.ConversationVO;
 import com.ecru.outfit.entity.AiChatMessage;
 import com.ecru.outfit.entity.AiConversation;
+import com.ecru.outfit.entity.UserStyleArchive;
 import com.ecru.outfit.mapper.AiChatMessageMapper;
 import com.ecru.outfit.mapper.AiConversationMapper;
+import com.ecru.outfit.mapper.UserStyleArchiveMapper;
 import com.ecru.outfit.service.agent.WardrobeChatAgentService;
 import com.ecru.outfit.service.mcp.McpWeatherService;
 import com.ecru.outfit.service.rag.RagService;
@@ -24,6 +27,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -61,6 +65,9 @@ public class AiChatService {
 
     @Autowired
     private WardrobeChatAgentService wardrobeChatAgentService;
+
+    @Autowired
+    private UserStyleArchiveMapper userStyleArchiveMapper;
 
     @Autowired(required = false)
     private StringRedisTemplate redisTemplate;
@@ -100,6 +107,7 @@ public class AiChatService {
 
             // 4. 保存用户消息
             saveUserMessage(conversation.getId(), userId, userMessage, weatherInfo, request.getOccasion());
+            Map<String, Object> userStyleProfile = buildUserStyleProfile(userId);
 
             if (isSimpleGreetingMessage(userMessage)) {
                 Map<String, Object> greetingIntent = new HashMap<>();
@@ -111,7 +119,8 @@ public class AiChatService {
                         Collections.emptyList(),
                         greetingIntent,
                         Collections.emptyList(),
-                        false
+                        false,
+                        userStyleProfile
                 );
                 String aiResponse = buildGreetingResponse();
                 Long aiMessageId = saveAiMessage(conversation.getId(), userId, aiResponse, Collections.emptyList(), context);
@@ -134,7 +143,8 @@ public class AiChatService {
                         Collections.emptyList(),
                         identityIntent,
                         Collections.emptyList(),
-                        false
+                        false,
+                        userStyleProfile
                 );
                 String aiResponse = buildIdentityResponse();
                 Long aiMessageId = saveAiMessage(conversation.getId(), userId, aiResponse, Collections.emptyList(), context);
@@ -154,17 +164,34 @@ public class AiChatService {
             log.info("是否需要检索衣柜: {}", needClothingSearch);
 
             // 7. 提取负面偏好
-            List<String> negativePreferences = extractNegativePreferences(intentAnalysis);
+            List<String> negativePreferences = mergeNegativePreferences(
+                    extractNegativePreferences(intentAnalysis),
+                    userStyleProfile
+            );
 
             // 8. 检索推荐衣物(仅在需要时)
             List<Map<String, Object>> recommendedClothes = new ArrayList<>();
             if (needClothingSearch) {
-                String query = generateClothingQuery(userMessage, weatherInfo, request.getOccasion(), intentAnalysis);
+                String query = generateClothingQuery(
+                        userMessage,
+                        weatherInfo,
+                        request.getOccasion(),
+                        intentAnalysis,
+                        userStyleProfile
+                );
                 recommendedClothes = searchClothes(userId, query, negativePreferences);
             }
 
             // 9. 构建上下文信息
-            Map<String, Object> context = buildContext(weatherInfo, request.getOccasion(), recommendedClothes, intentAnalysis, negativePreferences, needClothingSearch);
+            Map<String, Object> context = buildContext(
+                    weatherInfo,
+                    request.getOccasion(),
+                    recommendedClothes,
+                    intentAnalysis,
+                    negativePreferences,
+                    needClothingSearch,
+                    userStyleProfile
+            );
 
             // 10. 生成AI回复
             WardrobeChatAgentService.ChatAgentResult chatAgentResult = wardrobeChatAgentService.generateChatReply(
@@ -530,7 +557,9 @@ public class AiChatService {
     /**
      * 生成衣物查询
      */
-    private String generateClothingQuery(String userMessage, String weatherInfo, String occasion, Map<String, Object> intentAnalysis) {
+    private String generateClothingQuery(String userMessage, String weatherInfo, String occasion,
+                                         Map<String, Object> intentAnalysis,
+                                         Map<String, Object> userStyleProfile) {
         StringBuilder query = new StringBuilder();
 
         // 根据意图分析添加查询条件
@@ -574,6 +603,11 @@ public class AiChatService {
         if (lowerMessage.contains("毛衣")) query.append("毛衣 ");
         if (lowerMessage.contains("t恤")) query.append("T恤 ");
         if (lowerMessage.contains("牛仔裤")) query.append("牛仔裤 ");
+
+        if (userStyleProfile != null) {
+            appendTopPreferences(query, userStyleProfile.get("preferredStyles"), 3);
+            appendTopPreferences(query, userStyleProfile.get("preferredColors"), 2);
+        }
 
         if (query.length() == 0) {
             query.append(userMessage);
@@ -642,7 +676,8 @@ public class AiChatService {
                                              List<Map<String, Object>> recommendedClothes,
                                              Map<String, Object> intentAnalysis,
                                              List<String> negativePreferences,
-                                             boolean needClothingSearch) {
+                                             boolean needClothingSearch,
+                                             Map<String, Object> userStyleProfile) {
         Map<String, Object> context = new HashMap<>();
         if (weatherInfo != null) {
             context.put("weather", weatherInfo);
@@ -661,12 +696,106 @@ public class AiChatService {
         }
         // 添加是否需要检索衣柜的标志，用于AI理解上下文
         context.put("needClothingSearch", needClothingSearch);
+        if (userStyleProfile != null && !userStyleProfile.isEmpty()) {
+            context.put("userStyleProfile", userStyleProfile);
+        }
         return context;
     }
 
     /**
      * 更新会话标题（如果是新会话）
      */
+    private Map<String, Object> buildUserStyleProfile(Long userId) {
+        UserStyleArchive archive = userStyleArchiveMapper.selectByUserId(userId);
+        if (archive == null) {
+            return Collections.emptyMap();
+        }
+
+        Map<String, Object> profile = new HashMap<>();
+        putListField(profile, "preferredStyles", archive.getPreferredStyles());
+        putListField(profile, "avoidedStyles", archive.getAvoidedStyles());
+        putListField(profile, "preferredColors", archive.getPreferredColors());
+        putListField(profile, "avoidedColors", archive.getAvoidedColors());
+        putTextField(profile, "bodyType", archive.getBodyType());
+        putTextField(profile, "skinTone", archive.getSkinTone());
+        putTextField(profile, "occupation", archive.getOccupation());
+        putListField(profile, "lifestyleTags", archive.getLifestyleTags());
+        return profile;
+    }
+
+    private void putTextField(Map<String, Object> profile, String key, String value) {
+        if (StringUtils.hasText(value)) {
+            profile.put(key, value.trim());
+        }
+    }
+
+    private void putListField(Map<String, Object> profile, String key, String rawValue) {
+        List<String> values = parseListField(rawValue);
+        if (!values.isEmpty()) {
+            profile.put(key, values);
+        }
+    }
+
+    private List<String> mergeNegativePreferences(List<String> negativePreferences, Map<String, Object> userStyleProfile) {
+        Set<String> merged = new LinkedHashSet<>();
+        if (negativePreferences != null) {
+            merged.addAll(negativePreferences);
+        }
+        if (userStyleProfile != null && !userStyleProfile.isEmpty()) {
+            merged.addAll(asStringList(userStyleProfile.get("avoidedColors")));
+        }
+        return new ArrayList<>(merged);
+    }
+
+    private void appendTopPreferences(StringBuilder builder, Object value, int limit) {
+        if (limit <= 0) {
+            return;
+        }
+        List<String> values = asStringList(value);
+        for (int i = 0; i < Math.min(values.size(), limit); i++) {
+            builder.append(values.get(i)).append(" ");
+        }
+    }
+
+    private List<String> asStringList(Object value) {
+        if (value instanceof List<?> rawList) {
+            List<String> result = new ArrayList<>();
+            for (Object item : rawList) {
+                if (item == null) {
+                    continue;
+                }
+                String text = String.valueOf(item).trim();
+                if (!text.isEmpty()) {
+                    result.add(text);
+                }
+            }
+            return result;
+        }
+        return Collections.emptyList();
+    }
+
+    private List<String> parseListField(String raw) {
+        if (!StringUtils.hasText(raw)) {
+            return Collections.emptyList();
+        }
+        try {
+            if (raw.trim().startsWith("[")) {
+                return JSON.parseObject(raw, new TypeReference<List<String>>() {
+                }).stream().filter(StringUtils::hasText).map(String::trim).toList();
+            }
+        } catch (Exception ex) {
+            log.debug("Parse style profile list failed, fallback to split: {}", raw, ex);
+        }
+
+        List<String> result = new ArrayList<>();
+        for (String part : raw.split("[,，/]")) {
+            if (StringUtils.hasText(part)) {
+                result.add(part.trim());
+            }
+        }
+        return result;
+    }
+
     private void updateConversationTitleIfNeeded(AiConversation conversation, boolean isNewConversation, String userMessage, String aiReply, Long userId) {
         if (isNewConversation && conversation.getTitle() == null) {
             String title = generateConversationTitle(userMessage, aiReply, userId);
