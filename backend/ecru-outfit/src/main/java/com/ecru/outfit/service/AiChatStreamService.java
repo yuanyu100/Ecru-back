@@ -12,7 +12,6 @@ import com.ecru.outfit.entity.UserStyleArchive;
 import com.ecru.outfit.mapper.AiChatMessageMapper;
 import com.ecru.outfit.mapper.AiConversationMapper;
 import com.ecru.outfit.mapper.UserStyleArchiveMapper;
-import com.ecru.outfit.service.agent.WardrobeChatAgentService;
 import com.ecru.outfit.service.mcp.McpWeatherService;
 import com.ecru.outfit.service.rag.RagService;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +22,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -40,6 +40,10 @@ import java.util.concurrent.atomic.AtomicReference;
 @Slf4j
 @Service
 public class AiChatStreamService {
+
+    private static final int SIMULATED_STREAM_MIN_CHUNK_SIZE = 8;
+    private static final int SIMULATED_STREAM_MAX_CHUNK_SIZE = 24;
+    private static final Duration SIMULATED_STREAM_CHUNK_DELAY = Duration.ofMillis(45);
 
     private static final Set<String> GENERIC_TITLES = new HashSet<>(Arrays.asList(
             "聊天",
@@ -71,9 +75,6 @@ public class AiChatStreamService {
     private AiPromptSettingsService promptSettingsService;
 
     @Autowired
-    private WardrobeChatAgentService wardrobeChatAgentService;
-
-    @Autowired
     private UserStyleArchiveMapper userStyleArchiveMapper;
 
     public Flux<String> chatStream(Long userId, ChatRequestDTO request) {
@@ -101,6 +102,8 @@ public class AiChatStreamService {
                                 weatherInfo,
                                 request.getOccasion(),
                                 Collections.emptyList(),
+                                Collections.emptyMap(),
+                                Collections.emptyList(),
                                 false,
                                 userStyleProfile
                         ));
@@ -111,20 +114,27 @@ public class AiChatStreamService {
                                 weatherInfo,
                                 request.getOccasion(),
                                 Collections.emptyList(),
+                                Collections.emptyMap(),
+                                Collections.emptyList(),
                                 false,
                                 userStyleProfile
                         ));
                         chatContext.setRecommendedClothes(Collections.emptyList());
                         chatContext.setDirectResponse(buildIdentityResponse());
                     } else {
-                        boolean needClothingSearch = isNeedClothingSearchNormalized(userMessage);
+                        Map<String, Object> intentAnalysis = textGeneratorService.analyzeQueryIntent(userMessage, userId);
+                        boolean needClothingSearch = isNeedClothingSearch(intentAnalysis, userMessage);
                         List<Map<String, Object>> recommendedClothes = new ArrayList<>();
-                        List<String> negativePreferences = extractArchiveNegativePreferences(userStyleProfile);
+                        List<String> negativePreferences = mergeNegativePreferences(
+                                extractNegativePreferences(intentAnalysis),
+                                userStyleProfile
+                        );
                         if (needClothingSearch) {
                             String query = generateClothingQuery(
                                     userMessage,
                                     weatherInfo,
                                     request.getOccasion(),
+                                    intentAnalysis,
                                     userStyleProfile
                             );
                             recommendedClothes = searchClothes(userId, query, negativePreferences);
@@ -133,6 +143,8 @@ public class AiChatStreamService {
                                 weatherInfo,
                                 request.getOccasion(),
                                 recommendedClothes,
+                                intentAnalysis,
+                                negativePreferences,
                                 needClothingSearch,
                                 userStyleProfile
                         ));
@@ -161,47 +173,41 @@ public class AiChatStreamService {
                     .doOnComplete(() -> saveAiMessageAsync(chatContext, chatContext.getDirectResponse()));
         }
 
-        return Mono.fromCallable(() -> wardrobeChatAgentService.generateChatReply(
-                        userId,
-                        request.getMessage(),
-                        request.getLocation(),
-                        request.getOccasion(),
-                        (String) chatContext.getContext().get("weather"),
-                        chatContext.getChatHistory(),
-                        chatContext.getContext(),
-                        chatContext.getRecommendedClothes()
-                ))
-                .subscribeOn(Schedulers.boundedElastic())
-                .flatMapMany(result -> {
-                    if (result.getRecommendedClothes() != null && !result.getRecommendedClothes().isEmpty()) {
-                        chatContext.setRecommendedClothes(result.getRecommendedClothes());
-                    }
-
-                    String reply = result.getReply() == null ? "" : result.getReply();
-                    if (reply.isBlank()) {
-                        log.warn("LangChain4j stream agent returned empty reply, fallback to legacy stream");
-                        return generateLegacyStreamResponse(request, chatContext);
-                    }
-                    return Flux.fromIterable(chunkReply(reply))
-                            .concatWith(Flux.just("[DONE]"))
-                            .doOnComplete(() -> saveAiMessageAsync(chatContext, reply));
-                })
+        return generateRealtimeStreamResponse(chatContext)
                 .onErrorResume(error -> {
-                    log.warn("LangChain4j stream agent failed, fallback to legacy stream: {}", error.getMessage());
-                    return generateLegacyStreamResponse(request, chatContext);
+                    log.warn("Realtime stream generation failed, fallback to legacy stream: {}", error.getMessage());
+                    return generateLegacyStreamResponse(chatContext);
                 });
     }
 
-    private Flux<String> generateLegacyStreamResponse(ChatRequestDTO request, ChatContext chatContext) {
+    private Flux<String> generateRealtimeStreamResponse(ChatContext chatContext) {
         StringBuilder fullResponse = new StringBuilder();
-        return streamService.generateStreamResponse(
-                        request.getMessage(),
+        return streamService.generateStreamResponseWithCustomPrompt(
+                        buildRealtimeStreamSystemPrompt(chatContext),
+                        chatContext.getUserMessage(),
                         chatContext.getChatHistory(),
                         chatContext.getContext(),
                         chatContext.getUserId()
                 )
                 .doOnNext(chunk -> {
-                    if (!chunk.startsWith("[") && !chunk.startsWith("{")) {
+                    if (!"[DONE]".equals(chunk) && !chunk.startsWith("[ERROR]")) {
+                        fullResponse.append(chunk);
+                    }
+                })
+                .doOnComplete(() -> saveAiMessageAsync(chatContext, fullResponse.toString()))
+                .doOnError(streamError -> log.error("Realtime stream failed: {}", streamError.getMessage(), streamError));
+    }
+
+    private Flux<String> generateLegacyStreamResponse(ChatContext chatContext) {
+        StringBuilder fullResponse = new StringBuilder();
+        return streamService.generateStreamResponse(
+                        chatContext.getUserMessage(),
+                        chatContext.getChatHistory(),
+                        chatContext.getContext(),
+                        chatContext.getUserId()
+                )
+                .doOnNext(chunk -> {
+                    if (!"[DONE]".equals(chunk) && !chunk.startsWith("[ERROR]")) {
                         fullResponse.append(chunk);
                     }
                 })
@@ -215,11 +221,70 @@ public class AiChatStreamService {
             return chunks;
         }
 
-        int chunkSize = 24;
-        for (int i = 0; i < reply.length(); i += chunkSize) {
-            chunks.add(reply.substring(i, Math.min(reply.length(), i + chunkSize)));
+        StringBuilder current = new StringBuilder();
+        for (int i = 0; i < reply.length(); i++) {
+            char ch = reply.charAt(i);
+            current.append(ch);
+
+            if (ch == '\n') {
+                flushChunk(chunks, current);
+                continue;
+            }
+
+            if (current.length() >= SIMULATED_STREAM_MIN_CHUNK_SIZE && isNaturalChunkBoundary(ch)) {
+                flushChunk(chunks, current);
+                continue;
+            }
+
+            if (current.length() >= SIMULATED_STREAM_MAX_CHUNK_SIZE) {
+                flushChunk(chunks, current);
+            }
         }
+
+        flushChunk(chunks, current);
         return chunks;
+    }
+
+    private boolean isNaturalChunkBoundary(char ch) {
+        return Character.isWhitespace(ch)
+                || ch == '，'
+                || ch == '。'
+                || ch == '、'
+                || ch == '；'
+                || ch == '：'
+                || ch == '！'
+                || ch == '？'
+                || ch == ','
+                || ch == '.'
+                || ch == ';'
+                || ch == ':'
+                || ch == '!'
+                || ch == '?';
+    }
+
+    private void flushChunk(List<String> chunks, StringBuilder current) {
+        if (current.length() == 0) {
+            return;
+        }
+        chunks.add(current.toString());
+        current.setLength(0);
+    }
+
+    private String buildRealtimeStreamSystemPrompt(ChatContext chatContext) {
+        StringBuilder prompt = new StringBuilder(promptSettingsService.getChatSystemPrompt());
+        prompt.append("\nReturn only the user-facing reply text.");
+        prompt.append("\nDo not output JSON, code fences, or any control markers.");
+        prompt.append("\nIf you mention clothing recommendations, only use items from the provided context.");
+        prompt.append("\nIf the provided context has no clothes, answer naturally without inventing wardrobe items.");
+        prompt.append("\nKeep the tone practical, natural, and sufficiently detailed for styling advice.");
+        prompt.append("\nFor recommendation or styling questions, give a complete answer, usually around 2-4 short paragraphs or an equally substantial structured answer.");
+        prompt.append("\nExplain why the suggested items fit the weather, occasion, and user preferences instead of giving only a brief conclusion.");
+        prompt.append("\nRespect negative preferences and avoid recommending colors or styles marked as avoided in the context.");
+
+        if (chatContext.getRecommendedClothes() != null && !chatContext.getRecommendedClothes().isEmpty()) {
+            prompt.append("\nThe context includes grounded wardrobe items. Reference the most relevant items and explain their fit clearly.");
+        }
+        return prompt.toString();
     }
 
     private void saveAiMessageAsync(ChatContext chatContext, String fullResponse) {
@@ -394,8 +459,20 @@ public class AiChatStreamService {
     private String generateClothingQuery(String userMessage,
                                         String weatherInfo,
                                         String occasion,
+                                        Map<String, Object> intentAnalysis,
                                         Map<String, Object> userStyleProfile) {
         StringBuilder builder = new StringBuilder();
+        if (intentAnalysis != null) {
+            appendIntentText(builder, intentAnalysis.get("style"));
+            appendIntentText(builder, intentAnalysis.get("season"));
+            appendIntentText(builder, intentAnalysis.get("clothingType"));
+            Object keywords = intentAnalysis.get("keywords");
+            if (keywords instanceof List<?> values) {
+                for (Object value : values) {
+                    appendIntentText(builder, value);
+                }
+            }
+        }
         if (userMessage != null && !userMessage.isBlank()) {
             builder.append(userMessage).append(' ');
         }
@@ -434,6 +511,97 @@ public class AiChatStreamService {
             log.warn("Failed to search clothes: {}", e.getMessage());
         }
         return results;
+    }
+
+    private boolean isNeedClothingSearch(Map<String, Object> intentAnalysis, String userMessage) {
+        if (intentAnalysis != null) {
+            String intent = readIntentText(intentAnalysis.get("intent"));
+            if (intent != null) {
+                String normalizedIntent = intent.toLowerCase(Locale.ROOT);
+                if (normalizedIntent.contains("greeting")
+                        || normalizedIntent.contains("identity")
+                        || normalizedIntent.contains("chat")
+                        || normalizedIntent.contains("thanks")
+                        || normalizedIntent.contains("goodbye")
+                        || normalizedIntent.contains("farewell")) {
+                    return false;
+                }
+            }
+
+            if (StringUtils.hasText(readIntentText(intentAnalysis.get("clothingType")))
+                    || StringUtils.hasText(readIntentText(intentAnalysis.get("style")))) {
+                return true;
+            }
+        }
+        return isNeedClothingSearchNormalized(userMessage);
+    }
+
+    private List<String> extractNegativePreferences(Map<String, Object> intentAnalysis) {
+        if (intentAnalysis == null) {
+            return Collections.emptyList();
+        }
+
+        Object rawValue = intentAnalysis.get("negativePreferences");
+        if (!(rawValue instanceof List<?> values)) {
+            return Collections.emptyList();
+        }
+
+        List<String> result = new ArrayList<>();
+        for (Object value : values) {
+            if (value == null) {
+                continue;
+            }
+            String text = String.valueOf(value).trim();
+            if (!text.isEmpty()) {
+                result.add(text);
+            }
+        }
+        return result;
+    }
+
+    private List<String> mergeNegativePreferences(List<String> negativePreferences, Map<String, Object> userStyleProfile) {
+        Set<String> merged = new LinkedHashSet<>();
+        if (negativePreferences != null) {
+            merged.addAll(negativePreferences);
+        }
+        if (userStyleProfile != null && !userStyleProfile.isEmpty()) {
+            merged.addAll(asStringList(userStyleProfile.get("avoidedColors")));
+        }
+        return new ArrayList<>(merged);
+    }
+
+    private void appendIntentText(StringBuilder builder, Object value) {
+        String text = readIntentText(value);
+        if (text != null) {
+            builder.append(text).append(' ');
+        }
+    }
+
+    private String readIntentText(Object value) {
+        if (value == null) {
+            return null;
+        }
+
+        if (value instanceof List<?> values) {
+            StringBuilder builder = new StringBuilder();
+            for (Object item : values) {
+                if (item == null) {
+                    continue;
+                }
+                String text = String.valueOf(item).trim();
+                if (text.isEmpty()) {
+                    continue;
+                }
+                if (builder.length() > 0) {
+                    builder.append(' ');
+                }
+                builder.append(text);
+            }
+            return builder.length() == 0 ? null : builder.toString();
+        }
+
+        String text = String.valueOf(value).trim();
+        return text.isEmpty() ? null : text;
     }
 
     private String normalizeUserMessage(String userMessage) {
@@ -477,6 +645,8 @@ public class AiChatStreamService {
     private Map<String, Object> buildContext(String weatherInfo,
                                              String occasion,
                                              List<Map<String, Object>> recommendedClothes,
+                                             Map<String, Object> intentAnalysis,
+                                             List<String> negativePreferences,
                                              boolean needClothingSearch,
                                              Map<String, Object> userStyleProfile) {
         Map<String, Object> context = new HashMap<>();
@@ -488,6 +658,12 @@ public class AiChatStreamService {
         }
         if (recommendedClothes != null && !recommendedClothes.isEmpty()) {
             context.put("clothes", recommendedClothes);
+        }
+        if (intentAnalysis != null && !intentAnalysis.isEmpty()) {
+            context.put("intent", intentAnalysis);
+        }
+        if (negativePreferences != null && !negativePreferences.isEmpty()) {
+            context.put("negativePreferences", negativePreferences);
         }
         if (userStyleProfile != null && !userStyleProfile.isEmpty()) {
             context.put("userStyleProfile", userStyleProfile);
