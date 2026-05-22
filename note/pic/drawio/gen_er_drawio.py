@@ -356,6 +356,7 @@ def er_outfit(p):
     make_edge(p, c,  oi, "1:N")
 
 
+
 # ══════════════════════════════════════════════════════════
 # ER5：AI 对话与监控模块
 # 表：users(ref) / ai_conversations / ai_chat_messages
@@ -456,6 +457,28 @@ def er_ai(p):
     make_edge(p, cr, sd, "N:1")
     make_edge(p, cr, sh, "N:1")
 
+# ══════════════════════════════════════════════════════════
+# ER6：知识向量模块
+# 表：knowledge_embeddings
+# ══════════════════════════════════════════════════════════
+def er_knowledge_embeddings(p):
+    ke, _ = make_table(p, "knowledge_embeddings", "知识向量表", 60, 120, [
+        ("id",                "INT4",         "pk"),
+        ("knowledge_type",    "VARCHAR(32)",  ""),
+        ("knowledge_id",      "INT8",         ""),
+        ("title",             "VARCHAR(255)", ""),
+        ("embedding",         "VECTOR",       ""),
+        ("embedding_model",   "VARCHAR(255)", ""),
+        ("embedding_text",    "TEXT",         ""),
+        ("metadata",          "JSONB",        ""),
+        ("created_at",        "TIMESTAMP(6)", ""),
+        ("updated_at",        "TIMESTAMP(6)", ""),
+    ])
+    # 若有关联表，可在此处添加 make_edge 建立关联
+    # 示例：make_edge(p, 关联表ID, ke, "1:N")
+
+# 在原有 diagrams 列表中添加该模块
+diagrams.append(("er_06_知识向量模块", er_knowledge_embeddings))
 
 # ── 生成文件 ──────────────────────────────────────────────
 out_dir = os.path.dirname(os.path.abspath(__file__))
@@ -466,6 +489,7 @@ diagrams = [
     ("er_03_风格偏好模块", er_style),
     ("er_04_穿搭推荐模块", er_outfit),
     ("er_05_AI对话监控模块", er_ai),
+    ("er_06_知识向量模块", er_knowledge_embeddings),
 ]
 
 for name, fn in diagrams:

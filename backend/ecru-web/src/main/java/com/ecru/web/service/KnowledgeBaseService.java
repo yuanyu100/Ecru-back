@@ -2,6 +2,7 @@ package com.ecru.web.service;
 
 import com.ecru.common.exception.BusinessException;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -16,6 +17,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.HashMap;
 
 @Service
 public class KnowledgeBaseService {
@@ -26,11 +28,17 @@ public class KnowledgeBaseService {
 
     private final JdbcTemplate jdbcTemplate;
     private final KnowledgeVectorSyncService knowledgeVectorSyncService;
+    private final boolean knowledgeVectorEnabled;
+    private final int vectorScoreBoost;
 
     public KnowledgeBaseService(@Qualifier("mysqlDataSource") DataSource dataSource,
-                                KnowledgeVectorSyncService knowledgeVectorSyncService) {
+                                KnowledgeVectorSyncService knowledgeVectorSyncService,
+                                @Value("${knowledge.search.vector-enabled:true}") boolean knowledgeVectorEnabled,
+                                @Value("${knowledge.search.vector-score-boost:12}") int vectorScoreBoost) {
         this.jdbcTemplate = new JdbcTemplate(dataSource);
         this.knowledgeVectorSyncService = knowledgeVectorSyncService;
+        this.knowledgeVectorEnabled = knowledgeVectorEnabled;
+        this.vectorScoreBoost = vectorScoreBoost;
     }
 
     public Map<String, Object> search(String query, String type, Integer limit) {
@@ -42,27 +50,19 @@ public class KnowledgeBaseService {
         SearchType searchType = SearchType.from(type);
         int safeLimit = clampLimit(limit, DEFAULT_LIMIT);
         List<String> expandedTerms = expandTerms(trimmedQuery);
-        List<Map<String, Object>> results = new ArrayList<>();
-        Set<String> seenDocumentIds = new LinkedHashSet<>();
+        Map<String, Map<String, Object>> mergedResults = new LinkedHashMap<>();
 
-        for (Map<String, Object> vectorItem : searchByVector(trimmedQuery, searchType, safeLimit)) {
-            String documentId = asString(vectorItem.get("documentId"));
-            if (StringUtils.isBlank(documentId) || !seenDocumentIds.add(documentId)) {
-                continue;
+        if (knowledgeVectorEnabled) {
+            for (Map<String, Object> vectorItem : searchByVector(trimmedQuery, searchType, safeLimit)) {
+                mergeSearchResult(mergedResults, vectorItem, true);
             }
-            vectorItem.put("matchSource", "vector");
-            results.add(vectorItem);
         }
 
         for (Map<String, Object> textItem : searchByText(trimmedQuery, searchType, expandedTerms)) {
-            String documentId = asString(textItem.get("documentId"));
-            if (StringUtils.isBlank(documentId) || !seenDocumentIds.add(documentId)) {
-                continue;
-            }
-            textItem.put("matchSource", "text");
-            results.add(textItem);
+            mergeSearchResult(mergedResults, textItem, false);
         }
 
+        List<Map<String, Object>> results = new ArrayList<>(mergedResults.values());
         results.sort(searchItemComparator());
 
         Map<String, Object> response = new LinkedHashMap<>();
@@ -232,12 +232,16 @@ public class KnowledgeBaseService {
 
         double similarity = vectorRow.get("similarity") instanceof Number number ? number.doubleValue() : 0D;
         int relevance = (int) Math.max(1, Math.min(99, Math.round(similarity * 100)));
-        return switch (knowledgeType) {
+        Map<String, Object> item = switch (knowledgeType) {
             case KnowledgeVectorSyncService.TYPE_FABRIC -> buildVectorFabricItem(knowledgeId, relevance);
             case KnowledgeVectorSyncService.TYPE_GUIDE -> buildVectorGuideItem(knowledgeId, relevance);
             case KnowledgeVectorSyncService.TYPE_CARE_LABEL -> buildVectorCareLabelItem(knowledgeId, relevance);
             default -> null;
         };
+        if (item != null) {
+            item.put("similarity", similarity);
+        }
+        return item;
     }
 
     private Map<String, Object> buildVectorFabricItem(Long fabricId, int relevance) {
@@ -569,9 +573,76 @@ public class KnowledgeBaseService {
         }
     }
 
+    private void mergeSearchResult(Map<String, Map<String, Object>> mergedResults, Map<String, Object> item, boolean vectorResult) {
+        if (item == null) {
+            return;
+        }
+
+        String documentId = asString(item.get("documentId"));
+        if (StringUtils.isBlank(documentId)) {
+            return;
+        }
+
+        item.put("matchSource", vectorResult ? "vector" : "text");
+        item.put("vectorScore", vectorResult ? asInt(item.get("relevance")) : 0);
+        item.put("textScore", vectorResult ? 0 : asInt(item.get("relevance")));
+        item.put("similarity", vectorResult ? asDouble(item.get("similarity")) : 0D);
+
+        Map<String, Object> existing = mergedResults.get(documentId);
+        if (existing == null) {
+            item.put("relevance", blendedRelevance(item));
+            mergedResults.put(documentId, item);
+            return;
+        }
+
+        if (vectorResult) {
+            existing.put("vectorScore", Math.max(asInt(existing.get("vectorScore")), asInt(item.get("vectorScore"))));
+            existing.put("similarity", Math.max(asDouble(existing.get("similarity")), asDouble(item.get("similarity"))));
+            if (!"both".equals(existing.get("matchSource"))) {
+                existing.put("matchSource", "vector");
+            }
+        } else {
+            existing.put("textScore", Math.max(asInt(existing.get("textScore")), asInt(item.get("textScore"))));
+            if (!"both".equals(existing.get("matchSource"))) {
+                existing.put("matchSource", "text");
+            }
+        }
+
+        if (asInt(existing.get("vectorScore")) > 0 && asInt(existing.get("textScore")) > 0) {
+            existing.put("matchSource", "both");
+        }
+
+        fillBlank(existing, item, "content");
+        fillBlank(existing, item, "source");
+        fillBlank(existing, item, "tags");
+        existing.put("relevance", blendedRelevance(existing));
+    }
+
+    private int blendedRelevance(Map<String, Object> item) {
+        int vectorScore = asInt(item.get("vectorScore"));
+        int textScore = asInt(item.get("textScore"));
+        int score = Math.max(vectorScore, textScore);
+
+        if (vectorScore > 0) {
+            score = Math.max(score, Math.min(99, vectorScore + vectorScoreBoost));
+        }
+        if (vectorScore > 0 && textScore > 0) {
+            score = Math.min(99, Math.max(score, ((vectorScore + textScore) / 2) + 8));
+        }
+        return Math.min(99, Math.max(score, textScore));
+    }
+
+    private void fillBlank(Map<String, Object> target, Map<String, Object> source, String key) {
+        Object targetValue = target.get(key);
+        if (targetValue == null || StringUtils.isBlank(String.valueOf(targetValue))) {
+            target.put(key, source.get(key));
+        }
+    }
+
     private Comparator<Map<String, Object>> searchItemComparator() {
         return Comparator
                 .comparing((Map<String, Object> item) -> asInt(item.get("relevance")), Comparator.reverseOrder())
+                .thenComparing((Map<String, Object> item) -> matchSourcePriority(asString(item.get("matchSource"))), Comparator.reverseOrder())
                 .thenComparing(item -> StringUtils.defaultString(asString(item.get("title"))), String.CASE_INSENSITIVE_ORDER);
     }
 
@@ -625,6 +696,23 @@ public class KnowledgeBaseService {
 
     private Long asLong(Object value) {
         return value instanceof Number number ? number.longValue() : null;
+    }
+
+    private Double asDouble(Object value) {
+        return value instanceof Number number ? number.doubleValue() : 0D;
+    }
+
+    private Integer matchSourcePriority(String matchSource) {
+        if ("both".equalsIgnoreCase(matchSource)) {
+            return 3;
+        }
+        if ("vector".equalsIgnoreCase(matchSource)) {
+            return 2;
+        }
+        if ("text".equalsIgnoreCase(matchSource)) {
+            return 1;
+        }
+        return 0;
     }
 
     private enum SearchType {

@@ -31,6 +31,9 @@ public class KnowledgeVectorSyncService {
     @Value("${ai.siliconflow.embedding.model}")
     private String modelName;
 
+    @Value("${rag.vector.similarity-threshold:0.7}")
+    private double similarityThreshold;
+
     public KnowledgeVectorSyncService(@Qualifier("postgresJdbcTemplate") JdbcTemplate postgresJdbcTemplate,
                                       EmbeddingService embeddingService,
                                       ObjectMapper objectMapper) {
@@ -40,55 +43,32 @@ public class KnowledgeVectorSyncService {
     }
 
     public void upsertFabric(Map<String, Object> fabric) {
+        String embeddingText = buildFabricEmbeddingText(fabric);
         upsert(
                 TYPE_FABRIC,
                 asLong(fabric.get("fabricId")),
                 asString(fabric.get("name")),
-                joinText(
-                        fabric.get("name"),
-                        fabric.get("alias"),
-                        fabric.get("fabricType"),
-                        fabric.get("summary"),
-                        fabric.get("properties"),
-                        fabric.get("careGuide"),
-                        fabric.get("suitableSeasons"),
-                        fabric.get("suitableOccasions"),
-                        fabric.get("keywords")),
+                embeddingText,
                 buildMetadata(TYPE_FABRIC, fabric));
     }
 
     public void upsertGuide(Map<String, Object> guide) {
+        String embeddingText = buildGuideEmbeddingText(guide);
         upsert(
                 TYPE_GUIDE,
                 asLong(guide.get("guideId")),
                 asString(guide.get("title")),
-                joinText(
-                        guide.get("title"),
-                        guide.get("subtitle"),
-                        guide.get("guideType"),
-                        guide.get("summary"),
-                        guide.get("content"),
-                        guide.get("author"),
-                        guide.get("publishDate"),
-                        guide.get("tags"),
-                        guide.get("keywords")),
+                embeddingText,
                 buildMetadata(TYPE_GUIDE, guide));
     }
 
     public void upsertCareLabel(Map<String, Object> careLabel) {
+        String embeddingText = buildCareLabelEmbeddingText(careLabel);
         upsert(
                 TYPE_CARE_LABEL,
                 asLong(careLabel.get("careLabelId")),
                 asString(careLabel.get("symbolName")),
-                joinText(
-                        careLabel.get("symbolCode"),
-                        careLabel.get("symbolName"),
-                        careLabel.get("category"),
-                        careLabel.get("instruction"),
-                        careLabel.get("explanation"),
-                        careLabel.get("doText"),
-                        careLabel.get("dontText"),
-                        careLabel.get("keywords")),
+                embeddingText,
                 buildMetadata(TYPE_CARE_LABEL, careLabel));
     }
 
@@ -127,8 +107,14 @@ public class KnowledgeVectorSyncService {
             List<Object> args = new ArrayList<>();
             args.add(vectorString);
             if (StringUtils.isNotBlank(knowledgeType) && !"all".equalsIgnoreCase(knowledgeType)) {
-                sql.append(" WHERE knowledge_type = ? ");
+                sql.append(" WHERE knowledge_type = ? AND 1 - (embedding <=> ?::vector) >= ? ");
                 args.add(knowledgeType);
+                args.add(vectorString);
+                args.add(similarityThreshold);
+            } else {
+                sql.append(" WHERE 1 - (embedding <=> ?::vector) >= ? ");
+                args.add(vectorString);
+                args.add(similarityThreshold);
             }
             sql.append(" ORDER BY similarity DESC LIMIT ? ");
             args.add(safeLimit);
@@ -193,6 +179,71 @@ public class KnowledgeVectorSyncService {
         metadata.put("knowledgeType", knowledgeType);
         metadata.putAll(source);
         return metadata;
+    }
+
+    private String buildFabricEmbeddingText(Map<String, Object> fabric) {
+        return joinSections(
+                weightedLine("面料名称", fabric.get("name"), 3),
+                weightedLine("面料别名", fabric.get("alias"), 1),
+                weightedLine("面料类型", fabric.get("fabricType"), 2),
+                weightedLine("核心关键词", fabric.get("keywords"), 3),
+                weightedLine("适用季节", fabric.get("suitableSeasons"), 2),
+                weightedLine("适用场景", fabric.get("suitableOccasions"), 2),
+                weightedLine("面料摘要", fabric.get("summary"), 2),
+                weightedLine("面料特性", fabric.get("properties"), 2),
+                weightedLine("护理说明", fabric.get("careGuide"), 1));
+    }
+
+    private String buildGuideEmbeddingText(Map<String, Object> guide) {
+        return joinSections(
+                weightedLine("指南标题", guide.get("title"), 3),
+                weightedLine("指南副标题", guide.get("subtitle"), 1),
+                weightedLine("指南类型", guide.get("guideType"), 2),
+                weightedLine("核心关键词", guide.get("keywords"), 3),
+                weightedLine("标签", guide.get("tags"), 2),
+                weightedLine("内容摘要", guide.get("summary"), 2),
+                weightedLine("正文内容", guide.get("content"), 1),
+                weightedLine("作者", guide.get("author"), 1),
+                weightedLine("发布日期", guide.get("publishDate"), 1));
+    }
+
+    private String buildCareLabelEmbeddingText(Map<String, Object> careLabel) {
+        return joinSections(
+                weightedLine("洗护符号", careLabel.get("symbolCode"), 2),
+                weightedLine("符号名称", careLabel.get("symbolName"), 3),
+                weightedLine("分类", careLabel.get("category"), 2),
+                weightedLine("核心关键词", careLabel.get("keywords"), 3),
+                weightedLine("洗护指令", careLabel.get("instruction"), 3),
+                weightedLine("解释说明", careLabel.get("explanation"), 2),
+                weightedLine("建议做法", careLabel.get("doText"), 1),
+                weightedLine("禁忌做法", careLabel.get("dontText"), 1));
+    }
+
+    private String joinSections(String... sections) {
+        StringBuilder builder = new StringBuilder();
+        for (String section : sections) {
+            if (StringUtils.isBlank(section)) {
+                continue;
+            }
+            if (builder.length() > 0) {
+                builder.append('\n');
+            }
+            builder.append(section.trim());
+        }
+        return builder.toString();
+    }
+
+    private String weightedLine(String label, Object value, int weight) {
+        String text = StringUtils.trimToEmpty(asString(value));
+        if (StringUtils.isBlank(text) || weight <= 0) {
+            return "";
+        }
+
+        List<String> repeated = new ArrayList<>();
+        for (int i = 0; i < weight; i++) {
+            repeated.add(label + "：" + text);
+        }
+        return String.join("\n", repeated);
     }
 
     private String joinText(Object... values) {
