@@ -31,6 +31,10 @@ public class AiChatStreamController {
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(summary = "AI对话流式", description = "发送消息给AI助手并获取流式回复，支持打字机效果")
     public Flux<String> chatStream(@Valid @RequestBody ChatRequestDTO request) {
+        // 控制器层本身不做业务编排，只负责：
+        // 1. 从登录上下文取 userId
+        // 2. 调用服务层拿到 Flux<String>
+        // 3. 以 SSE 文本流方式持续返回给前端
         Long userId = UserContext.getCurrentUserId();
         if (userId == null) {
             return Flux.just("[ERROR]用户未登录");
@@ -40,7 +44,12 @@ public class AiChatStreamController {
 
         return aiChatStreamService.chatStream(userId, request)
                 .doOnNext(chunk -> {
-                    // 记录日志，但不记录内容（避免日志过大）
+                    // 这里约定了几种特殊控制片段：
+                    // [SESSION] 用于首包返回会话信息
+                    // [DONE] 表示流式输出完成
+                    // [ERROR] 表示上游生成失败
+                    // 其余普通文本片段由前端按顺序拼接显示。
+                    // 日志不记录正文内容，避免长回复把日志打满。
                     if (chunk.startsWith("[SESSION]")) {
                         log.info("发送会话信息: {}", chunk);
                     } else if (chunk.startsWith("[ERROR]")) {

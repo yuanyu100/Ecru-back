@@ -35,9 +35,6 @@ public class EmbeddingService {
         }
     }
 
-    public float[] generateClothingEmbedding(String clothingDescription) {
-        return generateEmbedding(clothingDescription);
-    }
 
     public List<float[]> generateBatchEmbeddings(List<String> texts) {
         List<String> safeTexts = texts == null ? List.of() : texts;

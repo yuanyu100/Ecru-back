@@ -52,6 +52,8 @@ public class KnowledgeBaseService {
         List<String> expandedTerms = expandTerms(trimmedQuery);
         Map<String, Map<String, Object>> mergedResults = new LinkedHashMap<>();
 
+        // 检索结果会融合“向量召回”和“文本匹配”两条链路：
+        // 一个偏语义相近，一个偏关键词精确命中。
         if (knowledgeVectorEnabled) {
             for (Map<String, Object> vectorItem : searchByVector(trimmedQuery, searchType, safeLimit)) {
                 mergeSearchResult(mergedResults, vectorItem, true);
@@ -124,6 +126,7 @@ public class KnowledgeBaseService {
     }
 
     public List<Map<String, Object>> matchFabrics(List<String> keywords, Integer limit) {
+        // 面料匹配是给材质问答服务的轻量召回接口，不走完整搜索结果结构。
         List<String> normalizedTerms = normalizeKeywords(keywords);
         if (normalizedTerms.isEmpty()) {
             return List.of();
@@ -148,6 +151,7 @@ public class KnowledgeBaseService {
     }
 
     public List<Map<String, Object>> matchCareLabels(List<String> keywords, Integer limit) {
+        // 洗护标识单独匹配，便于后续回答时把“材质知识”和“护理动作”拆开解释。
         List<String> normalizedTerms = normalizeKeywords(keywords);
         if (normalizedTerms.isEmpty()) {
             return List.of();
@@ -171,6 +175,7 @@ public class KnowledgeBaseService {
     }
 
     private List<Map<String, Object>> searchByVector(String query, SearchType searchType, int limit) {
+        // 向量检索负责找语义相关条目，真正返回前还会补充知识库业务字段。
         List<Map<String, Object>> vectorRows = knowledgeVectorSyncService.search(query, searchType.apiValue(), limit);
         List<Map<String, Object>> results = new ArrayList<>();
         for (Map<String, Object> row : vectorRows) {
@@ -183,6 +188,7 @@ public class KnowledgeBaseService {
     }
 
     private List<Map<String, Object>> searchByText(String query, SearchType searchType, List<String> expandedTerms) {
+        // 文本检索直接扫业务表，更适合术语、别名、洗护代码等强关键词场景。
         List<Map<String, Object>> results = new ArrayList<>();
 
         if (searchType.includeFabric()) {
@@ -475,6 +481,7 @@ public class KnowledgeBaseService {
     }
 
     private int calculateRelevance(String query, String title, String body, List<String> terms) {
+        // 规则相关度：标题命中权重大于正文命中，多关键词同时命中会追加奖励分。
         String queryLower = safeLower(query);
         String titleLower = safeLower(title);
         String bodyLower = safeLower(body);
@@ -532,6 +539,7 @@ public class KnowledgeBaseService {
     }
 
     private List<String> expandTerms(String query) {
+        // 同义词扩展把中英文、近义词和典型场景词归并到一起，提升知识召回覆盖率。
         Set<String> terms = new LinkedHashSet<>();
         terms.add(safeLower(query));
         for (String token : query.split("[\\s,，、;/]+")) {

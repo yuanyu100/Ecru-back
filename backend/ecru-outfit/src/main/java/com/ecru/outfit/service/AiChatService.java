@@ -94,6 +94,8 @@ public class AiChatService {
     @Transactional
     public ChatResponseDTO chat(Long userId, ChatRequestDTO request) {
         try {
+            // 非流式 AI 对话主入口：
+            // 先整理用户输入和历史上下文，再按需检索衣柜，最后调用 Agent 生成并保存回复。
             String userMessage = normalizeUserMessage(request.getMessage());
             // 1. 获取或创建会话
             AiConversation conversation = getOrCreateConversation(userId, request);
@@ -172,6 +174,8 @@ public class AiChatService {
             // 8. 检索推荐衣物(仅在需要时)
             List<Map<String, Object>> recommendedClothes = new ArrayList<>();
             if (needClothingSearch) {
+                // 检索词不是直接照搬原问题，而是叠加意图、风格和偏好后再做语义召回，
+                // 这样返回的衣物更贴近真实穿搭场景。
                 String query = generateClothingQuery(
                         userMessage,
                         weatherInfo,
@@ -237,7 +241,7 @@ public class AiChatService {
         String sessionId = request.getSessionId();
 
         if (sessionId != null && !sessionId.trim().isEmpty()) {
-            // 尝试获取现有会话
+            // 前端传入 sessionId 时优先复用老会话，保证多轮对话上下文连续。
             AiConversation conversation = conversationMapper.selectBySessionId(sessionId);
             if (conversation != null && conversation.getUserId().equals(userId)) {
                 return conversation;
@@ -560,6 +564,8 @@ public class AiChatService {
     private String generateClothingQuery(String userMessage, String weatherInfo, String occasion,
                                          Map<String, Object> intentAnalysis,
                                          Map<String, Object> userStyleProfile) {
+        // 把自然语言问题压缩成更适合向量检索的查询描述，
+        // 尽量保留风格、季节、单品类型等强约束。
         StringBuilder query = new StringBuilder();
 
         // 根据意图分析添加查询条件
@@ -644,6 +650,7 @@ public class AiChatService {
     }
 
     private List<Map<String, Object>> searchClothes(Long userId, String query, List<String> negativePreferences) {
+        // RAG 层返回的是结构化衣物结果，这里转成对话上下文更容易消费的轻量字段。
         List<Map<String, Object>> results = new ArrayList<>();
         if (query == null || query.trim().isEmpty()) {
             return results;
@@ -678,6 +685,8 @@ public class AiChatService {
                                              List<String> negativePreferences,
                                              boolean needClothingSearch,
                                              Map<String, Object> userStyleProfile) {
+        // context 是模型生成阶段的事实边界：
+        // 天气、场景、候选衣物、负面偏好和用户风格都集中放在这里。
         Map<String, Object> context = new HashMap<>();
         if (weatherInfo != null) {
             context.put("weather", weatherInfo);
@@ -706,6 +715,7 @@ public class AiChatService {
      * 更新会话标题（如果是新会话）
      */
     private Map<String, Object> buildUserStyleProfile(Long userId) {
+        // 用户风格档案来自长期偏好沉淀，会和本轮问句一起决定推荐方向。
         UserStyleArchive archive = userStyleArchiveMapper.selectByUserId(userId);
         if (archive == null) {
             return Collections.emptyMap();
@@ -737,6 +747,7 @@ public class AiChatService {
     }
 
     private List<String> mergeNegativePreferences(List<String> negativePreferences, Map<String, Object> userStyleProfile) {
+        // 负面偏好既可能来自本轮意图识别，也可能来自用户长期设置，这里统一合并后下传。
         Set<String> merged = new LinkedHashSet<>();
         if (negativePreferences != null) {
             merged.addAll(negativePreferences);

@@ -67,6 +67,8 @@ public class AiTextGeneratorStreamService {
                                                                Map<String, Object> context,
                                                                Long userId) {
         return Flux.create(sink -> {
+            // 这一层是真正对接流式大模型 SDK 的地方。
+            // 上层服务只管准备 prompt/上下文，这里负责把模型回调桥接成 Reactor Flux。
             AiApiCallContext monitorContext = AiApiCallContext.create(
                     AiApiMonitorWrapper.Scene.STREAM_CHAT, modelName, userId
             );
@@ -76,6 +78,7 @@ public class AiTextGeneratorStreamService {
 
             try {
                 ChatRequest request = ChatRequest.builder()
+                        // buildChatMessages 会把 system prompt、最近历史和当前用户问题组织成最终消息列表。
                         .messages(buildChatMessages(systemPrompt, prompt, chatHistory, context))
                         .temperature(STREAM_TEMPERATURE)
                         .maxOutputTokens(STREAM_MAX_TOKENS)
@@ -83,6 +86,7 @@ public class AiTextGeneratorStreamService {
                 monitorContext.setPromptLength(request.toString().length());
 
                 sink.onDispose(() -> {
+                    // 如果前端中途断开 SSE，这里会收到取消信号，并把监控状态记为 cancelled。
                     cancelled.set(true);
                     recordCancelledIfNeeded(monitorContext, recorded, responseLength.get());
                 });
@@ -90,6 +94,8 @@ public class AiTextGeneratorStreamService {
                 streamingChatModel.chat(request, new StreamingChatResponseHandler() {
                     @Override
                     public void onPartialResponse(String partialResponse) {
+                        // 模型每吐出一小段文本，就立即转发给上层 Flux，
+                        // 上层控制器再原样推送给前端，实现“打字机效果”。
                         if (cancelled.get() || sink.isCancelled() || partialResponse == null || partialResponse.isEmpty()) {
                             return;
                         }
@@ -104,6 +110,7 @@ public class AiTextGeneratorStreamService {
                             return;
                         }
 
+                        // 只有模型完整结束时，才记录 token usage 并输出统一结束标记 [DONE]。
                         applyTokenUsage(monitorContext, response.tokenUsage());
                         monitorContext.markSuccess(200);
                         monitorContext.setResponseLength(responseLength.get());
@@ -119,6 +126,8 @@ public class AiTextGeneratorStreamService {
                             return;
                         }
 
+                        // 这里把异常转换为流内的 [ERROR] 片段，而不是直接抛出，
+                        // 这样前端可以按统一协议处理错误状态。
                         log.error("Failed to stream AI response: {}", error.getMessage(), error);
                         monitorContext.markFailed(AiApiMonitorWrapper.ErrorType.BUSINESS_ERROR, error.getMessage(), null);
                         monitorContext.setResponseLength(responseLength.get());
@@ -142,10 +151,14 @@ public class AiTextGeneratorStreamService {
                                                 String prompt,
                                                 List<Map<String, String>> chatHistory,
                                                 Map<String, Object> context) {
+        // 消息组装顺序固定为：
+        // system -> 最近几轮历史 -> 当前用户消息（内嵌业务上下文）
+        // 这是当前流式对话 prompt 的最终入模结构。
         List<ChatMessage> messages = new ArrayList<>();
         messages.add(SystemMessage.from(resolveSystemPrompt(systemPrompt, context)));
 
         if (chatHistory != null && !chatHistory.isEmpty()) {
+            // 这里只截最近 5 轮历史，避免长会话把流式首包时间拉长。
             int startIndex = Math.max(0, chatHistory.size() - 5);
             for (int i = startIndex; i < chatHistory.size(); i++) {
                 Map<String, String> history = chatHistory.get(i);
@@ -197,6 +210,7 @@ public class AiTextGeneratorStreamService {
 
     private String resolveSystemPrompt(String systemPrompt, Map<String, Object> context) {
         if (systemPrompt != null && !systemPrompt.trim().isEmpty()) {
+            // 上层若显式传入 system prompt，则优先使用上层定义的更强约束版本。
             return systemPrompt;
         }
 
@@ -211,6 +225,8 @@ public class AiTextGeneratorStreamService {
     }
 
     private String buildUserPrompt(String prompt, Map<String, Object> context) {
+        // 用户消息正文与业务上下文会被合并成一条最终 UserMessage。
+        // 这样模型看到的是“问题 + 参考信息”，而不是只看到一句裸问题。
         StringBuilder userContent = new StringBuilder();
         userContent.append(prompt == null ? "" : prompt);
 
@@ -238,6 +254,7 @@ public class AiTextGeneratorStreamService {
                 List<Map<String, Object>> clothes = (List<Map<String, Object>>) context.get("clothes");
                 if (clothes != null && !clothes.isEmpty()) {
                     userContent.append("可用衣物:\n");
+                    // 候选衣物在 prompt 里只保留前 5 个，控制 token，同时减少模型选择困难。
                     int limit = Math.min(5, clothes.size());
                     for (int i = 0; i < limit; i++) {
                         Map<String, Object> cloth = clothes.get(i);
@@ -257,6 +274,7 @@ public class AiTextGeneratorStreamService {
             }
         }
 
+        // 对最终用户提示做长度截断，避免上下文过长挤占模型输出空间。
         return limitLength(userContent.toString(), 1000);
     }
 

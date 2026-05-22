@@ -1,0 +1,32 @@
+{
+  "updateExisting": false,
+  "items": [
+    {
+      "symbolCode": "WASH_INSIDE_OUT",
+      "symbolName": "翻面洗涤",
+      "category": "洗涤说明",
+      "instruction": "建议衣物翻面后清洗，减少磨损。",
+      "keywords": "翻面,洗涤,印花,牛仔",
+      "source": "demo-import-txt-cn",
+      "active": true
+    },
+    {
+      "symbolCode": "LOW_TEMP_IRON",
+      "symbolName": "低温熨烫",
+      "category": "熨烫说明",
+      "instruction": "建议低温熨烫，避免高温压烫。",
+      "keywords": "低温,熨烫,衬衫,面料",
+      "source": "demo-import-txt-cn",
+      "active": true
+    },
+    {
+      "symbolCode": "SEPARATE_DARK_LIGHT",
+      "symbolName": "深浅分洗",
+      "category": "洗涤说明",
+      "instruction": "深色和浅色衣物分开清洗，避免串色。",
+      "keywords": "深浅,分洗,串色,新衣",
+      "source": "demo-import-txt-cn",
+      "active": true
+    }
+  ]
+}

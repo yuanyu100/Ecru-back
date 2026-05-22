@@ -40,6 +40,8 @@ public class VectorSearchServiceV3 {
      */
     public List<VectorSearchResult> searchClothes(Long userId, String query, Integer limit, List<String> negativePreferences) {
         try {
+            // 标准 RAG 检索链路：
+            // 查询文本生成 embedding，再做 pgvector 近邻搜索，最后回表补全业务字段。
             log.debug("开始语义检索V3，用户ID: {}, 查询: {}, 限制: {}", userId, query, limit);
             float[] queryEmbedding = embeddingService.generateEmbedding(query);
             log.debug("嵌入生成成功，长度: {}", queryEmbedding != null ? queryEmbedding.length : 0);
@@ -83,11 +85,15 @@ public class VectorSearchServiceV3 {
                 Long clothingId = ((Number) vectorResult.get("clothing_id")).longValue();
                 Double similarity = (Double) vectorResult.get("similarity");
 
+                // 向量表只适合检索，不适合直接展示，所以这里需要回主表补详细信息。
                 VectorSearchResult result = getClothingDetails(clothingId);
                 if (result == null) {
+                    // 主表缺失时退回 embedding 表里的简版信息，尽量避免整条结果丢失。
                     result = getClothingDetailsFromEmbeddings(clothingId);
                 }
                 if (result != null && !isNegativeMatch(result, negativePreferences)) {
+                    // similarity 代表这件衣物和“本次穿搭查询语义”的接近程度。
+                    // 当前链路按 pgvector 返回顺序保留候选，上层再决定是否继续裁剪。
                     result.setSimilarity(similarity);
                     results.add(result);
                 }
@@ -115,7 +121,8 @@ public class VectorSearchServiceV3 {
             return false;
         }
         
-        // 检查颜色
+        // 当前先按颜色做硬过滤，避免推荐结果命中用户明确回避的颜色。
+        // 也就是说：即便向量相似度很高，只要主色/次色踩中了负面偏好，仍然会被剔除。
         String primaryColor = result.getPrimaryColor();
         String secondaryColor = result.getSecondaryColor();
         
@@ -145,7 +152,7 @@ public class VectorSearchServiceV3 {
     private List<VectorSearchResult> getMockResults(String query, Integer limit, List<String> negativePreferences) {
         List<VectorSearchResult> results = new ArrayList<>();
         
-        // 根据查询文本添加相关衣物
+        // 这是向量检索失败时的兜底数据，主要用于开发调试和降级保活。
         boolean isWinter = query != null && (query.contains("冬季") || query.contains("保暖") || query.contains("厚实") || query.contains("羽绒服"));
         
         if (isWinter) {
@@ -285,6 +292,7 @@ public class VectorSearchServiceV3 {
      */
     private VectorSearchResult getClothingDetails(Long clothingId) {
         try {
+            // 优先从业务主表读取，能拿到更完整的颜色、材质、风格和场景标签。
             Clothing clothing = clothingMapper.selectById(clothingId);
             if (clothing == null) {
                 return null;
@@ -316,6 +324,7 @@ public class VectorSearchServiceV3 {
      */
     private VectorSearchResult getClothingDetailsFromEmbeddings(Long clothingId) {
         try {
+            // embedding 表只保留最小检索信息，因此这里只能构造退化版结果。
             String sql = "SELECT clothing_id, embedding_text, metadata FROM clothing_embeddings WHERE clothing_id = ?";
             Map<String, Object> embeddingMap = jdbcTemplate.queryForMap(sql, clothingId);
 
@@ -346,6 +355,7 @@ public class VectorSearchServiceV3 {
      */
     public boolean generateAndStoreEmbedding(Long clothingId, String clothingText) {
         try {
+            // 存向量时顺带保存少量 metadata，便于检索后快速做辅助展示或过滤。
             float[] embedding = embeddingService.generateEmbedding(clothingText);
             if (embedding == null) {
                 return false;

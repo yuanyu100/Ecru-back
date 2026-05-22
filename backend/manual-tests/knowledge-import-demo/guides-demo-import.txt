@@ -1,0 +1,50 @@
+{
+  "updateExisting": false,
+  "items": [
+    {
+      "title": "春季通勤穿搭指南",
+      "subtitle": "适合办公室和地铁场景",
+      "guideType": "场景穿搭指南",
+      "summary": "适合春季通勤的基础搭配建议。",
+      "content": "建议选择轻薄外套和衬衫，整体风格干净利落，适合通勤。",
+      "author": "Ecru-demo",
+      "publishDate": "2026-05-22",
+      "tags": "春季,通勤,办公室",
+      "coverImageUrl": "",
+      "coverImageCaption": "",
+      "keywords": "通勤,外套,衬衫",
+      "source": "demo-import-txt-cn",
+      "active": true
+    },
+    {
+      "title": "白衬衫搭配建议",
+      "subtitle": "适合日常和面试场景",
+      "guideType": "单品搭配指南",
+      "summary": "白衬衫适合通勤、面试和日常。",
+      "content": "白衬衫可以搭配西裤、半裙或牛仔裤，风格简洁，很容易形成干练造型。",
+      "author": "Ecru-demo",
+      "publishDate": "2026-05-22",
+      "tags": "白衬衫,通勤,面试",
+      "coverImageUrl": "",
+      "coverImageCaption": "",
+      "keywords": "白衬衫,西裤,半裙,牛仔裤",
+      "source": "demo-import-txt-cn",
+      "active": true
+    },
+    {
+      "title": "针织衫清洗与收纳",
+      "subtitle": "减少起球和变形",
+      "guideType": "面料护理指南",
+      "summary": "针织衫建议低温轻柔清洗。",
+      "content": "清洗后平铺放置，避免长时间悬挂，可以更好保持衣物版型。",
+      "author": "Ecru-demo",
+      "publishDate": "2026-05-22",
+      "tags": "针织衫,清洗,收纳",
+      "coverImageUrl": "",
+      "coverImageCaption": "",
+      "keywords": "针织衫,平铺,收纳,护理",
+      "source": "demo-import-txt-cn",
+      "active": true
+    }
+  ]
+}

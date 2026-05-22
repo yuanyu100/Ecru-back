@@ -33,6 +33,7 @@ public class RagService {
      */
     public List<VectorSearchServiceV3.VectorSearchResult> searchClothes(Long userId, String query, Integer limit, List<String> negativePreferences) {
         try {
+            // RagService 是对上层暴露的门面，屏蔽底层向量检索细节。
             return vectorSearchService.searchClothes(userId, query, limit, negativePreferences);
         } catch (Exception e) {
             log.error("语义检索衣物失败: {}", e.getMessage(), e);
@@ -59,6 +60,7 @@ public class RagService {
      */
     public boolean generateClothingEmbedding(Long clothingId, String clothingText) {
         try {
+            // 新衣物或衣物文本变更后，需要先写入向量，后续才能参与语义召回。
             return vectorSearchService.generateAndStoreEmbedding(clothingId, clothingText);
         } catch (Exception e) {
             log.error("为衣物生成嵌入失败: {}", e.getMessage(), e);
@@ -102,6 +104,7 @@ public class RagService {
     public java.util.Map<String, Object> getClothingStatistics(Long userId) {
         Map<String, Object> statistics = new HashMap<>();
         try {
+            // 这里聚合衣橱维度的统计结果，供推荐和分析页面共用。
             statistics.put("overview", clothingMapper.selectClothingStatistics(userId, null));
             statistics.put("byCategory", clothingMapper.selectClothingCountByCategory(userId));
             statistics.put("byColor", clothingMapper.selectClothingCountByColor(userId));

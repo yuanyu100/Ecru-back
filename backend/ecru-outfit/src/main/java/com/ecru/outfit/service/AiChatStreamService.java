@@ -81,12 +81,17 @@ public class AiChatStreamService {
         AtomicReference<ChatContext> contextRef = new AtomicReference<>();
 
         return Mono.fromCallable(() -> {
+                    // 流式对话与普通对话复用同一套上下文准备逻辑，
+                    // 只是最终改为把回复按 chunk 连续推送给前端。
+                    // 这里先在阻塞线程池里完成“准备阶段”，避免数据库查询和天气/RAG 操作阻塞 Reactor 事件线程。
                     AiConversation conversation = getOrCreateConversation(userId, request);
                     boolean isNewConversation = conversation.getMessageCount() == 0;
                     String weatherInfo = getWeatherInfo(request.getLocation());
                     List<Map<String, String>> chatHistory = getChatHistoryFromDb(conversation.getId());
 
                     String userMessage = normalizeUserMessage(request.getMessage());
+                    // 用户消息会先落库，再开始流式生成。
+                    // 这样即使后续生成中断，历史记录里也能保留用户这一次输入。
                     saveUserMessage(conversation.getId(), userId, userMessage, weatherInfo, request.getOccasion());
 
                     ChatContext chatContext = new ChatContext();
@@ -98,6 +103,7 @@ public class AiChatStreamService {
                     Map<String, Object> userStyleProfile = buildUserStyleProfile(userId);
 
                     if (isSimpleGreetingMessage(userMessage)) {
+                        // 纯问候语直接走短路分支，不做意图识别、不走检索、不调大模型。
                         chatContext.setContext(buildContext(
                                 weatherInfo,
                                 request.getOccasion(),
@@ -110,6 +116,7 @@ public class AiChatStreamService {
                         chatContext.setRecommendedClothes(Collections.emptyList());
                         chatContext.setDirectResponse(buildGreetingResponse());
                     } else if (isIdentityQuestionMessage(userMessage)) {
+                        // “你是谁”这类身份问题也走短路分支，减少延迟和模型成本。
                         chatContext.setContext(buildContext(
                                 weatherInfo,
                                 request.getOccasion(),
@@ -122,6 +129,8 @@ public class AiChatStreamService {
                         chatContext.setRecommendedClothes(Collections.emptyList());
                         chatContext.setDirectResponse(buildIdentityResponse());
                     } else {
+                        // 普通问题进入完整链路：
+                        // 意图识别 -> 是否需要衣柜检索 -> 负面偏好合并 -> 构造模型上下文。
                         Map<String, Object> intentAnalysis = textGeneratorService.analyzeQueryIntent(userMessage, userId);
                         boolean needClothingSearch = isNeedClothingSearch(intentAnalysis, userMessage);
                         List<Map<String, Object>> recommendedClothes = new ArrayList<>();
@@ -130,6 +139,7 @@ public class AiChatStreamService {
                                 userStyleProfile
                         );
                         if (needClothingSearch) {
+                            // 对于推荐类问题，先召回候选衣物，再让模型基于候选组织自然语言回答。
                             String query = generateClothingQuery(
                                     userMessage,
                                     weatherInfo,
@@ -152,6 +162,8 @@ public class AiChatStreamService {
                     }
 
                     contextRef.set(chatContext);
+                    // 首个流片段不是正文，而是会话元信息。
+                    // 前端可据此立即拿到 sessionId，用于后续继续追问或刷新会话标题。
                     return String.format("[SESSION]%s|%s|%s",
                             conversation.getSessionId(),
                             conversation.getTitle() != null ? conversation.getTitle() : "",
@@ -168,11 +180,15 @@ public class AiChatStreamService {
         }
 
         if (chatContext.getDirectResponse() != null) {
+            // 问候语、身份类问题直接走固定回复，避免不必要的模型调用。
+            // 这类回复仍然会沿用统一的流式协议：正文 -> [DONE] -> 异步落库。
             return Flux.just(chatContext.getDirectResponse())
                     .concatWith(Flux.just("[DONE]"))
                     .doOnComplete(() -> saveAiMessageAsync(chatContext, chatContext.getDirectResponse()));
         }
 
+        // 优先使用实时流式模型；失败时自动回退到旧流式实现，保证接口稳定。
+        // 这里的回退是“同一次请求内无感切换”，前端不需要重试。
         return generateRealtimeStreamResponse(chatContext)
                 .onErrorResume(error -> {
                     log.warn("Realtime stream generation failed, fallback to legacy stream: {}", error.getMessage());
@@ -183,6 +199,8 @@ public class AiChatStreamService {
     private Flux<String> generateRealtimeStreamResponse(ChatContext chatContext) {
         StringBuilder fullResponse = new StringBuilder();
         return streamService.generateStreamResponseWithCustomPrompt(
+                        // 这里传入的是流式专用 system prompt。
+                        // 相比普通对话，它更强调输出格式约束和“只能引用上下文衣物”。
                         buildRealtimeStreamSystemPrompt(chatContext),
                         chatContext.getUserMessage(),
                         chatContext.getChatHistory(),
@@ -190,10 +208,13 @@ public class AiChatStreamService {
                         chatContext.getUserId()
                 )
                 .doOnNext(chunk -> {
+                    // 边推边累计完整文本，结束后再统一落库，避免数据库里只存碎片响应。
                     if (!"[DONE]".equals(chunk) && !chunk.startsWith("[ERROR]")) {
                         fullResponse.append(chunk);
                     }
                 })
+                // 注意：streamService 会在正常完成时自己输出 [DONE]。
+                // 这里不额外拼接，避免前端收到两个结束标记。
                 .doOnComplete(() -> saveAiMessageAsync(chatContext, fullResponse.toString()))
                 .doOnError(streamError -> log.error("Realtime stream failed: {}", streamError.getMessage(), streamError));
     }
@@ -207,6 +228,7 @@ public class AiChatStreamService {
                         chatContext.getUserId()
                 )
                 .doOnNext(chunk -> {
+                    // 旧实现与实时实现保持相同协议，方便前端无感兼容。
                     if (!"[DONE]".equals(chunk) && !chunk.startsWith("[ERROR]")) {
                         fullResponse.append(chunk);
                     }
@@ -271,6 +293,9 @@ public class AiChatStreamService {
     }
 
     private String buildRealtimeStreamSystemPrompt(ChatContext chatContext) {
+        // 在系统默认 prompt 之上追加输出约束，
+        // 重点限制模型只能引用上下文里的候选衣物，避免凭空编造单品。
+        // 这类约束放在 system prompt，而不是 user prompt，优先级更高、更稳定。
         StringBuilder prompt = new StringBuilder(promptSettingsService.getChatSystemPrompt());
         prompt.append("\nReturn only the user-facing reply text.");
         prompt.append("\nDo not output JSON, code fences, or any control markers.");
@@ -289,6 +314,8 @@ public class AiChatStreamService {
 
     private void saveAiMessageAsync(ChatContext chatContext, String fullResponse) {
         try {
+            // 流式响应结束后统一保存完整消息，并同步更新会话标题和消息计数。
+            // 这里保存的是“最终拼接后的整段 assistant 回复”，不是逐 token 入库。
             AiConversation conversation = chatContext.getConversation();
             AiChatMessage message = new AiChatMessage();
             message.setConversationId(conversation.getId());
@@ -301,10 +328,14 @@ public class AiChatStreamService {
             message.setCreatedAt(LocalDateTime.now());
 
             if (chatContext.getRecommendedClothes() != null && !chatContext.getRecommendedClothes().isEmpty()) {
+                // 如果本轮命中了 RAG 候选衣物，会把候选一起快照到消息表，
+                // 便于历史会话回看时还原当时的推荐依据。
                 message.setRecommendations(JSON.toJSONString(chatContext.getRecommendedClothes()));
             }
 
             if (chatContext.getContext() != null && !chatContext.getContext().isEmpty()) {
+                // contextSnapshot 记录生成当时的天气、场景、偏好、候选等上下文，
+                // 便于后续排查模型输出为什么会这样回答。
                 message.setContextSnapshot(JSON.toJSONString(chatContext.getContext()));
             }
 
@@ -367,6 +398,7 @@ public class AiChatStreamService {
     private AiConversation getOrCreateConversation(Long userId, ChatRequestDTO request) {
         String sessionId = request.getSessionId();
         if (sessionId != null && !sessionId.trim().isEmpty()) {
+            // 流式和非流式共用 sessionId 机制，多轮追问会落到同一个 conversation。
             AiConversation conversation = conversationMapper.selectBySessionId(sessionId);
             if (conversation != null && conversation.getUserId().equals(userId)) {
                 return conversation;
@@ -376,6 +408,7 @@ public class AiChatStreamService {
     }
 
     private AiConversation createNewConversation(Long userId, ChatRequestDTO request) {
+        // 新会话在首轮请求时就创建，后续流式返回的 [SESSION] 会把这个 sessionId 带给前端。
         AiConversation conversation = new AiConversation();
         conversation.setUserId(userId);
         conversation.setSessionId(generateSessionId(userId));
@@ -420,6 +453,8 @@ public class AiChatStreamService {
     }
 
     private List<Map<String, String>> getChatHistoryFromDb(Long conversationId) {
+        // 这里只取最近若干轮历史，而不是整段长会话全部塞给模型，
+        // 目的是控制 token 消耗，并降低长上下文噪音。
         List<AiChatMessage> messages = chatMessageMapper.selectRecentMessages(conversationId, 10);
         Collections.reverse(messages);
 
@@ -434,6 +469,8 @@ public class AiChatStreamService {
     }
 
     private void saveUserMessage(Long conversationId, Long userId, String content, String weatherInfo, String occasion) {
+        // 用户消息和 assistant 消息分开落库：
+        // 用户消息在生成前保存，assistant 消息在流结束后保存。
         AiChatMessage message = new AiChatMessage();
         message.setConversationId(conversationId);
         message.setUserId(userId);
@@ -461,6 +498,12 @@ public class AiChatStreamService {
                                         String occasion,
                                         Map<String, Object> intentAnalysis,
                                         Map<String, Object> userStyleProfile) {
+        // 推荐衣物的检索词不是简单使用用户原话，而是把多种信号拼成一个“语义检索查询”：
+        // 1. 意图识别得到的风格/季节/单品类型/关键词
+        // 2. 用户原始问题
+        // 3. 天气与场景
+        // 4. 用户长期偏好的风格和颜色
+        // 这样向量检索更容易召回“适合这次问题”的衣物，而不是只召回词面相近的衣物。
         StringBuilder builder = new StringBuilder();
         if (intentAnalysis != null) {
             appendIntentText(builder, intentAnalysis.get("style"));
@@ -490,12 +533,16 @@ public class AiChatStreamService {
     }
 
     private List<Map<String, Object>> searchClothes(Long userId, String query, List<String> negativePreferences) {
+        // 这里只保留前端和模型真正需要的字段，避免把检索结果原样塞进上下文导致 prompt 过大。
         List<Map<String, Object>> results = new ArrayList<>();
         if (query == null || query.trim().isEmpty()) {
             return results;
         }
 
         try {
+            // RAG 召回通常取前 8 个候选，但真正写进 prompt 时会在下游再做更紧的裁剪。
+            // 这里的返回值还只是“候选衣物池”，不是最终推荐结果。
+            // 最终前端看到哪些衣物，还要经过 Agent 回复阶段的二次筛选。
             var searchResults = ragService.searchClothes(userId, query, 8, negativePreferences);
             for (var result : searchResults) {
                 Map<String, Object> item = new HashMap<>();
@@ -514,6 +561,9 @@ public class AiChatStreamService {
     }
 
     private boolean isNeedClothingSearch(Map<String, Object> intentAnalysis, String userMessage) {
+        // 先相信意图识别结果；只有意图不明显时，才回退到关键词启发式判断。
+        // 只有被判断为“确实和穿搭/衣物推荐有关”的问题，才会触发衣柜检索。
+        // 这样可以避免闲聊、问候、知识问答也误触发推荐流程。
         if (intentAnalysis != null) {
             String intent = readIntentText(intentAnalysis.get("intent"));
             if (intent != null) {
@@ -649,6 +699,9 @@ public class AiChatStreamService {
                                              List<String> negativePreferences,
                                              boolean needClothingSearch,
                                              Map<String, Object> userStyleProfile) {
+        // 与非流式对话保持一致的上下文字段，方便两条链路使用相同的业务约束。
+        // 这个 context 既会参与 prompt 构造，也会作为快照存进消息表。
+        // 其中 clothes 字段就是“候选衣物池”，后续模型回答必须尽量围绕这批衣物展开。
         Map<String, Object> context = new HashMap<>();
         if (weatherInfo != null) {
             context.put("weather", weatherInfo);

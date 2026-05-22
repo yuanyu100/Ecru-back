@@ -60,6 +60,14 @@ public class HomeRecommendationService {
                                                             String location,
                                                             Double temperature,
                                                             String weatherCondition) {
+        // 这是 `/outfit/home-recommendations` 的核心实现。
+        // 整体流程是：
+        // 1. 若允许复用，则先查最近一次首页推荐结果
+        // 2. 读取用户衣橱与风格偏好，构造推荐上下文
+        // 3. 用规则和打分生成最多 3 套候选 look
+        // 4. 清理旧的首页推荐记录并写入新的记录
+        // 5. 组装成首页接口返回结构
+        // 首页推荐优先复用已有结果；只有显式刷新或没有缓存推荐时才重新组合衣橱。
         if (!refresh) {
             List<OutfitAdviceRecord> existing = outfitAdviceRecordMapper.selectHomeRecommendations(userId, MAX_LOOKS);
             if (!existing.isEmpty()) {
@@ -82,6 +90,7 @@ public class HomeRecommendationService {
         }
 
         RecommendationContext context = buildContext(userId, location, temperature, weatherCondition);
+        // 这里采用规则和打分直接从用户衣橱里组合穿搭，不依赖大模型生成。
         List<GeneratedLook> looks = generateLooks(clothings, context, refresh);
         if (looks.isEmpty()) {
             HomeRecommendationResponseDTO empty = new HomeRecommendationResponseDTO();
@@ -92,6 +101,8 @@ public class HomeRecommendationService {
 
         List<OutfitAdviceRecord> existing = outfitAdviceRecordMapper.selectHomeRecommendations(userId, 20);
         if (!existing.isEmpty()) {
+            // 首页推荐是“可重建数据”，刷新时直接整批删除旧结果再重写，
+            // 这样可以保证首页展示和详情页读取到的是同一批新生成的 look。
             List<Long> adviceIds = existing.stream().map(OutfitAdviceRecord::getId).toList();
             outfitItemMapper.deleteByOutfitAdviceIds(adviceIds);
             outfitAdviceRecordMapper.deleteHomeRecommendations(userId);
@@ -102,6 +113,8 @@ public class HomeRecommendationService {
     }
 
     public HomeRecommendationLookDTO getRecommendationDetail(Long userId, Long recommendationId) {
+        // 详情只允许读取“当前用户自己的首页推荐记录”，
+        // 并且要求它必须满足 input_type=3 + occasion=HOME_DAILY 这两个首页推荐特征。
         OutfitAdviceRecord record = outfitAdviceRecordMapper.selectById(recommendationId);
         if (record == null) {
             return null;
@@ -117,6 +130,9 @@ public class HomeRecommendationService {
     }
 
     private RecommendationContext buildContext(Long userId, String location, Double temperature, String weatherCondition) {
+        // 推荐上下文同时融合即时环境信息和长期风格偏好。
+        // 首页推荐不依赖 AI 意图识别，因此上下文主要来自：
+        // 天气/温度/时段 + 风格档案 + 用户历史偏好分数。
         RecommendationContext context = new RecommendationContext();
         context.location = StringUtils.hasText(location) ? location : null;
         context.temperature = temperature;
@@ -162,6 +178,8 @@ public class HomeRecommendationService {
     }
 
     private List<GeneratedLook> generateLooks(List<Clothing> clothings, RecommendationContext context, boolean shuffle) {
+        // 先按服装角色分桶，再分别尝试“连衣裙方案”和“上装+下装方案”，最后统一排序。
+        // 本质上这里是在用户现有衣橱里做组合搜索，而不是生成新衣物。
         List<Clothing> tops = new ArrayList<>();
         List<Clothing> bottoms = new ArrayList<>();
         List<Clothing> outers = new ArrayList<>();
@@ -179,6 +197,7 @@ public class HomeRecommendationService {
         }
 
         java.util.Random rng = shuffle ? new java.util.Random() : null;
+        // refresh=true 时允许加入轻微随机扰动，避免每次刷新都返回完全一样的组合。
         Comparator<Clothing> ranking = Comparator.comparingDouble(
                 (Clothing item) -> scoreClothing(item, context) + (rng != null ? rng.nextDouble() * 1.2 - 0.6 : 0D)
         ).reversed();
@@ -191,6 +210,7 @@ public class HomeRecommendationService {
         Set<String> signatures = new HashSet<>();
 
         for (Clothing dress : dresses.stream().limit(shuffle ? 6 : 4).toList()) {
+            // 连衣裙是一件式方案：连衣裙 + 可选外套。
             GeneratedLook dressLook = buildDressLook(dress, outers, context);
             if (dressLook != null && signatures.add(dressLook.signature())) {
                 candidates.add(dressLook);
@@ -199,6 +219,7 @@ public class HomeRecommendationService {
 
         for (Clothing top : tops.stream().limit(shuffle ? 8 : 6).toList()) {
             for (Clothing bottom : bottoms.stream().limit(shuffle ? 8 : 6).toList()) {
+                // 两件式方案：上装 + 下装 + 可选外套。
                 GeneratedLook look = buildTwoPieceLook(top, bottom, outers, context);
                 if (look != null && signatures.add(look.signature())) {
                     candidates.add(look);
@@ -213,6 +234,7 @@ public class HomeRecommendationService {
     }
 
     private GeneratedLook buildDressLook(Clothing dress, List<Clothing> outers, RecommendationContext context) {
+        // 一件式 look：先固定连衣裙，再视温度和季节决定是否补外套。
         List<Clothing> items = new ArrayList<>();
         items.add(dress);
         Clothing outer = pickOuter(dress, null, outers, context);
@@ -223,6 +245,7 @@ public class HomeRecommendationService {
     }
 
     private GeneratedLook buildTwoPieceLook(Clothing top, Clothing bottom, List<Clothing> outers, RecommendationContext context) {
+        // 两件式 look：先定上装/下装主结构，再尝试选择最合适的外套。
         List<Clothing> items = new ArrayList<>();
         items.add(top);
         items.add(bottom);
@@ -238,8 +261,10 @@ public class HomeRecommendationService {
             return null;
         }
         if (context.temperature != null && context.temperature >= 24) {
+            // 天气偏热时默认不补外套，保证推荐结果更实穿。
             return null;
         }
+        // 外套不是必选项；如果要选，就挑“季节匹配 + 单品得分高 + 与主体配色更协调”的那件。
         return outers.stream()
                 .filter(item -> seasonFits(item, context.season))
                 .max(Comparator.comparingDouble(item -> scoreClothing(item, context) + colorHarmony(item, top, bottom)))
@@ -251,6 +276,7 @@ public class HomeRecommendationService {
             return null;
         }
 
+        // 只有形成完整穿搭结构的组合才会进入候选结果。
         boolean hasTop = items.stream().anyMatch(item -> "TOP".equals(normalizeCategory(item.getCategory(), item.getSubCategory(), item.getName())));
         boolean hasBottom = items.stream().anyMatch(item -> "BOTTOM".equals(normalizeCategory(item.getCategory(), item.getSubCategory(), item.getName())));
         boolean hasDress = items.stream().anyMatch(item -> "DRESS".equals(normalizeCategory(item.getCategory(), item.getSubCategory(), item.getName())));
@@ -260,7 +286,9 @@ public class HomeRecommendationService {
 
         GeneratedLook look = new GeneratedLook();
         look.items = items;
+        // 最终分数 = 单品得分之和 + 组合和谐度，用于候选 look 排序。
         look.score = items.stream().mapToDouble(item -> scoreClothing(item, context)).sum() + comboHarmony(items);
+        // 除了分数，系统还会顺手生成首页卡片展示所需的标题、标签、说明文案和色板。
         look.tags = buildTags(items, context);
         look.mood = buildMood(look.tags, context);
         look.title = look.mood + "穿搭";
@@ -280,6 +308,10 @@ public class HomeRecommendationService {
         List<OutfitAdviceRecord> saved = new ArrayList<>();
 
         for (GeneratedLook look : looks) {
+            // 首页推荐也落到搭配记录表中，便于复用详情页、历史记录和反馈能力。
+            // 约定：
+            // input_type = 3 表示“首页推荐自动生成”
+            // occasion = HOME_DAILY 表示“首页日常推荐”
             OutfitAdviceRecord record = new OutfitAdviceRecord();
             record.setUserId(userId);
             record.setInputType(3);
@@ -302,6 +334,8 @@ public class HomeRecommendationService {
 
             List<OutfitItem> itemEntities = new ArrayList<>();
             for (int i = 0; i < look.items.size(); i++) {
+                // look 里的每件衣物都会同步拆成 outfit_items，
+                // 详情页正是靠这些 item 记录恢复出每一套推荐的单品列表。
                 Clothing clothing = look.items.get(i);
                 OutfitItem item = new OutfitItem();
                 item.setOutfitAdviceId(record.getId());
@@ -324,6 +358,8 @@ public class HomeRecommendationService {
     }
 
     private HomeRecommendationResponseDTO buildResponse(List<OutfitAdviceRecord> records) {
+        // 首页接口返回的是“若干套 look 的摘要列表”，
+        // 所以这里会把数据库记录重新组装成前端卡片所需的结构。
         HomeRecommendationResponseDTO response = new HomeRecommendationResponseDTO();
         response.setGeneratedAt(records.isEmpty() ? LocalDateTime.now() : records.get(0).getCreatedAt());
         response.setLooks(records.stream().map(this::toLookDTO).toList());
@@ -331,6 +367,8 @@ public class HomeRecommendationService {
     }
 
     private HomeRecommendationLookDTO toLookDTO(OutfitAdviceRecord record) {
+        // 一条首页推荐记录 = 一套 look 的头信息；
+        // 真正的单品明细还需要去 outfit_items 和 clothing 表补全。
         List<OutfitItem> items = outfitItemMapper.selectByOutfitAdviceId(record.getId());
         Map<Long, Clothing> clothingMap = clothingMapper.selectBatchIds(items.stream()
                         .map(OutfitItem::getClothingId)
@@ -351,6 +389,7 @@ public class HomeRecommendationService {
     }
 
     private HomeRecommendationLookDTO.LookItem toLookItemDTO(OutfitItem item, Clothing clothing) {
+        // 首页详情里的单品卡片是由“推荐记录中的快照字段”与“衣橱主表里的补充字段”共同拼出来的。
         HomeRecommendationLookDTO.LookItem dto = new HomeRecommendationLookDTO.LookItem();
         dto.setClothingId(item.getClothingId());
         dto.setName(item.getItemName());
@@ -367,6 +406,7 @@ public class HomeRecommendationService {
     }
 
     private List<String> buildTags(List<Clothing> items, RecommendationContext context) {
+        // 首页标签优先展示季节，其次展示风格和颜色，让卡片信息密度足够高但不过长。
         LinkedHashSet<String> tags = new LinkedHashSet<>();
         if (StringUtils.hasText(context.season)) {
             tags.add(context.season);
@@ -384,6 +424,7 @@ public class HomeRecommendationService {
     }
 
     private List<String> buildTagsFromItems(List<OutfitItem> items, String season) {
+        // 详情回填时不再重新计算风格标签，而是用季节 + 类别 + 颜色快速拼一组展示标签。
         LinkedHashSet<String> tags = new LinkedHashSet<>();
         if (StringUtils.hasText(season)) {
             tags.add(season);
@@ -412,6 +453,7 @@ public class HomeRecommendationService {
     }
 
     private String buildNote(List<Clothing> items, RecommendationContext context) {
+        // 首页卡片副文案偏简短，只解释“这套由哪些衣物组成”以及“适合当前体感”。
         String names = items.stream()
                 .map(Clothing::getName)
                 .map(this::trimName)
@@ -424,6 +466,7 @@ public class HomeRecommendationService {
     }
 
     private String buildReasoning(List<Clothing> items, RecommendationContext context) {
+        // reasoning 是更偏内部解释/详情展示的文案，用来概括这套 look 为什么会被选中。
         List<String> reasons = new ArrayList<>();
         if (StringUtils.hasText(context.season)) {
             reasons.add("季节匹配");
@@ -436,6 +479,7 @@ public class HomeRecommendationService {
     }
 
     private String buildItemReason(Clothing clothing, RecommendationContext context) {
+        // 每件单品都带一条入选理由，方便详情页解释“为什么这件衣服会出现在这套推荐里”。
         List<String> reasons = new ArrayList<>();
         if (seasonFits(clothing, context.season)) {
             reasons.add("季节合适");
@@ -453,6 +497,7 @@ public class HomeRecommendationService {
     }
 
     private double scoreClothing(Clothing clothing, RecommendationContext context) {
+        // 单品打分偏向“当前能穿、用户喜欢、且值得重复利用”的衣物。
         double score = 0D;
         score += safeNumber(clothing.getFrequencyLevel()) * 0.9D;
         score += Math.max(0D, 4D - safeNumber(clothing.getWearCount()) * 0.12D);
@@ -475,6 +520,7 @@ public class HomeRecommendationService {
     }
 
     private double comboHarmony(List<Clothing> items) {
+        // 组合和谐度只是辅助项，避免颜色关系压过单品本身的实用性。
         if (items.size() < 2) {
             return 0D;
         }
@@ -505,6 +551,7 @@ public class HomeRecommendationService {
     }
 
     private boolean seasonFits(Clothing clothing, String season) {
+        // 没有季节标签时默认视为可穿，避免脏数据导致候选被过度过滤。
         if (!StringUtils.hasText(season)) {
             return true;
         }

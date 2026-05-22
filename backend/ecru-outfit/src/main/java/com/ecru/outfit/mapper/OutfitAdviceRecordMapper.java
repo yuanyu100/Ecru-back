@@ -44,8 +44,16 @@ public interface OutfitAdviceRecordMapper extends BaseMapper<OutfitAdviceRecord>
      */
     Integer countByUserId(@Param("userId") Long userId);
 
+    /**
+     * 查询用户当前保存的首页推荐记录
+     * 约定使用 input_type=3 + occasion=HOME_DAILY 作为首页推荐标识
+     */
     List<OutfitAdviceRecord> selectHomeRecommendations(@Param("userId") Long userId, @Param("limit") Integer limit);
 
+    /**
+     * 删除用户旧的首页推荐记录
+     * 首页推荐可重建，因此刷新时采用“删旧写新”的策略
+     */
     Integer deleteHomeRecommendations(@Param("userId") Long userId);
 
 }

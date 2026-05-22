@@ -1,0 +1,53 @@
+{
+  "updateExisting": false,
+  "items": [
+    {
+      "name": "羊毛",
+      "alias": "细羊毛,羊绒",
+      "fabricType": "天然纤维",
+      "warmthScore": 90,
+      "breathabilityScore": 72,
+      "comfortScore": 82,
+      "durabilityScore": 76,
+      "summary": "保暖，适合秋冬外套和针织衫。",
+      "careGuide": "建议冷水手洗或干洗。",
+      "suitableSeasons": "秋季,冬季",
+      "suitableOccasions": "通勤,日常",
+      "keywords": "羊毛,保暖,秋冬",
+      "source": "demo-import-txt-cn",
+      "active": true
+    },
+    {
+      "name": "纯棉",
+      "alias": "全棉,棉质",
+      "fabricType": "天然纤维",
+      "warmthScore": 58,
+      "breathabilityScore": 92,
+      "comfortScore": 90,
+      "durabilityScore": 80,
+      "summary": "透气，适合日常衬衫和T恤。",
+      "careGuide": "建议常规机洗，深浅分开。",
+      "suitableSeasons": "春季,夏季,秋季",
+      "suitableOccasions": "日常,通勤",
+      "keywords": "纯棉,透气,衬衫,T恤",
+      "source": "demo-import-txt-cn",
+      "active": true
+    },
+    {
+      "name": "亚麻",
+      "alias": "麻料,麻质",
+      "fabricType": "天然纤维",
+      "warmthScore": 42,
+      "breathabilityScore": 95,
+      "comfortScore": 78,
+      "durabilityScore": 68,
+      "summary": "轻薄透气，适合春夏日常穿搭。",
+      "careGuide": "建议冷水轻柔洗涤，自然风干。",
+      "suitableSeasons": "春季,夏季",
+      "suitableOccasions": "日常,度假",
+      "keywords": "亚麻,轻薄,透气,春夏",
+      "source": "demo-import-txt-cn",
+      "active": true
+    }
+  ]
+}

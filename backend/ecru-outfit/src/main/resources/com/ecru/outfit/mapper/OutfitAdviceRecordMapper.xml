@@ -34,6 +34,12 @@
     </update>
 
     <select id="selectHomeRecommendations" resultType="com.ecru.outfit.entity.OutfitAdviceRecord">
+        <!--
+            首页推荐记录的识别规则：
+            1. input_type = 3，表示系统自动生成的首页搭配
+            2. occasion = 'HOME_DAILY'，表示首页日常推荐场景
+            3. is_deleted = 0，过滤掉逻辑失效记录
+        -->
         SELECT *
         FROM outfit_advice_records
         WHERE user_id = #{userId}
@@ -45,6 +51,10 @@
     </select>
 
     <delete id="deleteHomeRecommendations" parameterType="java.lang.Long">
+        <!--
+            刷新首页推荐时，会先删掉旧的 HOME_DAILY 记录，
+            再写入新生成的一批推荐，保证首页和详情读取到的是同一批数据。
+        -->
         DELETE FROM outfit_advice_records
         WHERE user_id = #{userId}
           AND input_type = 3

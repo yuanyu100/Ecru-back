@@ -37,6 +37,7 @@ public class MaterialKnowledgeAssistantService {
     }
 
     public Map<String, Object> askMaterialQuestion(String material, String question, Long userId) {
+        // 材质问答主入口：先从知识库匹配，再决定是否让模型基于匹配结果组织答案。
         String safeMaterial = StringUtils.trimToEmpty(material);
         String safeQuestion = StringUtils.trimToEmpty(question);
         if (StringUtils.isBlank(safeMaterial)) {
@@ -50,6 +51,7 @@ public class MaterialKnowledgeAssistantService {
         List<Map<String, Object>> matchedFabrics = knowledgeBaseService.matchFabrics(keywords, MATCH_LIMIT);
         List<Map<String, Object>> matchedCareLabels = knowledgeBaseService.matchCareLabels(keywords, MATCH_LIMIT);
 
+        // AI 只负责组织表达，核心事实边界仍然来自知识库匹配结果。
         String answer = generateAiAnswer(safeMaterial, safeQuestion, matchedFabrics, matchedCareLabels, null, userId);
         String answerSource = "ai";
         if (StringUtils.isBlank(answer)) {
@@ -67,6 +69,7 @@ public class MaterialKnowledgeAssistantService {
     }
 
     public Flux<String> askMaterialQuestionStream(String material, String question, Long userId) {
+        // 流式版本与普通版本共用相同召回逻辑，只是把答案改成增量输出。
         String safeMaterial = StringUtils.trimToEmpty(material);
         String safeQuestion = StringUtils.trimToEmpty(question);
         if (StringUtils.isBlank(safeMaterial)) {
@@ -100,6 +103,7 @@ public class MaterialKnowledgeAssistantService {
             String materialHint,
             String question,
             Long userId) {
+        // 这里把“图片识别结果”和“知识库匹配结果”汇总起来，服务成分标识别后的追问场景。
         AiImageAnalyzerService.MaterialLabelAnalysisResult safeAnalysis =
                 analysis != null ? analysis : new AiImageAnalyzerService.MaterialLabelAnalysisResult();
 
@@ -138,6 +142,7 @@ public class MaterialKnowledgeAssistantService {
                                     List<Map<String, Object>> matchedCareLabels,
                                     AiImageAnalyzerService.MaterialLabelAnalysisResult analysis,
                                     Long userId) {
+        // 将知识库召回结果作为上下文提供给模型，降低材质问答里的幻觉风险。
         Map<String, Object> context = new LinkedHashMap<>();
         context.put("material", material);
         context.put("matchedFabrics", matchedFabrics);
@@ -161,6 +166,7 @@ public class MaterialKnowledgeAssistantService {
                                        List<Map<String, Object>> matchedFabrics,
                                        List<Map<String, Object>> matchedCareLabels,
                                        AiImageAnalyzerService.MaterialLabelAnalysisResult analysis) {
+        // 当模型不可用或无有效回复时，直接用知识库字段拼装出可读答案，保证接口稳定返回。
         String subject = StringUtils.defaultIfBlank(material, "这件衣物");
         List<String> parts = new ArrayList<>();
 
@@ -259,6 +265,7 @@ public class MaterialKnowledgeAssistantService {
     private List<String> collectKeywords(String materialHint,
                                          String question,
                                          AiImageAnalyzerService.MaterialLabelAnalysisResult analysis) {
+        // 关键词不仅来自用户问题，还包括 OCR 文本、材质比例、洗护符号等识别结果。
         LinkedHashSet<String> keywords = new LinkedHashSet<>();
         addKeywordText(keywords, materialHint);
         addKeywordText(keywords, question);

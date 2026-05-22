@@ -45,6 +45,9 @@ public class WardrobeChatAgentService {
                                              Map<String, Object> context,
                                              List<Map<String, Object>> recommendedClothes) {
         try {
+            // 这里的 recommendedClothes 已经是上一阶段 RAG 召回出的候选衣物池。
+            // Agent 的职责不是从零创造衣物，而是基于这批候选生成自然语言回复，
+            // 必要时再从候选池里挑出“真正要展示给前端的推荐项”。
             String wardrobeQuery = buildWardrobeQueryForChat(userMessage, context);
             LangChain4jWardrobeChatAgent agent = AiServices.builder(LangChain4jWardrobeChatAgent.class)
                     .chatModel(openAiChatModel)
@@ -73,6 +76,8 @@ public class WardrobeChatAgentService {
     }
 
     private String buildWardrobeQueryForChat(String userMessage, Map<String, Object> context) {
+        // Agent 工具侧也会收到一个 wardrobeQuery。
+        // 它和前面的 RAG query 类似，但更偏向让 Agent/Tool 理解本轮需求的摘要。
         StringBuilder builder = new StringBuilder();
         if (userMessage != null && !userMessage.isBlank()) {
             builder.append(userMessage).append(' ');
@@ -128,6 +133,7 @@ public class WardrobeChatAgentService {
         try {
             JSONObject json = extractJson(rawResponse);
             if (json == null) {
+                // 如果模型没有按预期输出 JSON，就保留完整候选池，不做二次筛选。
                 result.setReply(rawResponse);
                 return result;
             }
@@ -135,6 +141,8 @@ public class WardrobeChatAgentService {
             result.setReply(defaultString(json.getString("reply")));
             JSONArray ids = json.getJSONArray("recommendedItemIds");
             if (ids == null || ids.isEmpty() || recommendedClothes == null || recommendedClothes.isEmpty()) {
+                // 模型只给了文字回复、没有指定推荐 item id 时，
+                // 默认沿用上一阶段的全部候选衣物作为推荐结果。
                 return result;
             }
 
@@ -161,6 +169,8 @@ public class WardrobeChatAgentService {
                     .collect(Collectors.toList());
 
             if (!filtered.isEmpty()) {
+                // 只有当模型明确选中了若干 clothingId 时，才把推荐列表缩成子集。
+                // 这样前端展示的推荐衣物会和模型文字里真正提到的单品保持一致。
                 result.setRecommendedClothes(filtered);
             }
             return result;
@@ -192,6 +202,7 @@ public class WardrobeChatAgentService {
                                                 Map<String, Object> context,
                                                 List<Map<String, Object>> recommendedClothes) {
         ChatAgentResult fallback = new ChatAgentResult();
+        // 回退链路不会重新检索衣柜，而是直接复用已经拿到的候选衣物池。
         fallback.setRecommendedClothes(recommendedClothes);
 
         String fallbackReply = textGeneratorService.generateResponse(userMessage, chatHistory, context);
@@ -206,6 +217,7 @@ public class WardrobeChatAgentService {
         String normalized = defaultString(userMessage).toLowerCase(Locale.ROOT);
         if (normalized.contains("穿") || normalized.contains("搭") || normalized.contains("衣") || normalized.contains("outfit")) {
             if (recommendedClothes != null && !recommendedClothes.isEmpty()) {
+                // 即使模型完全失效，只要候选池里已经有衣物，系统也会给用户一个可继续追问的兜底话术。
                 return "我先根据你的衣橱筛了几件可搭配的单品，你可以继续告诉我天气、场景或风格，我再帮你细化整套穿搭。";
             }
             return "我可以继续帮你推荐穿搭。你可以直接告诉我天气、出行场景，或者先完善衣橱里的衣物信息。";

@@ -198,6 +198,9 @@ public class OutfitAdviceController {
             @RequestParam(value = "temperature", required = false) Double temperature,
             @RequestParam(value = "weatherCondition", required = false) String weatherCondition) {
         try {
+            // `/outfit/home-recommendations` 是首页推荐主入口。
+            // 控制器只负责接收前端传来的刷新标记和环境参数，
+            // 真正的搭配生成逻辑全部下沉到 HomeRecommendationService。
             Long userId = UserContext.getCurrentUserId();
             return Result.success(homeRecommendationService.getRecommendations(
                     userId,
@@ -216,6 +219,7 @@ public class OutfitAdviceController {
     @Operation(summary = "Home recommendation detail", description = "Return the selected homepage look with item-level wardrobe metadata.")
     public Result<HomeRecommendationLookDTO> getHomeRecommendationDetail(@PathVariable Long id) {
         try {
+            // 详情接口不会重新生成推荐，只是读取前面已经生成并保存好的某一套首页 look。
             Long userId = UserContext.getCurrentUserId();
             HomeRecommendationLookDTO detail = homeRecommendationService.getRecommendationDetail(userId, id);
             return detail == null ? Result.error(404, "Recommendation not found") : Result.success(detail);
