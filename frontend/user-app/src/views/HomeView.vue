@@ -125,7 +125,7 @@ const homeFlowPreferenceKey = 'ecru-home-flow-default-visible';
 const defaultHeadlineStayMs = 2200;
 const defaultHeadlineFadeMs = 820;
 const headlineRevealDelayMs = 120;
-const fallbackLocation = '所在城市';
+const fallbackLocation = '未获取定位';
 
 const fallbackCards = [
   {
@@ -293,8 +293,9 @@ const startHeadlineRotation = (sources) => {
 const buildRecommendationParams = (refresh = false) => {
   const weather = currentWeather.value || {};
   const params = { refresh };
-  if (weather.location) {
-    params.location = weather.location;
+  const location = String(weather.location || '').trim();
+  if (location && location !== fallbackLocation) {
+    params.location = location;
   }
   if (weather.temperature !== undefined && weather.temperature !== null && weather.temperature !== '') {
     params.temperature = weather.temperature;
@@ -452,8 +453,15 @@ const refreshWeather = async () => {
   } catch (error) {
     console.warn('Detect browser position failed:', error);
     try {
-      const cachedLocation = weatherApi.getCachedWeather()?.location || fallbackLocation;
-      await fetchWeatherByParams({ location: cachedLocation });
+      const cachedWeather = weatherApi.getCachedWeather();
+      const cachedLocation = String(cachedWeather?.location || '').trim();
+      if (cachedLocation && cachedLocation !== fallbackLocation) {
+        await fetchWeatherByParams({ location: cachedLocation });
+        return;
+      }
+      if (cachedWeather) {
+        currentWeather.value = cachedWeather;
+      }
     } catch (fallbackError) {
       console.warn('Fetch fallback weather failed:', fallbackError);
     }

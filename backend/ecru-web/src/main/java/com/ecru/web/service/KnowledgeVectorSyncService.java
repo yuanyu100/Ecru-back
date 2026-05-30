@@ -43,6 +43,7 @@ public class KnowledgeVectorSyncService {
     }
 
     public void upsertFabric(Map<String, Object> fabric) {
+        // 这里生成向量
         String embeddingText = buildFabricEmbeddingText(fabric);
         upsert(
                 TYPE_FABRIC,
